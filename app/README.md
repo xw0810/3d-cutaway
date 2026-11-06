@@ -34,7 +34,7 @@ npm install
 npm start        # 同步目录 + 打开应用
 npm run smoke    # 无头式自检：初始 → 搜索 → 切换 → 收起，截图到临时目录
 npm run dist     # 只打当前平台（这台机器上是 Windows x64）到 ../dist/3D交互模型库-<平台>-<架构>/
-npm run dist:all # 打 Windows / macOS / Linux 全平台到 ../dist/
+npm run dist:all # 按 TARGETS 打全平台（Windows 上会跳过 macOS）到 ../dist/
 ```
 
 `npm start` / `dist` / `dist:all` 前都会先跑 `npm run sync`。

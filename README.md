@@ -102,11 +102,11 @@ cd app
 npm install
 npm start        # 同步页面 + 打开应用
 npm run dist     # 只打当前平台 → ../dist/3D交互模型库-<平台>-<架构>/
-npm run dist:all # 打 Windows / macOS / Linux 全平台
+npm run dist:all # 按 TARGETS 打全平台（Windows 上会跳过 macOS）
 ```
 
-产物是免安装目录：Windows 用 `.exe`，macOS 是 `.app`，Linux 直接运行目录内的可执行文件，
-macOS 应用未做代码签名（分发前请在 macOS 上签名与公证）。
+产物是免安装目录：Windows 用 `.exe`，macOS 是 `.app`（在 Windows 上交叉构建时打成 zip），
+Linux 直接运行目录内的可执行文件；macOS 应用未做代码签名（分发前请在 macOS 上签名与公证）。
 
 macOS 的 `.app` 内含符号链接，**Windows 主机无法创建**，所以 Windows 上 `dist:all` 只会产出
 win32 与 linux 目标。macOS 包请在 macOS / Linux（WSL 也可以）上打，zip 会保留符号链接与可执行位：
