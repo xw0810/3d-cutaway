@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>人体心脏 · 交互式 3D 解剖</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#04050a}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:#fff;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(ellipse 95% 75% at 50% 40%,#1b1222 0%,#0b0a12 45%,#04050a 100%);
+  }
+  #c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab}
+  #c:active{cursor:grabbing}
+
+  .hud{
+    position:fixed;z-index:20;
+    background:rgba(18,15,24,.55);
+    -webkit-backdrop-filter:blur(16px) saturate(140%);
+    backdrop-filter:blur(16px) saturate(140%);
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:16px;
+    box-shadow:0 18px 50px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+    pointer-events:none;
+  }
+  .hud.tl{left:24px;top:24px;padding:16px 22px 18px}
+  .eyebrow{font-size:10px;letter-spacing:.34em;color:rgba(255,255,255,.38);margin-bottom:8px}
+  .hud h1{font-size:25px;font-weight:600;letter-spacing:.04em;line-height:1.1;
+    background:linear-gradient(180deg,#fff 0%,#ffb9b9 120%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hud .sub{font-size:11.5px;color:rgba(255,255,255,.45);margin-top:7px;letter-spacing:.06em}
+
+  .hud.tr{right:24px;top:24px;padding:12px;display:flex;flex-direction:column;gap:9px;pointer-events:auto}
+  button{
+    font-family:inherit;font-size:13px;letter-spacing:.06em;color:#fff;cursor:pointer;
+    border:1px solid rgba(255,255,255,.14);border-radius:11px;
+    background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.03));
+    padding:11px 20px;min-width:158px;
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    transition:transform .18s cubic-bezier(.2,.8,.3,1),background .2s,border-color .2s,box-shadow .25s;
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  }
+  button:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.28);background:linear-gradient(180deg,rgba(255,255,255,.17),rgba(255,255,255,.05))}
+  button:active{transform:translateY(0) scale(.985)}
+  button.on{
+    background:linear-gradient(180deg,#e63b4a,#a01423);
+    border-color:rgba(255,140,140,.55);
+    box-shadow:0 8px 28px rgba(220,40,60,.42),inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  button.ghost{font-size:12px;padding:9px 18px;color:rgba(255,255,255,.6);background:rgba(255,255,255,.03)}
+  button.ghost:hover{color:#fff}
+  .ico{font-size:14px;line-height:1;opacity:.85}
+
+  .hud.bl{left:24px;bottom:24px;padding:13px 17px;display:flex;flex-direction:column;gap:8px}
+  .legend{display:flex;align-items:center;gap:9px;font-size:11.5px;color:rgba(255,255,255,.62);letter-spacing:.05em}
+  .d{width:8px;height:8px;border-radius:50%;display:block}
+  .d.red{background:#ef3b45;box-shadow:0 0 10px rgba(239,59,69,.9)}
+  .d.blue{background:#3f7ded;box-shadow:0 0 10px rgba(63,125,237,.9)}
+  .beat{display:flex;align-items:center;gap:9px;font-size:11.5px;color:rgba(255,255,255,.45);letter-spacing:.05em;
+    margin-top:3px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08)}
+  .pulse{width:7px;height:7px;border-radius:50%;background:#ff5a63;box-shadow:0 0 12px rgba(255,90,99,.95)}
+  .beat b{color:rgba(255,255,255,.8);font-weight:500}
+
+  .hud.bc{left:50%;transform:translateX(-50%);bottom:24px;padding:9px 20px;font-size:11.5px;
+    color:rgba(255,255,255,.42);letter-spacing:.12em;border-radius:100px}
+
+  #labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .label{
+    position:absolute;left:0;top:0;display:flex;align-items:center;gap:7px;
+    padding:6px 12px 6px 9px;border-radius:100px;white-space:nowrap;
+    background:rgba(12,10,17,.72);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    border:1px solid rgba(255,255,255,.13);
+    font-size:12px;letter-spacing:.06em;color:rgba(255,255,255,.94);
+    transition:opacity .28s ease,border-color .2s,background .2s,color .2s;
+    box-shadow:0 6px 22px rgba(0,0,0,.45);
+    will-change:transform,opacity;
+  }
+  .label .dot{width:5px;height:5px;border-radius:50%;background:#ff8a80;box-shadow:0 0 8px rgba(255,120,110,.9);flex:none}
+  .label.hot{border-color:rgba(255,205,120,.75);background:rgba(60,34,12,.8);color:#fff}
+  .label.hot .dot{background:#ffd166;box-shadow:0 0 10px rgba(255,209,102,1)}
+
+  #tip{
+    position:fixed;z-index:30;left:0;top:0;max-width:290px;
+    padding:13px 16px;border-radius:13px;
+    background:rgba(14,11,19,.86);
+    -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+    border:1px solid rgba(255,255,255,.14);
+    box-shadow:0 16px 44px rgba(0,0,0,.6);
+    opacity:0;transform:translateY(6px);pointer-events:none;
+    transition:opacity .18s ease,transform .18s cubic-bezier(.2,.8,.3,1);
+  }
+  #tip.show{opacity:1;transform:translateY(0)}
+  #tip .tn{font-size:13px;font-weight:600;letter-spacing:.06em;color:#fff;margin-bottom:6px;
+    display:flex;align-items:center;gap:7px}
+  #tip .tn::before{content:"";width:5px;height:5px;border-radius:50%;background:#ffd166;
+    box-shadow:0 0 9px rgba(255,209,102,.95)}
+  #tip .td{font-size:12px;line-height:1.72;color:rgba(255,255,255,.62);letter-spacing:.04em}
+
+  #loader{
+    position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;
+    background:#05060b;transition:opacity .7s ease;
+  }
+  #loader.hide{opacity:0;pointer-events:none}
+  .spin{width:34px;height:34px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.1);border-top-color:#e23b4a;
+    animation:sp .9s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .lt{font-size:12px;letter-spacing:.28em;color:rgba(255,255,255,.42)}
+
+  @media (max-width:820px){
+    .hud.tl{left:14px;top:14px;padding:12px 16px}
+    .hud h1{font-size:20px}
+    .hud.tr{right:14px;top:14px;padding:9px}
+    button{min-width:0;padding:10px 14px;font-size:12px}
+    .hud.bl{display:none}
+    .hud.bc{bottom:16px;font-size:10.5px;padding:8px 14px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+
+<div class="hud tl">
+  <div class="eyebrow">解剖学 · 三维模型</div>
+  <h1>人体心脏</h1>
+  <p class="sub">四个腔室 · 四组瓣膜 · 传导系统</p>
+</div>
+
+<div class="hud tr">
+  <button id="btnExplode"><span class="ico">⤢</span><span id="btnExplodeTxt">拆解心脏</span></button>
+  <button id="btnReset" class="ghost">重置视角</button>
+</div>
+
+<div class="hud bl">
+  <div class="legend"><i class="d red"></i>富氧血 · 动脉</div>
+  <div class="legend"><i class="d blue"></i>缺氧血 · 静脉</div>
+  <div class="beat"><i class="pulse" id="beatDot"></i><b>60</b> 次 / 分</div>
+</div>
+
+<div class="hud bc">拖动旋转 · 滚轮缩放 · 悬停查看功能</div>
+
+<div id="tip"><div class="tn"></div><div class="td"></div></div>
+
+<div id="loader">
+  <div class="spin"></div>
+  <div class="lt">正在构建心脏模型</div>
+</div>
+
+<script>
+  window.__hbFail = setTimeout(function(){
+    var l = document.getElementById('loader');
+    if (l && !l.classList.contains('hide')) {
+      l.innerHTML = '<div style="font-size:13px;letter-spacing:.1em;color:#ff8a8a;text-align:center;line-height:2">无法加载 3D 引擎<br><span style="color:rgba(255,255,255,.4);font-size:12px">请检查网络连接后刷新页面</span></div>';
+    }
+  }, 9000);
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   基础工具
+   ========================================================= */
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const lerp = (a, b, t) => a + (b - a) * t;
+const WHITE = new THREE.Color(0xffffff);
+
+/* =========================================================
+   渲染器 / 场景 / 相机
+   ========================================================= */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.86;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearAlpha(0);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.1, 200);
+const CAM_HOME = new THREE.Vector3(2.05, 1.30, 5.85);
+camera.position.copy(CAM_HOME);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0.40, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.enablePan = false;
+controls.minDistance = 3.2;
+controls.maxDistance = 16;
+controls.minPolarAngle = 0.12;
+controls.maxPolarAngle = Math.PI - 0.12;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.85;
+controls.autoRotateSpeed = 0.42;
+
+/* =========================================================
+   灯光
+   ========================================================= */
+scene.add(new THREE.HemisphereLight(0x8fb0ef, 0x2a060d, 0.34));
+
+const key = new THREE.DirectionalLight(0xffe8d6, 1.55);
+key.position.set(4.5, 6.5, 6);
+scene.add(key);
+
+const rim = new THREE.DirectionalLight(0x6f9cff, 1.25);
+rim.position.set(-5.5, 2.5, -5);
+scene.add(rim);
+
+const warm = new THREE.DirectionalLight(0xff7a52, 0.45);
+warm.position.set(-3, -4, 4);
+scene.add(warm);
+
+const glowLow = new THREE.PointLight(0xff3040, 26, 12, 2.2);
+glowLow.position.set(0, -2.6, 2.2);
+scene.add(glowLow);
+
+// 心腔内部补光：让心肌内壁与腔室透出来
+const inLightA = new THREE.PointLight(0xff5c3a, 8.5, 3.2, 2.0);
+inLightA.position.set(0.16, 0.16, 0.26);
+scene.add(inLightA);
+const inLightB = new THREE.PointLight(0xff3320, 5.5, 2.6, 2.0);
+inLightB.position.set(-0.22, -0.34, -0.10);
+scene.add(inLightB);
+
+/* =========================================================
+   心形几何：参数曲面
+   ========================================================= */
+const APEX_Y = -1.18;
+const BASE_Y = 1.14;
+
+function profile(t) {
+  const tt = Math.max(t, 0);
+  let r = 0.855 * Math.sin(Math.PI * 0.5 * Math.pow(tt, 0.75));
+  r = Math.sqrt(r * r + 0.0022); // 圆润的心尖
+  // 顶部收口成穹顶
+  const s = clamp01((tt - 0.875) / 0.125);
+  r *= Math.sqrt(1 - 0.94 * s * s);
+  return r;
+}
+
+function surfPoint(u, t, off) {
+  off = off || 0;
+  let r = profile(t);
+  // 有机起伏
+  r *= 1 + 0.034 * Math.sin(4 * u + 6 * t) + 0.021 * Math.cos(7 * u - 3 * t);
+  // 前室间沟
+  let du = Math.atan2(Math.sin(u - Math.PI / 2), Math.cos(u - Math.PI / 2));
+  r *= 1 - 0.062 * Math.exp(-Math.pow(du / 0.30, 2));
+  r = Math.max(r + off, 0.0006);
+  return new THREE.Vector3(
+    Math.cos(u) * r * 0.985,
+    lerp(APEX_Y, BASE_Y, t),
+    Math.sin(u) * r * 0.80
+  );
+}
+
+function buildHeartSurface(segU, segV, uStart, uEnd, fadeSeam) {
+  const pos = [], uv = [], idx = [], col = [];
+  const c = new THREE.Color();
+  for (let j = 0; j <= segV; j++) {
+    const t = j / segV;
+    for (let i = 0; i <= segU; i++) {
+      const uf = i / segU;
+      const u = lerp(uStart, uEnd, uf);
+      const p = surfPoint(u, t, 0);
+      pos.push(p.x, p.y, p.z);
+      uv.push(uf, t);
+      // 心肌纹理：低频肌束 + 细密纤维
+      let sh = 0.86
+        + 0.085 * Math.sin(9.5 * u + 5.5 * t)
+        + 0.055 * Math.cos(3.0 * u - 17.0 * t)
+        + 0.032 * Math.sin(23.0 * u + 11.0 * t);
+      // 顶部（心房区）略暗，底部心尖略亮
+      sh *= 0.90 + 0.14 * smoothstep(0.0, 0.35, 1 - t);
+      sh = Math.max(0.55, Math.min(1.0, sh));
+      c.setRGB(sh, sh * 0.965, sh * 0.94);
+      if (fadeSeam) {
+        const a = smoothstep(0.0, 0.17, uf) * smoothstep(0.0, 0.17, 1 - uf);
+        col.push(c.r, c.g, c.b, a);
+      } else {
+        col.push(c.r, c.g, c.b);
+      }
+    }
+  }
+  for (let j = 0; j < segV; j++) {
+    for (let i = 0; i < segU; i++) {
+      const a = j * (segU + 1) + i, b = a + 1, cc = a + segU + 1, d = cc + 1;
+      idx.push(a, cc, b, b, cc, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setIndex(idx);
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, fadeSeam ? 4 : 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* =========================================================
+   变半径管道（血管）
+   ========================================================= */
+function taperedTube(curve, r0, r1, tubular, radial, ease) {
+  tubular = tubular || 120; radial = radial || 18; ease = ease || 1;
+  const frames = curve.computeFrenetFrames(tubular, false);
+  const pos = [], nor = [], idx = [], uvs = [];
+  const P = new THREE.Vector3();
+  for (let i = 0; i <= tubular; i++) {
+    const t = i / tubular;
+    curve.getPointAt(t, P);
+    const N = frames.normals[i], B = frames.binormals[i];
+    const r = lerp(r0, r1, Math.pow(t, ease));
+    for (let j = 0; j <= radial; j++) {
+      const v = (j / radial) * Math.PI * 2;
+      const sn = Math.sin(v), cs = -Math.cos(v);
+      const nx = cs * N.x + sn * B.x;
+      const ny = cs * N.y + sn * B.y;
+      const nz = cs * N.z + sn * B.z;
+      pos.push(P.x + r * nx, P.y + r * ny, P.z + r * nz);
+      nor.push(nx, ny, nz);
+      uvs.push(t, j / radial);
+    }
+  }
+  for (let i = 1; i <= tubular; i++) {
+    for (let j = 1; j <= radial; j++) {
+      const a = (radial + 1) * (i - 1) + (j - 1);
+      const b = (radial + 1) * i + (j - 1);
+      const c = (radial + 1) * i + j;
+      const d = (radial + 1) * (i - 1) + j;
+      idx.push(a, b, d, b, c, d);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setIndex(idx);
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  return g;
+}
+
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
+function curveFrom(pts, tension) {
+  return new THREE.CatmullRomCurve3(pts.map(p => V3(p[0], p[1], p[2])), false, 'centripetal');
+}
+
+function vesselMaterial(color, opts) {
+  opts = opts || {};
+  return new THREE.MeshPhysicalMaterial({
+    color: color,
+    roughness: opts.roughness !== undefined ? opts.roughness : 0.38,
+    metalness: 0.05,
+    clearcoat: 0.7,
+    clearcoatRoughness: 0.28,
+    sheen: 0.6,
+    sheenColor: new THREE.Color(color).offsetHSL(0, -0.05, 0.22),
+    transparent: true,
+    opacity: opts.opacity !== undefined ? opts.opacity : 0.58,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    envMapIntensity: 1.0
+  });
+}
+
+function makeVessel(pts, r0, r1, mat, opts) {
+  opts = opts || {};
+  const curve = curveFrom(pts, opts.tension);
+  const mesh = new THREE.Mesh(taperedTube(curve, r0, r1, opts.seg || 110, opts.rad || 16, opts.ease), mat);
+  const grp = new THREE.Group();
+  grp.add(mesh);
+  if (opts.caps !== false) {
+    const capA = new THREE.Mesh(new THREE.SphereGeometry(r0, 18, 12), mat);
+    capA.position.copy(curve.getPointAt(0));
+    const capB = new THREE.Mesh(new THREE.SphereGeometry(r1, 18, 12), mat);
+    capB.position.copy(curve.getPointAt(1));
+    grp.add(capA, capB);
+  }
+  return grp;
+}
+
+/* =========================================================
+   瓣膜
+   ========================================================= */
+function makeValve(R, n, color) {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: color || 0xdcc9a6,
+    roughness: 0.44,
+    metalness: 0.02,
+    clearcoat: 0.85,
+    clearcoatRoughness: 0.28,
+    sheen: 0.6,
+    sheenColor: new THREE.Color(0xffe9c9),
+    side: THREE.DoubleSide
+  });
+
+  const ann = new THREE.Mesh(new THREE.TorusGeometry(R, R * 0.072, 12, 72), mat);
+  group.add(ann);
+
+  const leaves = [];
+  const w0 = R * Math.sin(Math.PI / n) * 0.96;
+  const w1 = w0 * 0.10;
+
+  for (let k = 0; k < n; k++) {
+    const th = (k * Math.PI * 2) / n + Math.PI / n;
+    const shape = new THREE.Shape();
+    shape.moveTo(0, -w0);
+    shape.bezierCurveTo(R * 0.42, -w0 * 0.86, R * 0.82, -w1 * 1.4, R, -w1);
+    shape.lineTo(R, w1);
+    shape.bezierCurveTo(R * 0.82, w1 * 1.4, R * 0.42, w0 * 0.86, 0, w0);
+    shape.lineTo(0, -w0);
+    const geo = new THREE.ShapeGeometry(shape, 26);
+    const mesh = new THREE.Mesh(geo, mat);
+    const pivot = new THREE.Group();
+    pivot.position.set(Math.cos(th) * R, Math.sin(th) * R, 0);
+    pivot.rotation.z = th + Math.PI;
+    pivot.add(mesh);
+    group.add(pivot);
+    leaves.push(mesh);
+  }
+  return { group, leaves, mat };
+}
+
+/* =========================================================
+   部件登记
+   ========================================================= */
+const parts = [];
+const pickMeshes = [];
+let partSeq = 0;
+
+function register(group, opts) {
+  const id = 'p' + (partSeq++);
+  const part = {
+    id,
+    group,
+    name: opts.name,
+    desc: opts.desc,
+    dir: new THREE.Vector3().fromArray(opts.dir || [0, 0, 0]).multiplyScalar(0.5),
+    basePos: group.position.clone(),
+    isShell: !!opts.shell,
+    mats: [],
+    anchor: null
+  };
+  group.userData.partId = id;
+
+  const matSet = new Set();
+  group.traverse(o => {
+    if (o.isMesh) {
+      o.userData.partId = id;
+      pickMeshes.push(o);
+      matSet.add(o.material);
+    }
+  });
+  matSet.forEach(m => {
+    if (m.emissive) {
+      m.userData.baseEm = m.emissive.clone();
+      m.userData.baseEI = m.emissiveIntensity !== undefined ? m.emissiveIntensity : 1;
+      m.userData.hlEm = m.color ? m.color.clone().lerp(WHITE, 0.38) : new THREE.Color(0xffd9a0);
+    }
+    part.mats.push(m);
+  });
+
+  const anchor = new THREE.Object3D();
+  anchor.position.fromArray(opts.anchor || [0, 0.1, 0]);
+  group.add(anchor);
+  part.anchor = anchor;
+
+  parts.push(part);
+  return part;
+}
+
+/* =========================================================
+   构建心脏
+   ========================================================= */
+const heart = new THREE.Group();
+heart.rotation.z = -0.075;
+scene.add(heart);
+
+/* ---------- 心肌（外壳：后半实心，前半透明剖面） ---------- */
+const matMyoBack = new THREE.MeshPhysicalMaterial({
+  color: 0x4c060c,
+  vertexColors: true,
+  roughness: 0.78,
+  metalness: 0.0,
+  clearcoat: 0.16,
+  clearcoatRoughness: 0.8,
+  sheen: 0.26,
+  sheenRoughness: 0.7,
+  sheenColor: new THREE.Color(0xd93b3b),
+  transparent: true,
+  opacity: 1.0,
+  depthWrite: true,
+  side: THREE.DoubleSide,
+  envMapIntensity: 0.35
+});
+const matMyoFront = new THREE.MeshPhysicalMaterial({
+  color: 0x7d1119,
+  vertexColors: true,
+  roughness: 0.66,
+  metalness: 0.0,
+  clearcoat: 0.14,
+  clearcoatRoughness: 0.6,
+  sheen: 0.3,
+  sheenRoughness: 0.6,
+  sheenColor: new THREE.Color(0xe04a4a),
+  transparent: true,
+  opacity: 0.42,
+  depthWrite: false,
+  side: THREE.FrontSide,
+  envMapIntensity: 0.7
+});
+const myoGroup = new THREE.Group();
+const myoBack = new THREE.Mesh(buildHeartSurface(70, 96, Math.PI, Math.PI * 2), matMyoBack);
+const myoFront = new THREE.Mesh(buildHeartSurface(70, 96, 0, Math.PI, true), matMyoFront);
+myoBack.renderOrder = -2;
+myoFront.renderOrder = 20;
+myoGroup.add(myoBack, myoFront);
+
+// 室间隔：左右心室之间的肌性隔板
+const matSeptum = new THREE.MeshPhysicalMaterial({
+  color: 0x610d14, roughness: 0.8, metalness: 0.0,
+  clearcoat: 0.12, clearcoatRoughness: 0.8, sheen: 0.2, sheenColor: new THREE.Color(0xc03434),
+  transparent: true, opacity: 1.0, side: THREE.DoubleSide, envMapIntensity: 0.3
+});
+const septumGeo = new THREE.SphereGeometry(1, 40, 32);
+{
+  const p2 = septumGeo.attributes.position;
+  const v2 = new THREE.Vector3();
+  for (let i = 0; i < p2.count; i++) {
+    v2.fromBufferAttribute(p2, i);
+    const f = 1 + 0.30 * v2.y;
+    p2.setXYZ(i, v2.x * 0.062 * f, v2.y * 0.60, v2.z * 0.30 * f);
+  }
+  septumGeo.computeVertexNormals();
+}
+const septum = new THREE.Mesh(septumGeo, matSeptum);
+septum.position.set(-0.015, -0.22, 0.0);
+septum.renderOrder = 3;
+myoGroup.add(septum);
+
+heart.add(myoGroup);
+const partMyo = register(myoGroup, {
+  name: '心肌（心室壁）',
+  desc: '三层螺旋排列的心肌纤维同步收缩，把血液挤向动脉。',
+  dir: [0, 0, 0],
+  shell: true,
+  anchor: [0.05, 1.42, 0]
+});
+
+/* ---------- 四个腔室 ---------- */
+function chamberMesh(color, scale, taperK) {
+  const geo = new THREE.SphereGeometry(1, 60, 44);
+  const p = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const ang = Math.atan2(v.z, v.x);
+    const f = (1 + taperK * v.y) * (1 + 0.028 * Math.sin(4 * ang + 3 * v.y) + 0.018 * Math.cos(7 * v.y));
+    p.setXYZ(i, v.x * f * scale[0], v.y * scale[1], v.z * f * scale[2]);
+  }
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: color,
+    roughness: 0.74,
+    metalness: 0.02,
+    clearcoat: 0.14,
+    clearcoatRoughness: 0.6,
+    transparent: true,
+    opacity: 0.78,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    emissive: new THREE.Color(color).multiplyScalar(0.26),
+    emissiveIntensity: 0.55,
+    envMapIntensity: 0.65
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.renderOrder = 5;
+  return m;
+}
+
+const RA = new THREE.Group();
+RA.position.set(-0.35, 0.735, 0.01);
+RA.add(chamberMesh(0x2a3f6d, [0.36, 0.225, 0.305], 0.14));
+heart.add(RA);
+register(RA, {
+  name: '右心房',
+  desc: '接收全身回流的缺氧血，再送入右心室。',
+  dir: [-4.6, 1.0, 0.2],
+  anchor: [-0.05, 0.36, 0]
+});
+
+const RV = new THREE.Group();
+RV.position.set(-0.235, -0.13, 0.10);
+RV.add(chamberMesh(0x253b66, [0.385, 0.505, 0.315], 0.22));
+heart.add(RV);
+register(RV, {
+  name: '右心室',
+  desc: '把缺氧血泵入肺动脉，送往肺部重新换气。',
+  dir: [-1.55, -1.45, 1.45],
+  anchor: [-0.10, -0.55, 0]
+});
+
+const LA = new THREE.Group();
+LA.position.set(0.275, 0.75, -0.185);
+LA.add(chamberMesh(0x84151c, [0.36, 0.225, 0.305], 0.14));
+heart.add(LA);
+register(LA, {
+  name: '左心房',
+  desc: '接收肺静脉送回的富氧血，再送入左心室。',
+  dir: [2.15, 1.45, -0.45],
+  anchor: [0.05, 0.34, 0]
+});
+
+const LV = new THREE.Group();
+LV.position.set(0.175, -0.165, -0.03);
+LV.add(chamberMesh(0x7c1119, [0.395, 0.525, 0.325], 0.22));
+heart.add(LV);
+register(LV, {
+  name: '左心室',
+  desc: '全身最强的泵，把富氧血射入主动脉，推向每一个器官。',
+  dir: [1.75, -1.5, 0.65],
+  anchor: [0.13, -0.58, 0]
+});
+
+/* ---------- 四组瓣膜 ---------- */
+function placeValve(cfg) {
+  const outer = new THREE.Group();
+  outer.position.fromArray(cfg.pos);
+  outer.rotation.x = cfg.av ? Math.PI / 2 : -Math.PI / 2;
+  outer.rotation.z = cfg.tilt || 0;
+  const v = makeValve(cfg.R, cfg.n);
+  outer.add(v.group);
+  heart.add(outer);
+  return { outer, valve: v };
+}
+
+const V_TRI = placeValve({ R: 0.205, n: 3, pos: [-0.30, 0.435, 0.11], av: true, tilt: 0.14 });
+register(V_TRI.outer, {
+  name: '三尖瓣',
+  desc: '右心房与右心室之间的单向阀，收缩时锁死，血液只能单向通行。',
+  dir: [-1.9, -0.4, 2.6],
+  anchor: [0, -0.16, 0]
+});
+
+const V_PUL = placeValve({ R: 0.118, n: 3, pos: [-0.17, 0.505, 0.275], av: false, tilt: 0.12 });
+register(V_PUL.outer, {
+  name: '肺动脉瓣',
+  desc: '右心室出口的单向阀，只允许血液流向肺动脉。',
+  dir: [-2.1, 2.1, 2.1],
+  anchor: [0, 0.18, 0]
+});
+
+const V_MIT = placeValve({ R: 0.19, n: 2, pos: [0.255, 0.445, -0.10], av: true, tilt: -0.12 });
+register(V_MIT.outer, {
+  name: '二尖瓣',
+  desc: '左心房与左心室之间的单向阀，靠腱索拉住，绝不倒流。',
+  dir: [1.55, 0.15, 1.85],
+  anchor: [0, -0.16, 0]
+});
+
+const V_AOR = placeValve({ R: 0.122, n: 3, pos: [0.03, 0.512, 0.19], av: false, tilt: -0.1 });
+register(V_AOR.outer, {
+  name: '主动脉瓣',
+  desc: '左心室出口的单向阀，每次开合都承受着全身最高的压力。',
+  dir: [2.0, 1.6, 2.2],
+  anchor: [0, 0.18, 0]
+});
+
+/* ---------- 大血管 ---------- */
+const matArtery = vesselMaterial(0xba2028);
+const matVein = vesselMaterial(0x2b56ad);
+const matPulmVein = vesselMaterial(0xc72a2c);
+
+// 主动脉（弓形下降）
+const aorta = makeVessel([
+  [0.02, 0.51, 0.20], [0.10, 0.96, 0.17], [0.18, 1.38, 0.06], [0.14, 1.76, -0.10],
+  [-0.06, 1.97, -0.34], [-0.34, 1.91, -0.55], [-0.52, 1.58, -0.67],
+  [-0.59, 1.10, -0.73], [-0.62, 0.66, -0.75]
+], 0.150, 0.104, matArtery, { seg: 130, rad: 20, ease: 0.85 });
+heart.add(aorta);
+register(aorta, {
+  name: '主动脉',
+  desc: '人体最粗的动脉，把左心室的富氧血分配到全身。',
+  dir: [0.35, 2.55, -1.7],
+  anchor: [0.0, 1.45, -0.30]
+});
+
+// 肺动脉 + 左右分支
+const paTrunk = makeVessel([
+  [-0.17, 0.505, 0.275], [-0.235, 0.86, 0.30], [-0.225, 1.24, 0.245], [-0.11, 1.56, 0.11]
+], 0.128, 0.112, matVein, { seg: 80, rad: 18, caps: false });
+const paL = makeVessel([
+  [-0.11, 1.56, 0.11], [0.16, 1.72, -0.02], [0.52, 1.75, -0.12], [0.84, 1.67, -0.27]
+], 0.112, 0.080, matVein, { seg: 70, rad: 16, caps: false });
+const paR = makeVessel([
+  [-0.11, 1.56, 0.11], [-0.40, 1.72, -0.02], [-0.72, 1.70, -0.16], [-0.98, 1.60, -0.30]
+], 0.112, 0.076, matVein, { seg: 70, rad: 16, caps: false });
+const paGroup = new THREE.Group();
+paGroup.add(paTrunk, paL, paR);
+heart.add(paGroup);
+register(paGroup, {
+  name: '肺动脉',
+  desc: '唯一运送缺氧血的动脉，把血液送进左右肺换气。',
+  dir: [-1.9, 2.2, 1.6],
+  anchor: [-0.12, -0.12, 0.05]
+});
+
+// 上腔静脉
+const svc = makeVessel([
+  [-0.44, 0.90, 0.06], [-0.48, 1.32, 0.02], [-0.52, 1.76, -0.04], [-0.55, 2.16, -0.08]
+], 0.115, 0.104, matVein, { seg: 70, rad: 16 });
+heart.add(svc);
+register(svc, {
+  name: '上腔静脉',
+  desc: '把头部与上肢的缺氧血送回右心房。',
+  dir: [-3.9, 2.4, -1.0],
+  anchor: [-0.55, 2.24, -0.08]
+});
+
+// 下腔静脉
+const ivc = makeVessel([
+  [-0.38, 0.50, -0.06], [-0.41, -0.14, -0.44], [-0.45, -0.80, -0.62], [-0.47, -1.50, -0.70]
+], 0.122, 0.108, matVein, { seg: 80, rad: 16 });
+heart.add(ivc);
+register(ivc, {
+  name: '下腔静脉',
+  desc: '把腹部与下肢的缺氧血送回右心房，是全身最粗的静脉。',
+  dir: [-2.2, -2.9, -0.2],
+  anchor: [-0.47, -1.6, -0.7]
+});
+
+// 四根肺静脉
+const pvGroup = new THREE.Group();
+[
+  [[0.40, 0.90, -0.42], [0.58, 0.99, -0.94], [0.62, 0.94, -1.42]],
+  [[0.38, 0.70, -0.46], [0.54, 0.63, -0.96], [0.56, 0.54, -1.42]],
+  [[0.06, 0.92, -0.44], [-0.10, 1.00, -0.96], [-0.20, 0.94, -1.42]],
+  [[0.02, 0.68, -0.46], [-0.16, 0.60, -0.98], [-0.26, 0.50, -1.42]]
+].forEach(pts => {
+  pvGroup.add(makeVessel(pts, 0.074, 0.062, matPulmVein, { seg: 44, rad: 14 }));
+});
+heart.add(pvGroup);
+register(pvGroup, {
+  name: '肺静脉',
+  desc: '把肺部氧合后的鲜血送回左心房，是唯一运送富氧血的静脉。',
+  dir: [2.55, 0.75, -1.55],
+  anchor: [-0.22, 1.2, -1.48]
+});
+
+/* ---------- 冠状动脉 ---------- */
+const matCoronary = vesselMaterial(0xb01c20, { roughness: 0.44, opacity: 0.92 });
+const coroGroup = new THREE.Group();
+function coronaryPath(u0, t0, u1, t1, steps, off) {
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const k = i / steps;
+    const u = lerp(u0, u1, k);
+    const t = lerp(t0, t1, k);
+    const p = surfPoint(u, t, off);
+    pts.push([p.x, p.y, p.z]);
+  }
+  return pts;
+}
+// 前降支
+coroGroup.add(makeVessel(coronaryPath(1.40, 0.94, 1.76, 0.13, 22, 0.016), 0.020, 0.007, matCoronary, { seg: 80, rad: 9, caps: false }));
+// 右冠状动脉
+coroGroup.add(makeVessel(coronaryPath(2.55, 0.88, 4.15, 0.05, 26, 0.016), 0.019, 0.007, matCoronary, { seg: 90, rad: 9, caps: false }));
+// 回旋支
+coroGroup.add(makeVessel(coronaryPath(1.42, 0.88, 0.46, 0.40, 22, 0.015), 0.017, 0.006, matCoronary, { seg: 70, rad: 9, caps: false }));
+heart.add(coroGroup);
+register(coroGroup, {
+  name: '冠状动脉',
+  desc: '心脏给自己的供血管，为心肌输送氧和养分。',
+  dir: [4.0, -1.2, 1.0],
+  anchor: [0.45, 0.15, 0.45]
+});
+
+/* ---------- 传导系统 ---------- */
+const matNode = new THREE.MeshStandardMaterial({
+  color: 0xffdf9a, emissive: new THREE.Color(0xffb02e), emissiveIntensity: 1.0,
+  roughness: 0.35, metalness: 0.25
+});
+
+const SA = new THREE.Group();
+const saNode = new THREE.Mesh(new THREE.SphereGeometry(0.082, 24, 18), matNode);
+saNode.position.set(-0.44, 0.875, 0.16);
+SA.add(saNode);
+heart.add(SA);
+register(SA, {
+  name: '窦房结',
+  desc: '心脏的天然起搏器，每分钟自发放电约 60 次，决定心跳的节律。',
+  dir: [-2.8, -1.1, 2.6],
+  anchor: [-0.44, 0.99, 0.16]
+});
+
+const AV = new THREE.Group();
+const avNode = new THREE.Mesh(new THREE.SphereGeometry(0.062, 22, 16), matNode);
+avNode.position.set(-0.12, 0.44, 0.02);
+AV.add(avNode);
+heart.add(AV);
+register(AV, {
+  name: '房室结',
+  desc: '把心房的电信号延迟约 0.1 秒，让心房先排空、心室再收缩。',
+  dir: [0.5, -0.7, 3.2],
+  anchor: [-0.12, 0.53, 0.02]
+});
+
+const WIRE = new THREE.Group();
+const matWire = new THREE.MeshStandardMaterial({
+  color: 0xffd98a, emissive: new THREE.Color(0xffa41f), emissiveIntensity: 0.75,
+  roughness: 0.4, metalness: 0.2
+});
+function wire(pts, r0, r1, seg) {
+  const c = curveFrom(pts, 0.42);
+  return new THREE.Mesh(taperedTube(c, r0, r1, seg || 60, 8), matWire);
+}
+// 希氏束
+WIRE.add(wire([[-0.12, 0.44, 0.02], [-0.10, 0.30, 0.03], [-0.06, 0.10, 0.02], [-0.03, -0.08, 0.02]], 0.021, 0.018, 50));
+// 左束支
+WIRE.add(wire([[-0.03, -0.08, 0.02], [0.06, -0.30, 0.04], [0.14, -0.58, 0.02], [0.19, -0.80, 0.00]], 0.018, 0.010, 50));
+// 右束支
+WIRE.add(wire([[-0.03, -0.08, 0.02], [-0.14, -0.30, 0.05], [-0.23, -0.58, 0.07], [-0.29, -0.82, 0.08]], 0.018, 0.010, 50));
+// 浦肯野纤维
+[
+  [[0.19, -0.80, 0.00], [0.26, -0.60, 0.14], [0.30, -0.36, 0.20]],
+  [[0.19, -0.80, 0.00], [0.28, -0.62, -0.10], [0.33, -0.40, -0.16]],
+  [[0.14, -0.58, 0.02], [0.02, -0.42, 0.20], [-0.06, -0.24, 0.26]],
+  [[-0.29, -0.82, 0.08], [-0.38, -0.58, 0.18], [-0.44, -0.34, 0.16]],
+  [[-0.29, -0.82, 0.08], [-0.34, -0.60, -0.08], [-0.38, -0.38, -0.14]]
+].forEach(p => WIRE.add(wire(p, 0.011, 0.006, 30)));
+
+// 电信号光点
+const sparkMat = new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 0.95 });
+const spark = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 10), sparkMat);
+WIRE.add(spark);
+const sparkGlowMat = new THREE.MeshBasicMaterial({ color: 0xffb02e, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+const sparkGlow = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10), sparkGlowMat);
+WIRE.add(sparkGlow);
+
+heart.add(WIRE);
+register(WIRE, {
+  name: '希氏束与浦肯野纤维',
+  desc: '把电信号高速传到心室壁，让左右心室几乎同一瞬间收缩。',
+  dir: [0.55, -0.15, 2.75],
+  anchor: [0.15, -0.72, 0.05]
+});
+
+const sparkCurve = curveFrom([
+  [-0.44, 0.875, 0.16], [-0.30, 0.70, 0.12], [-0.12, 0.44, 0.02], [-0.10, 0.30, 0.03],
+  [-0.06, 0.10, 0.02], [-0.03, -0.08, 0.02], [0.06, -0.30, 0.04], [0.14, -0.58, 0.02], [0.19, -0.80, 0.00]
+], 0.5);
+
+/* =========================================================
+   血流粒子
+   ========================================================= */
+const blueFlowCurve = curveFrom([
+  [-0.55, 2.08, -0.08], [-0.52, 1.70, -0.04], [-0.48, 1.26, 0.01], [-0.44, 0.90, 0.05],
+  [-0.39, 0.74, 0.05], [-0.34, 0.53, 0.08], [-0.29, 0.43, 0.10], [-0.24, 0.18, 0.11],
+  [-0.21, -0.14, 0.11], [-0.20, -0.46, 0.11], [-0.19, -0.20, 0.18], [-0.18, 0.12, 0.24],
+  [-0.175, 0.44, 0.275], [-0.17, 0.78, 0.30], [-0.20, 1.18, 0.25], [-0.11, 1.56, 0.11],
+  [0.16, 1.72, -0.02], [0.52, 1.75, -0.12], [0.84, 1.67, -0.27]
+], 0.30);
+
+const redFlowCurve = curveFrom([
+  [0.64, 1.06, -1.44], [0.54, 0.95, -1.00], [0.42, 0.85, -0.52], [0.34, 0.77, -0.28],
+  [0.30, 0.60, -0.14], [0.26, 0.45, -0.10], [0.20, 0.16, -0.05], [0.16, -0.14, -0.04],
+  [0.15, -0.50, -0.03], [0.14, -0.16, 0.01], [0.12, 0.14, 0.04], [0.09, 0.44, 0.07],
+  [0.10, 0.58, 0.09], [0.14, 0.95, 0.08], [0.19, 1.38, 0.01], [0.14, 1.76, -0.14],
+  [-0.06, 1.97, -0.34], [-0.34, 1.91, -0.55], [-0.52, 1.58, -0.67], [-0.59, 1.10, -0.73],
+  [-0.62, 0.66, -0.75]
+], 0.30);
+
+const flows = [];
+function makeFlow(curve, color, count, size) {
+  const geo = new THREE.IcosahedronGeometry(size || 0.03, 0);
+  const mat = new THREE.MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: 0.62,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 6;
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(mesh);
+  const base = new Float32Array(count);
+  for (let i = 0; i < count; i++) base[i] = (i + Math.random() * 0.85) / count;
+  const f = { curve, mesh, count, base, offset: Math.random(), mat, speed: 0.085 };
+  flows.push(f);
+  return f;
+}
+makeFlow(blueFlowCurve, 0x3d84ff, 180, 0.027);
+makeFlow(redFlowCurve, 0xff2b36, 180, 0.027);
+
+/* =========================================================
+   标签
+   ========================================================= */
+const labelLayer = document.getElementById('labels');
+parts.forEach(p => {
+  const el = document.createElement('div');
+  el.className = 'label';
+  el.innerHTML = '<span class="dot"></span><span class="txt"></span>';
+  el.querySelector('.txt').textContent = p.name;
+  el.style.opacity = '0';
+  labelLayer.appendChild(el);
+  p.el = el;
+});
+
+/* =========================================================
+   交互状态
+   ========================================================= */
+const state = {
+  exploded: false,
+  explodeT: 0,
+  hover: null,
+  time: 0,
+  phase: 0,
+  desiredDist: 0,
+  lastInteract: -99
+};
+
+const btnExplode = document.getElementById('btnExplode');
+const btnExplodeTxt = document.getElementById('btnExplodeTxt');
+const btnReset = document.getElementById('btnReset');
+const tipEl = document.getElementById('tip');
+const tipName = tipEl.querySelector('.tn');
+const tipDesc = tipEl.querySelector('.td');
+const beatDot = document.getElementById('beatDot');
+
+btnExplode.addEventListener('click', () => {
+  state.exploded = !state.exploded;
+  btnExplodeTxt.textContent = state.exploded ? '合拢心脏' : '拆解心脏';
+  btnExplode.classList.toggle('on', state.exploded);
+  state.desiredDist = state.exploded ? 10.8 : CAM_HOME.length();
+  clearHover();
+});
+
+btnReset.addEventListener('click', () => {
+  camera.position.copy(CAM_HOME);
+  controls.target.set(0, 0.40, 0);
+  state.desiredDist = 0;
+});
+
+controls.addEventListener('start', () => { state.lastInteract = state.time; state.desiredDist = 0; });
+
+/* ---------- 拾取 ---------- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function pickPart(cx, cy) {
+  pointer.x = (cx / window.innerWidth) * 2 - 1;
+  pointer.y = -(cy / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(pickMeshes, false);
+  if (!hits.length) return null;
+  for (let i = 0; i < hits.length; i++) {
+    const id = hits[i].object.userData.partId;
+    if (id !== partMyo.id) return id;
+  }
+  return hits[0].object.userData.partId;
+}
+
+function setHighlight(part, on) {
+  part.mats.forEach(m => {
+    if (!m.emissive) return;
+    if (on) {
+      m.emissive.copy(m.userData.hlEm);
+      m.emissiveIntensity = 1.15;
+    } else {
+      m.emissive.copy(m.userData.baseEm);
+      m.emissiveIntensity = m.userData.baseEI;
+    }
+  });
+}
+
+function clearHover() {
+  if (state.hover) {
+    setHighlight(state.hover, false);
+    state.hover.el.classList.remove('hot');
+    state.hover = null;
+  }
+  tipEl.classList.remove('show');
+  canvas.style.cursor = 'grab';
+}
+
+function setHover(id, cx, cy) {
+  const part = parts.find(p => p.id === id) || null;
+  if (part === state.hover) {
+    if (part) moveTip(cx, cy);
+    return;
+  }
+  clearHover();
+  if (!part) return;
+  state.hover = part;
+  setHighlight(part, true);
+  part.el.classList.add('hot');
+  tipName.textContent = part.name;
+  tipDesc.textContent = part.desc;
+  tipEl.classList.add('show');
+  moveTip(cx, cy);
+  canvas.style.cursor = 'pointer';
+}
+
+function moveTip(cx, cy) {
+  const pad = 14;
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+  let x = cx + 20, y = cy + 18;
+  if (x + w + pad > window.innerWidth) x = cx - w - 20;
+  if (y + h + pad > window.innerHeight) y = cy - h - 18;
+  x = Math.max(pad, Math.min(x, window.innerWidth - w - pad));
+  y = Math.max(pad, Math.min(y, window.innerHeight - h - pad));
+  tipEl.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+let pointerDown = false;
+canvas.addEventListener('pointermove', e => {
+  if (pointerDown) { clearHover(); return; }
+  const id = pickPart(e.clientX, e.clientY);
+  setHover(id, e.clientX, e.clientY);
+});
+canvas.addEventListener('pointerdown', () => { pointerDown = true; clearHover(); });
+window.addEventListener('pointerup', () => { pointerDown = false; });
+canvas.addEventListener('pointerleave', () => { clearHover(); });
+
+/* =========================================================
+   动画
+   ========================================================= */
+const clock = new THREE.Clock();
+const tmpV = new THREE.Vector3();
+const dummy = new THREE.Object3D();
+const tmpT = new THREE.Vector3();
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+const fps = { bpm: 60 };
+
+function beatState(phase) {
+  const vent = Math.pow(Math.sin(Math.PI * clamp01((phase - 0.02) / 0.34)), 1.15);
+  const atr = Math.pow(Math.sin(Math.PI * clamp01((phase - 0.80) / 0.19)), 1.6);
+  const semi = smoothstep(0.035, 0.105, phase) * (1 - smoothstep(0.325, 0.415, phase));
+  const av = 1 - semi;
+  return { vent, atr, semi, av };
+}
+
+function tick() {
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  state.time += dt;
+
+  const period = 60 / fps.bpm;
+  const phase = (state.time % period) / period;
+  const b = beatState(phase);
+
+  /* --- 拆解插值 --- */
+  const target = state.exploded ? 1 : 0;
+  state.explodeT += (target - state.explodeT) * Math.min(1, dt * 4.6);
+  if (Math.abs(target - state.explodeT) < 0.0008) state.explodeT = target;
+  const et = state.explodeT;
+  const ease = et * et * (3 - 2 * et);
+
+  /* --- 部件位移 --- */
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (p.isShell) continue;
+    p.group.position.set(
+      p.basePos.x + p.dir.x * ease,
+      p.basePos.y + p.dir.y * ease,
+      p.basePos.z + p.dir.z * ease
+    );
+  }
+
+  /* --- 心肌外壳：拆解时几乎隐去 --- */
+  matMyoBack.opacity = lerp(1.0, 0.14, ease);
+  matMyoFront.opacity = lerp(0.42, 0.12, ease);
+  matSeptum.opacity = lerp(1.0, 0.10, ease);
+  const shellScale = (1 + 0.10 * ease) * (1 - 0.024 * b.vent);
+  myoGroup.scale.setScalar(shellScale);
+  myoGroup.position.y = 0.06 * ease;
+
+  /* --- 心跳 --- */
+  const cvL = 1 - 0.105 * b.vent;
+  const cvR = 1 - 0.085 * b.vent;
+  const ca = 1 - 0.062 * b.atr;
+
+  LV.children[0].scale.set(cvL, 1 - 0.115 * b.vent, cvL);
+  RV.children[0].scale.set(cvR, 1 - 0.095 * b.vent, cvR);
+  LA.children[0].scale.setScalar(ca);
+  RA.children[0].scale.setScalar(ca);
+
+  // 瓣膜开合
+  const openSemi = b.semi * 0.95;
+  const openAV = b.av * 0.95;
+  [V_PUL.valve, V_AOR.valve].forEach(v => {
+    v.leaves.forEach(m => { m.rotation.y = 0.17 - openSemi * 1.12; });
+  });
+  [V_TRI.valve, V_MIT.valve].forEach(v => {
+    v.leaves.forEach(m => { m.rotation.y = 0.13 - openAV * 1.05; });
+  });
+
+  // 传导系统发光 + 电信号光点
+  const saPulse = Math.pow(Math.max(0, Math.sin(Math.PI * clamp01(phase / 0.30))), 2);
+  matNode.emissiveIntensity = 0.7 + 2.6 * saPulse;
+  matWire.emissiveIntensity = 0.55 + 0.5 * b.vent;
+  const su = clamp01((phase - 0.005) / 0.26);
+  if (su > 0 && su < 1) {
+    sparkCurve.getPointAt(su, tmpV);
+    spark.position.copy(tmpV);
+    sparkGlow.position.copy(tmpV);
+    const k = Math.sin(Math.PI * su);
+    spark.scale.setScalar(0.6 + k * 0.5);
+    sparkGlow.scale.setScalar(0.7 + k * 0.9);
+    spark.visible = sparkGlow.visible = true;
+  } else {
+    spark.visible = sparkGlow.visible = false;
+  }
+
+  /* --- 血流 --- */
+  const expandFade = lerp(1, 0.22, ease);
+  flows[0].speed = 0.055 + 0.11 * b.av + 0.05 * b.vent;
+  flows[1].speed = 0.055 + 0.13 * b.semi + 0.03 * (1 - b.semi);
+  for (let fi = 0; fi < flows.length; fi++) {
+    const f = flows[fi];
+    f.offset = (f.offset + dt * f.speed) % 1;
+    f.mat.opacity = expandFade;
+    for (let i = 0; i < f.count; i++) {
+      let u = (f.base[i] + f.offset) % 1;
+      f.curve.getPointAt(u, tmpV);
+      f.curve.getTangentAt(u, tmpT);
+      const edge = Math.min(u, 1 - u);
+      const s = Math.max(0.001, clamp01(edge * 16) * (0.72 + 0.4 * Math.sin(u * 11.0 + i)));
+      dummy.position.copy(tmpV);
+      dummy.quaternion.setFromUnitVectors(AXIS_X, tmpT.normalize());
+      dummy.scale.set(2.6 * s, 0.66 * s, 0.66 * s);
+      dummy.updateMatrix();
+      f.mesh.setMatrixAt(i, dummy.matrix);
+    }
+    f.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /* --- 标签投影 --- */
+  const W = window.innerWidth, H = window.innerHeight;
+  const showLabels = smoothstep(0.16, 0.55, et);
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    const el = p.el;
+    if (showLabels <= 0.01) { el.style.opacity = '0'; continue; }
+    p.anchor.getWorldPosition(tmpV);
+    const worldY = tmpV.y;
+    tmpV.project(camera);
+    if (tmpV.z > 1) { el.style.opacity = '0'; continue; }
+    const x = (tmpV.x * 0.5 + 0.5) * W;
+    const y = (-tmpV.y * 0.5 + 0.5) * H;
+    let o = showLabels;
+    if (x < -120 || x > W + 120 || y < -60 || y > H + 60) o = 0;
+    el.style.transform = `translate(-50%,-50%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    el.style.opacity = o.toFixed(2);
+    el.style.zIndex = String(Math.round(1000 - worldY * 10));
+  }
+
+  /* --- 相机推拉 --- */
+  if (state.desiredDist > 0) {
+    const dir = camera.position.clone().sub(controls.target);
+    const cur = dir.length();
+    const nd = THREE.MathUtils.damp(cur, state.desiredDist, 3.2, dt);
+    camera.position.copy(controls.target).add(dir.normalize().multiplyScalar(nd));
+    if (Math.abs(nd - state.desiredDist) < 0.02) state.desiredDist = 0;
+  }
+
+  heart.scale.setScalar(1 - 0.010 * b.vent);
+
+  controls.autoRotate = (state.time - state.lastInteract > 7) && !state.hover && !state.exploded;
+  controls.update();
+
+  /* --- 心搏指示灯 --- */
+  const bd = 0.75 + 0.5 * b.vent;
+  beatDot.style.transform = `scale(${bd.toFixed(2)})`;
+  beatDot.style.opacity = String(0.55 + 0.45 * b.vent);
+
+  renderer.render(scene, camera);
+}
+
+/* =========================================================
+   尺寸与启动
+   ========================================================= */
+function onResize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+
+(async function boot() {
+  try {
+    const mod = await import('three/addons/environments/RoomEnvironment.js');
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const env = pmrem.fromScene(new mod.RoomEnvironment(), 0.045);
+    scene.environment = env.texture;
+    pmrem.dispose();
+  } catch (e) {
+    /* 环境贴图不可用时退化为纯灯光照明 */
+  }
+
+  if (location.search.indexOf('explode') >= 0) {
+    state.exploded = true;
+    state.explodeT = 1;
+    btnExplodeTxt.textContent = '合拢心脏';
+    btnExplode.classList.add('on');
+    camera.position.copy(controls.target).add(CAM_HOME.clone().normalize().multiplyScalar(10.8));
+  }
+
+  clearTimeout(window.__hbFail);
+  const loader = document.getElementById('loader');
+  loader.classList.add('hide');
+  setTimeout(() => loader.remove(), 800);
+
+  tick();
+})();
+</script>
+</body>
+</html>

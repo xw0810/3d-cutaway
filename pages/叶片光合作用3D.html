@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>叶片的秘密 · 光合作用 3D 剖面</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#030906}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:#eafff2;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(ellipse 70% 60% at 72% 12%, rgba(122,214,92,.20) 0%, rgba(20,60,34,.10) 40%, transparent 70%),
+      radial-gradient(ellipse 100% 80% at 50% 55%, #0a2416 0%, #051209 48%, #030906 100%);
+  }
+  #c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab}
+  #c:active{cursor:grabbing}
+
+  /* 阳光光晕 */
+  .sun{
+    position:fixed;right:-8vw;top:-14vh;width:52vw;height:52vw;z-index:1;pointer-events:none;
+    background:radial-gradient(circle at 50% 50%, rgba(255,240,180,.30) 0%, rgba(190,255,150,.13) 22%, rgba(120,200,90,.05) 45%, transparent 68%);
+    filter:blur(6px);
+  }
+  .rays{
+    position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.30;
+    background:repeating-linear-gradient(116deg,
+      rgba(255,255,220,.09) 0px, rgba(255,255,220,.09) 1px,
+      transparent 1px, transparent 118px);
+    -webkit-mask-image:radial-gradient(ellipse 60% 50% at 72% 8%, #000 0%, transparent 72%);
+    mask-image:radial-gradient(ellipse 60% 50% at 72% 8%, #000 0%, transparent 72%);
+  }
+  .vig{position:fixed;inset:0;z-index:2;pointer-events:none;
+    background:radial-gradient(ellipse 78% 70% at 50% 48%, transparent 40%, rgba(0,4,2,.55) 100%)}
+
+  .hud{
+    position:fixed;z-index:20;
+    background:rgba(9,24,16,.55);
+    -webkit-backdrop-filter:blur(18px) saturate(150%);
+    backdrop-filter:blur(18px) saturate(150%);
+    border:1px solid rgba(168,255,190,.13);
+    border-radius:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.07);
+  }
+  .hud.tl{left:26px;top:26px;padding:17px 24px 19px;pointer-events:none}
+  .eyebrow{font-size:10px;letter-spacing:.36em;color:rgba(190,255,205,.45);margin-bottom:9px}
+  .hud h1{font-size:27px;font-weight:600;letter-spacing:.05em;line-height:1.08;
+    background:linear-gradient(178deg,#f4fff4 0%,#a8ef7c 120%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hud .sub{font-size:11.5px;color:rgba(198,255,210,.48);margin-top:8px;letter-spacing:.08em}
+
+  .hud.tr{right:26px;top:26px;padding:11px;display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+  button{
+    font-family:inherit;font-size:13px;letter-spacing:.06em;color:#eaffee;cursor:pointer;
+    border:1px solid rgba(180,255,200,.16);border-radius:12px;
+    background:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.025));
+    padding:11px 20px;min-width:166px;
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    transition:transform .18s cubic-bezier(.2,.8,.3,1),background .2s,border-color .2s,box-shadow .25s;
+  }
+  button:hover{transform:translateY(-1px);border-color:rgba(190,255,210,.34);background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.04))}
+  button:active{transform:translateY(0) scale(.985)}
+  button.on{
+    background:linear-gradient(180deg,#63c04a,#2b7a2a);
+    border-color:rgba(180,255,160,.55);
+    box-shadow:0 8px 26px rgba(90,200,80,.38),inset 0 1px 0 rgba(255,255,255,.28);
+  }
+  .ico{font-size:13px;line-height:1;opacity:.9}
+
+  .hud.bl{left:26px;bottom:26px;padding:14px 18px;display:flex;flex-direction:column;gap:9px;pointer-events:none}
+  .legend{display:flex;align-items:center;gap:10px;font-size:11.5px;color:rgba(215,255,225,.62);letter-spacing:.05em}
+  .legend b{font-weight:500;color:rgba(235,255,240,.88)}
+  .d{width:8px;height:8px;border-radius:50%;display:block;flex:0 0 auto}
+  .d.photon{background:#ffe98a;box-shadow:0 0 10px rgba(255,233,138,.9)}
+  .d.water{background:#6cc2f7;box-shadow:0 0 10px rgba(108,194,247,.9)}
+  .d.sugar{background:#ffb954;box-shadow:0 0 10px rgba(255,185,84,.9)}
+  .d.air{background:#9ff6ff;box-shadow:0 0 10px rgba(159,246,255,.9)}
+
+  .meter{margin-top:2px;padding-top:10px;border-top:1px solid rgba(168,255,190,.12);
+    display:flex;flex-direction:column;gap:7px;font-size:11px;color:rgba(200,255,212,.45);letter-spacing:.05em}
+  .row{display:flex;align-items:center;gap:9px}
+  .row span:last-child{margin-left:auto;color:rgba(226,255,232,.82);font-variant-numeric:tabular-nums}
+  .bar{width:74px;height:3px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden}
+  .bar i{display:block;height:100%;width:50%;background:linear-gradient(90deg,#4dbb5c,#b6ff7a);border-radius:2px;transition:width .2s linear}
+  .sunbtn{display:flex;align-items:center;gap:8px;cursor:pointer;pointer-events:auto;user-select:none;
+    padding:6px 10px;margin:-4px -6px;border-radius:9px;transition:background .2s}
+  .sunbtn:hover{background:rgba(255,255,255,.06)}
+  .sunbtn .lamp{width:7px;height:7px;border-radius:50%;background:#ffd987;box-shadow:0 0 12px rgba(255,217,135,.95)}
+  .sunbtn.off .lamp{background:#4a5a4e;box-shadow:none}
+  .sunbtn.off{color:rgba(255,255,255,.3)}
+
+  .hud.bc{left:50%;transform:translateX(-50%);bottom:26px;padding:9px 20px;font-size:11.5px;
+    color:rgba(210,255,222,.42);letter-spacing:.12em;border-radius:100px;pointer-events:none}
+  .hud.bc kbd{font-family:inherit;color:rgba(230,255,236,.72);padding:0 2px}
+
+  /* 部件标签 */
+  #labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .label{
+    position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;
+    padding:5px 12px 5px 8px;border-radius:100px;white-space:nowrap;
+    background:rgba(9,22,14,.78);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    border:1px solid rgba(180,255,200,.18);
+    font-size:12.5px;letter-spacing:.06em;color:rgba(232,255,238,.9);
+    box-shadow:0 8px 26px rgba(0,0,0,.5);
+    transition:opacity .3s ease;opacity:0;will-change:transform,opacity;
+  }
+  .label .dt{width:6px;height:6px;border-radius:50%;background:#a8f078;box-shadow:0 0 9px rgba(168,240,120,.9);flex:0 0 auto}
+  .label.mini{font-size:10.5px;padding:4px 10px 4px 7px;background:rgba(9,22,14,.62);color:rgba(226,255,232,.75)}
+
+  /* 悬停提示 */
+  #tip{
+    position:fixed;left:0;top:0;z-index:30;pointer-events:none;opacity:0;
+    transform:translate3d(-999px,-999px,0);
+    transition:opacity .16s ease;
+    max-width:330px;
+  }
+  #tip .box{
+    background:rgba(8,20,13,.9);border:1px solid rgba(180,255,200,.24);
+    border-radius:12px;padding:9px 13px 10px;
+    box-shadow:0 14px 40px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  }
+  #tip .name{font-size:12.5px;font-weight:600;letter-spacing:.08em;color:#d6ffb0;display:block;margin-bottom:3px}
+  #tip .desc{font-size:11.5px;line-height:1.55;color:rgba(226,255,232,.66);letter-spacing:.03em}
+
+  /* 载入 */
+  #loader{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+    background:radial-gradient(ellipse at 50% 45%,#0a2316 0%,#04100a 60%,#030906 100%);
+    transition:opacity .7s ease;color:rgba(200,255,215,.6);font-size:12px;letter-spacing:.32em}
+  #loader.hide{opacity:0;pointer-events:none}
+  .ld{width:52px;height:52px;border-radius:50%;border:1px solid rgba(150,255,170,.16);position:relative}
+  .ld:before{content:"";position:absolute;inset:-1px;border-radius:50%;
+    border:1px solid transparent;border-top-color:#9be86f;animation:spin 1.1s linear infinite}
+  .ld:after{content:"";position:absolute;inset:12px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#b9ff8a,#2f8a3a 70%);filter:blur(.4px);opacity:.85}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (max-width:820px){
+    .hud h1{font-size:21px}
+    .hud.tr{right:14px;top:14px;padding:8px}
+    button{min-width:auto;padding:9px 14px;font-size:12px}
+    .hud.tl{left:14px;top:14px;padding:13px 16px}
+    .hud.bl{left:14px;bottom:14px;padding:11px 13px;transform:scale(.94);transform-origin:left bottom}
+    .hud.bc{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="sun"></div>
+<div class="rays"></div>
+<div class="vig"></div>
+
+<div class="hud tl">
+  <div class="eyebrow">光 合 作 用 · 全 过 程</div>
+  <h1>叶片的秘密</h1>
+  <div class="sub">叶片纵切 · 从蜡质表面一路看到类囊体</div>
+</div>
+
+<div class="hud tr">
+  <button id="btnExplode"><span class="ico">◈</span><span id="explodeTxt">爆炸视图</span></button>
+  <button id="btnReset"><span class="ico">⟲</span><span>复位视角</span></button>
+</div>
+
+<div class="hud bl">
+  <div class="legend"><span class="d photon"></span><b>光子</b> → 光反应激发叶绿素</div>
+  <div class="legend"><span class="d water"></span><b>水</b> 沿木质部上升</div>
+  <div class="legend"><span class="d sugar"></span><b>糖</b> 经韧皮部运出</div>
+  <div class="legend"><span class="d air"></span><b>氧气</b> 从气孔逸出</div>
+  <div class="meter">
+    <div class="row"><span>气孔开度</span><span class="bar"><i id="barStoma"></i></span><span id="valStoma">50%</span></div>
+    <div class="row"><span>卡尔文循环</span><span style="margin-left:auto" id="valCalvin">1.0 圈/秒</span></div>
+    <div class="sunbtn" id="sunToggle"><span class="lamp"></span><span>阳光照射中</span></div>
+  </div>
+</div>
+
+<div class="hud bc">拖拽环绕 · 滚轮缩放，一路钻进叶绿体</div>
+
+<div id="labels"></div>
+<div id="tip"><div class="box"><span class="name"></span><span class="desc"></span></div></div>
+
+<div id="loader"><div class="ld"></div><div>正在组装叶片</div></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ============================================================
+   0. 基础工具
+   ============================================================ */
+const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+let _seed = 20261027;
+function rnd() { _seed = (_seed * 16807) % 2147483647; return (_seed - 1) / 2147483646; }
+const rr = (a, b) => a + (b - a) * rnd();
+
+/** 给几何体烘焙竖直方向的明暗渐变，让细胞有体积感 */
+function shadeByAxis(geo, axis, lo, hi) {
+  const pos = geo.attributes.position;
+  let min = Infinity, max = -Infinity;
+  const idx = axis === 'y' ? 1 : axis === 'x' ? 0 : 2;
+  for (let i = 0; i < pos.count; i++) {
+    const v = pos.getComponent(i, idx);
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = (pos.getComponent(i, idx) - min) / Math.max(1e-6, max - min);
+    const k = lo + (hi - lo) * t;
+    colors[i * 3] = k; colors[i * 3 + 1] = k; colors[i * 3 + 2] = k;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geo;
+}
+
+/* ============================================================
+   1. 渲染器 / 相机 / 控制器
+   ============================================================ */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, logarithmicDepthBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.localClippingEnabled = true;
+renderer.setClearAlpha(0);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x04120b, 0.008);
+
+const camera = new THREE.PerspectiveCamera(36, window.innerWidth / window.innerHeight, 0.02, 200);
+const TARGET = new THREE.Vector3(-0.43, 1.24, -0.5);
+const CAM_HOME = new THREE.Vector3(3.5, 3.6, 11.3);
+
+camera.position.copy(CAM_HOME).add(TARGET);
+camera.lookAt(TARGET);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(TARGET);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.8;
+controls.zoomSpeed = 0.95;
+controls.panSpeed = 0.7;
+controls.minDistance = 0.8;
+controls.maxDistance = 22;
+controls.minPolarAngle = 0.16;
+controls.maxPolarAngle = Math.PI - 0.16;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.32;
+
+
+/* 程序化天穹：深绿渐变 + 太阳方向的光晕 */
+function makeSky() {
+  const geo = new THREE.SphereGeometry(70, 40, 24);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      uSun: { value: new THREE.Vector3(7.5, 9.5, 6.5).normalize() }
+    },
+    vertexShader: `
+      varying vec3 vDir;
+      void main(){
+        vDir = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      varying vec3 vDir;
+      uniform vec3 uSun;
+      void main(){
+        vec3 d = normalize(vDir);
+        float h = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 col = mix(vec3(0.008, 0.028, 0.017), vec3(0.045, 0.135, 0.080), pow(h, 1.4));
+        float sun = pow(max(dot(d, uSun), 0.0), 26.0);
+        float halo = pow(max(dot(d, uSun), 0.0), 3.2);
+        col += vec3(1.0, 0.90, 0.62) * sun * 0.55;
+        col += vec3(0.30, 0.52, 0.22) * halo * 0.28;
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+/* ============================================================
+   2. 灯光 / 环境
+   ============================================================ */
+scene.add(new THREE.HemisphereLight(0xc8ffd8, 0x0a2a16, 0.42));
+
+const sunLight = new THREE.DirectionalLight(0xfff6d8, 2.7);
+sunLight.position.set(7.5, 9.5, 6.5);
+scene.add(sunLight);
+
+const rimLight = new THREE.DirectionalLight(0x8dffb8, 1.15);
+rimLight.position.set(-8, 3.2, -5);
+scene.add(rimLight);
+
+const coolFill = new THREE.DirectionalLight(0x84c4ff, 0.45);
+coolFill.position.set(-4, -5, 3.5);
+scene.add(coolFill);
+
+// 正面补光：照亮切面内部
+const frontFill = new THREE.DirectionalLight(0xdcffe4, 1.35);
+frontFill.position.set(1.5, 0.8, 9);
+scene.add(frontFill);
+
+// 左侧暖光：勾出层与层的边缘
+const edgeWarm = new THREE.DirectionalLight(0xffd9a8, 0.75);
+edgeWarm.position.set(-8, 2.5, 5);
+scene.add(edgeWarm);
+
+const insideGlow = new THREE.PointLight(0x8cff6a, 0.0, 3.0, 2.0);
+insideGlow.position.set(-0.43, 1.3, 0.9);
+scene.add(insideGlow);
+
+const veinGlow = new THREE.PointLight(0x63c6ff, 0.7, 4, 2.0);
+veinGlow.position.set(-1.2, 0.6, 0.6);
+scene.add(veinGlow);
+
+/* ============================================================
+   2.5 后期：柔和泛光（让光子、叶绿体发光）
+   ============================================================ */
+let composer = null, bloomPass = null;
+function initComposer() {
+  try {
+    composer = new EffectComposer(renderer);
+    composer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
+    composer.setSize(window.innerWidth, window.innerHeight);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight), 0.34, 0.55, 0.9
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+  } catch (e) {
+    composer = null;
+  }
+}
+
+/* ============================================================
+   3. 裁切面（叶片纵切的切面）
+   ============================================================ */
+const CLIP_Z = -0.15;
+const CLIP = new THREE.Plane(new THREE.Vector3(0, 0, -1), CLIP_Z);
+
+/* ============================================================
+   4. 部件 / 材质注册（用于高亮与爆炸）
+   ============================================================ */
+const ACCENT = new THREE.Color(0xc8ff8a);
+const FADE_PARTS = new Set(['surface', 'upperEpi', 'spongy', 'lowerEpi', 'vein', 'palisade', 'stoma']);
+const groups = {};
+const partMats = {};
+const pickables = [];
+const explodeParts = [];
+
+function partBucket(id) {
+  if (!partMats[id]) partMats[id] = { solid: [], line: [], rim: [] };
+  return partMats[id];
+}
+
+function mkGroup(id, parent = scene) {
+  const g = new THREE.Group();
+  g.name = id;
+  parent.add(g);
+  groups[id] = g;
+  return g;
+}
+
+function tag(obj, part, pick = true) {
+  obj.userData.part = part;
+  if (pick && obj.isMesh) pickables.push(obj);
+  return obj;
+}
+
+/** 标准材质（自动登记高亮） */
+function std(part, params = {}, opts = {}) {
+  const m = new THREE.MeshStandardMaterial(Object.assign({
+    roughness: 0.55, metalness: 0.02, envMapIntensity: 0.2
+  }, params));
+  if (opts.clip !== false) { m.clippingPlanes = [CLIP]; }
+  const e = { mat: m, base: (m.emissive || new THREE.Color(0)).clone(), baseEI: m.emissiveIntensity, animated: !!opts.animated, op: m.opacity };
+  partBucket(part).solid.push(e);
+  return m;
+}
+
+/** 玻璃质感材质 */
+function phys(part, params = {}, opts = {}) {
+  const m = new THREE.MeshPhysicalMaterial(Object.assign({
+    roughness: 0.3, metalness: 0.0, envMapIntensity: 0.26
+  }, params));
+  if (opts.clip !== false) { m.clippingPlanes = [CLIP]; }
+  const e = { mat: m, base: (m.emissive || new THREE.Color(0)).clone(), baseEI: m.emissiveIntensity, animated: !!opts.animated, op: m.opacity };
+  partBucket(part).solid.push(e);
+  return m;
+}
+
+/** 线条材质 */
+function lineMat(part, params = {}, opts = {}) {
+  const m = new THREE.LineBasicMaterial(Object.assign({ transparent: true, opacity: 0.4 }, params));
+  if (opts.clip !== false) { m.clippingPlanes = [CLIP]; }
+  partBucket(part).line.push({ mat: m, base: m.color.clone(), baseOp: m.opacity });
+  return m;
+}
+
+/** 边缘光壳（菲涅尔） */
+function rimMat(part, color, opacity = 0.5) {
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uOpacity: { value: opacity } },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vP;
+      void main(){
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vP = mv.xyz;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor; uniform float uOpacity;
+      varying vec3 vN; varying vec3 vP;
+      void main(){
+        float f = 1.0 - abs(dot(normalize(vN), normalize(-vP)));
+        f = pow(clamp(f, 0.0, 1.0), 3.1);
+        gl_FragColor = vec4(uColor, f * uOpacity);
+      }`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+  });
+  partBucket(part).rim.push({ mat: m, base: opacity });
+  return m;
+}
+
+/* ============================================================
+   5. 形体（叶片样本块）
+   ============================================================ */
+const L = {
+  x0: -4.3, x1: 4.3,
+  cuticleTop: 2.31,
+  upperTop: 2.16, upperBot: 1.80,
+  palBot: 0.915, palTop: 1.79,
+  spBot: 0.34, spTop: 0.94,
+  lowTop: 0.335, lowBot: 0.045,
+  zFront: -0.15, zBack: -3.2,
+  veinY: 0.86, veinZ: -0.72
+};
+
+/* ---------- 5.1 上表面：角质层 + 叶脉网络 ---------- */
+const gSurface = mkGroup('surface');
+
+{
+  const geo = shadeByAxis(new RoundedBoxGeometry(8.6, 0.15, 3.2, 4, 0.055), 'z', 1.12, 0.68);
+  const m = phys('surface', {
+    color: 0x3a7d21, roughness: 0.3, metalness: 0.02, vertexColors: true,
+    clearcoat: 1.0, clearcoatRoughness: 0.06,
+    emissive: 0x0b2209, emissiveIntensity: 0.3
+  });
+  const mesh = new THREE.Mesh(geo, m);
+  mesh.position.set(0, 2.235, -1.6);
+  gSurface.add(tag(mesh, 'surface'));
+}
+
+// 叶脉网络：主脉 + 侧脉 + 细脉
+{
+  const veinMat = std('surface', {
+    color: 0x74b046, roughness: 0.62, metalness: 0.0,
+    emissive: 0x16330b, emissiveIntensity: 0.2
+  }, { clip: false });
+
+  const mid = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-4.3, 2.305, -1.52),
+    new THREE.Vector3(-2.2, 2.318, -1.60),
+    new THREE.Vector3(0, 2.322, -1.56),
+    new THREE.Vector3(2.2, 2.316, -1.62),
+    new THREE.Vector3(4.3, 2.302, -1.54)
+  ]);
+  const midMesh = new THREE.Mesh(new THREE.TubeGeometry(mid, 90, 0.046, 8, false), veinMat);
+  gSurface.add(tag(midMesh, 'surface'));
+
+  // 侧脉
+  const xs = [-3.6, -2.55, -1.5, -0.45, 0.6, 1.65, 2.7, 3.6];
+  xs.forEach((x, i) => {
+    [-1, 1].forEach(sgn => {
+      const zEnd = sgn > 0 ? -0.12 : -3.02;
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(x, 2.312, -1.56),
+        new THREE.Vector3(x + 0.55, 2.318, -1.56 + (zEnd + 1.56) * 0.42),
+        new THREE.Vector3(x + 1.05, 2.316, -1.56 + (zEnd + 1.56) * 0.78),
+        new THREE.Vector3(x + 1.32, 2.308, zEnd + (sgn > 0 ? 0.12 : -0.12))
+      ]);
+      const r = 0.030 - (i % 2) * 0.006;
+      const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 44, r, 6, false), veinMat);
+      gSurface.add(tag(mesh, 'surface'));
+    });
+  });
+
+  // 细脉：横向小连接
+  for (let i = 0; i < 26; i++) {
+    const x = rr(-4.1, 4.1);
+    const z = rr(-2.9, -0.3);
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(x, 2.312, z),
+      new THREE.Vector3(x + rr(0.2, 0.5), 2.316, z + rr(-0.35, 0.35))
+    ]);
+    const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.012, 5, false), veinMat);
+    gSurface.add(tag(mesh, 'surface', false));
+  }
+}
+
+/* ---------- 5.2 上表皮 ---------- */
+const gUpperEpi = mkGroup('upperEpi');
+{
+  const cellGeo = new RoundedBoxGeometry(1.02, 0.345, 1.52, 2, 0.075);
+  const cellMat = phys('upperEpi', {
+    color: 0x8bc25c, roughness: 0.34, metalness: 0.0,
+    transparent: true, opacity: 0.3, clearcoat: 0.7, clearcoatRoughness: 0.2,
+    emissive: 0x16330f, emissiveIntensity: 0.25, side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const rim = rimMat('upperEpi', 0x9bf07a, 0.20);
+  const edgeMat = lineMat('upperEpi', { color: 0xb6e894, opacity: 0.5 });
+
+  const xs = [-3.85, -2.75, -1.65, -0.55, 0.55, 1.65, 2.75, 3.85];
+  const zs = [-0.78, -2.38];
+  zs.forEach((z, zi) => {
+    xs.forEach(x => {
+      const mesh = new THREE.Mesh(cellGeo, cellMat);
+      mesh.position.set(x, 1.982, z);
+      gUpperEpi.add(tag(mesh, 'upperEpi'));
+      const shell = new THREE.Mesh(cellGeo, rim);
+      shell.position.copy(mesh.position);
+      shell.scale.setScalar(1.004);
+      gUpperEpi.add(shell);
+    });
+  });
+  // 细胞壁细线
+  const boxLines = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.0, 0.33, 1.5));
+  zs.forEach(z => xs.forEach(x => {
+    const l = new THREE.LineSegments(boxLines, edgeMat);
+    l.position.set(x, 1.982, z);
+    gUpperEpi.add(l);
+  }));
+}
+
+/* ---------- 5.3 栅栏组织（柱状细胞 + 塞满叶绿体） ---------- */
+const gPalisade = mkGroup('palisade');
+const palCells = [];
+{
+  const xs = [];
+  for (let i = 0; i < 10; i++) xs.push(-3.87 + i * 0.86);
+  const zs = [-0.22, -1.12, -2.02];
+  const cellGeo = shadeByAxis(new THREE.CapsuleGeometry(0.30, 0.40, 6, 20), 'y', 0.62, 1.12);
+
+  const cellMat = phys('palisade', {
+    color: 0x86bd52, roughness: 0.3, metalness: 0, vertexColors: true,
+    transparent: true, opacity: 0.13, clearcoat: 0.9, clearcoatRoughness: 0.16,
+    emissive: 0x18380f, emissiveIntensity: 0.3, side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const rim = rimMat('palisade', 0x8fe36e, 0.13);
+
+  // 细胞群
+  zs.forEach((z, zi) => xs.forEach((x, xi) => {
+    const g = new THREE.Group();
+    g.position.set(x, 1.372, z);
+    g.rotation.z = rr(-0.025, 0.025);
+    g.rotation.x = rr(-0.015, 0.015);
+    const mesh = new THREE.Mesh(cellGeo, cellMat);
+    g.add(tag(mesh, 'palisade'));
+    const shell = new THREE.Mesh(cellGeo, rim);
+    shell.scale.setScalar(1.008);
+    g.add(shell);
+    gPalisade.add(g);
+    palCells.push({ g, x, z, size: 1 });
+  }));
+
+  // 叶绿体（实例化）
+  const heroX = -0.43, heroZ = -0.22;
+  const instances = [];
+  palCells.forEach(c => {
+    if (Math.abs(c.x - heroX) < 0.01 && Math.abs(c.z - heroZ) < 0.01) return;
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      instances.push({
+        p: new THREE.Vector3(
+          c.x + rr(-0.13, 0.13),
+          1.372 + rr(-0.26, 0.28),
+          c.z + rr(-0.13, 0.13)
+        ),
+        s: rr(0.8, 1.05),
+        r: rr(0, Math.PI)
+      });
+    }
+  });
+
+  const chGeo = new THREE.SphereGeometry(0.066, 12, 9);
+  const chMat = std('palisade', {
+    color: 0x2b7733, roughness: 0.42, metalness: 0.04,
+    emissive: 0x1d6b22, emissiveIntensity: 0.4, transparent: true, opacity: 1
+  }, { clip: false });
+  const inst = new THREE.InstancedMesh(chGeo, chMat, instances.length);
+  const dummy = new THREE.Object3D();
+  instances.forEach((it, i) => {
+    dummy.position.copy(it.p);
+    dummy.rotation.set(0, it.r, it.r * 0.5);
+    dummy.scale.set(it.s * 1.65, it.s * 0.95, it.s * 1.15);
+    dummy.updateMatrix();
+    inst.setMatrixAt(i, dummy.matrix);
+  });
+  inst.instanceMatrix.needsUpdate = true;
+  inst.userData.part = 'palisade';
+  pickables.push(inst);
+  gPalisade.add(inst);
+}
+
+/* ---------- 5.4 海绵组织（疏松细胞 + 气隙） ---------- */
+const gSpongy = mkGroup('spongy');
+{
+  const base = new THREE.IcosahedronGeometry(1, 2);
+  const pos = base.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const n = 1 + 0.20 * Math.sin(v.x * 4.1 + v.y * 3.2) * Math.cos(v.z * 3.7) + rr(-0.05, 0.05);
+    v.multiplyScalar(n);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  base.computeVertexNormals();
+  shadeByAxis(base, 'y', 0.6, 1.15);
+
+  const cellMat = phys('spongy', {
+    color: 0x74a848, roughness: 0.34, metalness: 0, vertexColors: true,
+    transparent: true, opacity: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.2,
+    emissive: 0x16330f, emissiveIntensity: 0.3, side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const rim = rimMat('spongy', 0x9bee78, 0.28);
+
+  const spots = [];
+  const spRows = [-0.56, -1.22, -1.98];
+  spRows.forEach((z, ri) => {
+    for (let i = 0; i < 8; i++) {
+      spots.push([
+        -3.72 + i * 1.06 + rr(-0.12, 0.12),
+        0.44 + rr(-0.06, 0.16),
+        z + rr(-0.1, 0.1)
+      ]);
+    }
+  });
+  const chloros = [];
+  spots.forEach(([x, y, z]) => {
+    const g = new THREE.Group();
+    const s = rr(0.26, 0.36);
+    g.position.set(x, y, z);
+    g.scale.set(s * rr(0.95, 1.15), s * rr(0.85, 1.0), s * rr(0.95, 1.1));
+    const mesh = new THREE.Mesh(base, cellMat);
+    g.add(tag(mesh, 'spongy'));
+    const shell = new THREE.Mesh(base, rim);
+    shell.scale.setScalar(1.012);
+    g.add(shell);
+    gSpongy.add(g);
+    for (let i = 0; i < 3; i++) {
+      chloros.push({ p: new THREE.Vector3(x + rr(-0.2, 0.2), y + rr(-0.2, 0.2), z + rr(-0.2, 0.2)), s: rr(0.7, 0.95) });
+    }
+  });
+
+  const chGeo = new THREE.SphereGeometry(0.062, 10, 8);
+  const chMat = std('spongy', {
+    color: 0x2d7a33, roughness: 0.45, emissive: 0x1b6a20, emissiveIntensity: 0.38
+  }, { clip: false });
+  const inst = new THREE.InstancedMesh(chGeo, chMat, chloros.length);
+  const dummy = new THREE.Object3D();
+  chloros.forEach((it, i) => {
+    dummy.position.copy(it.p);
+    dummy.rotation.set(rr(0, 3), rr(0, 3), rr(0, 3));
+    dummy.scale.set(it.s * 1.6, it.s * 0.9, it.s * 1.1);
+    dummy.updateMatrix();
+    inst.setMatrixAt(i, dummy.matrix);
+  });
+  inst.userData.part = 'spongy';
+  pickables.push(inst);
+  gSpongy.add(inst);
+}
+
+/* ---------- 5.5 下表皮（带气孔缺口） ---------- */
+const gLowerEpi = mkGroup('lowerEpi');
+const stomataHoles = [-2.78, 2.78];
+{
+  const cellGeo = new RoundedBoxGeometry(1.02, 0.29, 1.52, 2, 0.065);
+  const cellMat = phys('lowerEpi', {
+    color: 0xa9d67c, roughness: 0.36, metalness: 0,
+    transparent: true, opacity: 0.28, clearcoat: 0.65, clearcoatRoughness: 0.22,
+    emissive: 0x16330f, emissiveIntensity: 0.22, side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const rim = rimMat('lowerEpi', 0x9bf07a, 0.2);
+  const edgeMat = lineMat('lowerEpi', { color: 0xa8dc88, opacity: 0.3 });
+  const boxLines = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.0, 0.275, 1.5));
+
+  const xs = [-3.85, -2.75, -1.65, -0.55, 0.55, 1.65, 2.75, 3.85];
+  const zs = [-0.62, -2.32];
+  zs.forEach((z, zi) => {
+    xs.forEach(x => {
+      // 前排便留出气孔缺口
+      if (zi === 0 && stomataHoles.some(h => Math.abs(h - x) < 0.2)) return;
+      const mesh = new THREE.Mesh(cellGeo, cellMat);
+      mesh.position.set(x, 0.19, z);
+      gLowerEpi.add(tag(mesh, 'lowerEpi'));
+      const shell = new THREE.Mesh(cellGeo, rim);
+      shell.position.copy(mesh.position);
+      shell.scale.setScalar(1.005);
+      gLowerEpi.add(shell);
+      const l = new THREE.LineSegments(boxLines, edgeMat);
+      l.position.copy(mesh.position);
+      gLowerEpi.add(l);
+    });
+  });
+}
+
+/* ---------- 5.6 叶脉：木质部 / 韧皮部 ---------- */
+const gVein = mkGroup('vein');
+const xylemTubes = [], phloemTubes = [];
+{
+  const LEN = 8.7;
+  // 维管束鞘
+  const sheathGeo = new THREE.CylinderGeometry(0.205, 0.205, LEN, 26, 1, true);
+  const sheathMat = phys('vein', {
+    color: 0xc8c187, roughness: 0.42, metalness: 0.02,
+    transparent: true, opacity: 0.3, clearcoat: 0.3, clearcoatRoughness: 0.35,
+    emissive: 0x2a2a0c, emissiveIntensity: 0.15, side: THREE.DoubleSide,
+    depthWrite: false
+  }, { clip: false });
+  const sheath = new THREE.Mesh(sheathGeo, sheathMat);
+  sheath.rotation.z = Math.PI / 2;
+  sheath.position.set(0, L.veinY, L.veinZ);
+  gVein.add(tag(sheath, 'vein'));
+  const sheathRim = new THREE.Mesh(sheathGeo, rimMat('vein', 0xece2a8, 0.2));
+  sheathRim.rotation.copy(sheath.rotation);
+  sheathRim.position.copy(sheath.position);
+  sheathRim.scale.setScalar(1.004);
+  gVein.add(sheathRim);
+
+  // 木质部（上）
+  const xyMat = phys('vein', {
+    color: 0x5c93b3, roughness: 0.45, metalness: 0.0,
+    transparent: true, opacity: 0.5, clearcoat: 0.0,
+    emissive: 0x0e3a52, emissiveIntensity: 0.08
+  }, { clip: false });
+  [[0.92, L.veinZ - 0.09], [0.92, L.veinZ + 0.09], [0.85, L.veinZ]].forEach(([y, z]) => {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.034, LEN, 16, 1, true), xyMat);
+    t.rotation.z = Math.PI / 2;
+    t.position.set(0, y, z);
+    gVein.add(tag(t, 'vein'));
+    xylemTubes.push({ y, z });
+  });
+
+  // 韧皮部（下）
+  const phMat = phys('vein', {
+    color: 0xb0844a, roughness: 0.45, metalness: 0.0,
+    transparent: true, opacity: 0.5, clearcoat: 0.0,
+    emissive: 0x5b3c0f, emissiveIntensity: 0.08
+  }, { clip: false });
+  [[0.78, L.veinZ - 0.09], [0.78, L.veinZ + 0.09], [0.82, L.veinZ]].forEach(([y, z]) => {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, LEN, 16, 1, true), phMat);
+    t.rotation.z = Math.PI / 2;
+    t.position.set(0, y, z);
+    gVein.add(tag(t, 'vein'));
+    phloemTubes.push({ y, z });
+  });
+}
+
+/* ---------- 5.7 气孔与保卫细胞 ---------- */
+const gStoma = mkGroup('stoma');
+const guardPairs = [];
+const stomataSurface = [];
+{
+  const guardMat = phys('stoma', {
+    color: 0x8ccb58, roughness: 0.3, metalness: 0.02,
+    clearcoat: 0.9, clearcoatRoughness: 0.15,
+    emissive: 0x255a16, emissiveIntensity: 0.35
+  }, { clip: false });
+  const guardRim = rimMat('stoma', 0xc8ff92, 0.24);
+  const poreMat = new THREE.MeshBasicMaterial({ color: 0x03170b, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+  const poreRimMat = new THREE.MeshBasicMaterial({ color: 0x7fe06a, transparent: true, opacity: 0.22, side: THREE.DoubleSide });
+
+  const guardGeo = new THREE.SphereGeometry(1, 20, 14);
+
+  // 剖面处的两对气孔（正面可见）：两个肾形保卫细胞夹出一个孔
+  stomataHoles.forEach(x => {
+    const g = new THREE.Group();
+    g.position.set(x, 0.19, -0.34);
+    const pair = { g, openness: 0.5, guards: [] };
+
+    [-1, 1].forEach(sgn => {
+      const mesh = new THREE.Mesh(guardGeo, guardMat);
+      mesh.scale.set(0.125, 0.185, 0.135);
+      mesh.position.set(sgn * 0.16, 0, 0);
+      mesh.rotation.z = sgn * 0.26;
+      mesh.rotation.y = sgn * 0.1;
+      g.add(tag(mesh, 'stoma'));
+      const shell = new THREE.Mesh(guardGeo, guardRim);
+      shell.position.copy(mesh.position);
+      shell.rotation.copy(mesh.rotation);
+      shell.scale.copy(mesh.scale).multiplyScalar(1.04);
+      g.add(shell);
+      pair.guards.push({ mesh, sgn, shell });
+    });
+
+    // 孔道（透镜形）
+    const pore = new THREE.Mesh(new THREE.CircleGeometry(1, 22), poreMat);
+    pore.scale.set(0.085, 0.17, 1);
+    pore.position.set(0, 0, -0.15);
+    g.add(pore);
+    const poreRim = new THREE.Mesh(new THREE.CircleGeometry(1, 22), poreRimMat);
+    poreRim.scale.set(0.135, 0.21, 1);
+    poreRim.position.set(0, 0, -0.2);
+    g.add(poreRim);
+    pair.pore = pore;
+    pair.poreRim = poreRim;
+
+    gStoma.add(g);
+    guardPairs.push(pair);
+  });
+
+  // 下表面（背面）真实气孔群：从下方看到的小孔
+  const xs = [-3.7, -3.1, -2.45, -1.8, -1.15, -0.5, 0.15, 0.8, 1.45, 2.1, 2.75, 3.4, 4.0];
+  const zs = [-0.55, -1.35, -2.15, -2.85];
+  zs.forEach((z, zi) => xs.forEach((x, xi) => {
+    if ((xi + zi) % 2 !== 0) return;
+    const g = new THREE.Group();
+    g.position.set(x + rr(-0.12, 0.12), 0.035, z + rr(-0.1, 0.1));
+    g.rotation.x = Math.PI / 2;
+    const s = rr(0.85, 1.2);
+    g.scale.setScalar(s);
+    const pair = { g, guards: [], openness: 0.5, surface: true };
+    [-1, 1].forEach(sgn => {
+      const mesh = new THREE.Mesh(guardGeo, guardMat);
+      mesh.scale.set(0.052, 0.088, 0.05);
+      mesh.position.x = sgn * 0.062;
+      mesh.rotation.z = sgn * 0.22;
+      g.add(mesh);
+      pair.guards.push({ mesh, sgn });
+    });
+    const pore = new THREE.Mesh(new THREE.CircleGeometry(1, 16), poreMat);
+    pore.scale.set(0.04, 0.085, 1);
+    pore.position.z = 0.012;
+    g.add(pore);
+    pair.pore = pore;
+    gStoma.add(g);
+    stomataSurface.push(pair);
+  }));
+}
+
+/* ============================================================
+   6. 叶绿体（可钻入的核心）
+   ============================================================ */
+const CH_POS = new THREE.Vector3(-0.43, 1.30, -0.36);
+const gChloro = mkGroup('chloroplast');
+gChloro.position.copy(CH_POS);
+
+const gGrana = mkGroup('grana', gChloro);
+const gStroma = mkGroup('stroma', gChloro);
+const gCalvin = mkGroup('calvin', gChloro);
+const gETC = mkGroup('etc', gChloro);
+
+const granaStacks = [];
+const psNodes = [];
+const discMats = [];
+
+{
+  /* 被膜：类透镜外形 */
+  const envGeo = new THREE.SphereGeometry(1, 40, 26);
+  const envMat = phys('chloroplast', {
+    color: 0x9fe37a, roughness: 0.12, metalness: 0.0,
+    transparent: true, opacity: 0.045, clearcoat: 1, clearcoatRoughness: 0.06,
+    emissive: 0x2f6b1c, emissiveIntensity: 0.03, side: THREE.BackSide,
+    depthWrite: false
+  }, { clip: false });
+  const env = new THREE.Mesh(envGeo, envMat);
+  env.scale.set(0.33, 0.185, 0.215);
+  gChloro.add(tag(env, 'chloroplast'));
+
+  const envRim = new THREE.Mesh(envGeo, rimMat('chloroplast', 0xc4ff8a, 0.2));
+  envRim.scale.set(0.335, 0.19, 0.22);
+  gChloro.add(envRim);
+
+  /* 内膜 */
+  const innerMat = phys('stroma', {
+    color: 0xbff09a, roughness: 0.4, transparent: true, opacity: 0.018,
+    emissive: 0x3a7a22, emissiveIntensity: 0.25, side: THREE.DoubleSide, depthWrite: false
+  }, { clip: false });
+  const inner = new THREE.Mesh(envGeo, innerMat);
+  inner.scale.set(0.30, 0.165, 0.195);
+  gStroma.add(tag(inner, 'stroma', false));
+
+  /* 基质内的淀粉粒 */
+  const starchMat = std('stroma', {
+    color: 0xd7e8b0, roughness: 0.55, emissive: 0x46551f, emissiveIntensity: 0.08
+  }, { clip: false });
+  [[-0.20, -0.055, 0.03, 0.019], [0.20, 0.055, -0.02, 0.016], [0.03, -0.075, -0.05, 0.014]].forEach(([x, y, z, s]) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(s, 10, 8), starchMat);
+    m.position.set(x, y, z);
+    m.scale.set(1.3, 0.95, 1.1);
+    gStroma.add(tag(m, 'stroma'));
+  });
+
+  /* 基粒：堆叠的类囊体圆盘 */
+  const stackSpots = [
+    [-0.185, 0.012, 0.012, 0],
+    [-0.085, -0.028, 0.030, 0.4],
+    [0.012, 0.020, -0.020, 0.8],
+    [0.110, -0.018, 0.024, 1.2],
+    [0.198, 0.020, -0.010, 1.6]
+  ];
+  const discGeo = new THREE.CylinderGeometry(0.036, 0.036, 0.0095, 18);
+
+  stackSpots.forEach(([sx, sy, sz, ph], si) => {
+    const stack = new THREE.Group();
+    stack.position.set(sx, sy, sz);
+    stack.rotation.z = rr(-0.12, 0.12);
+    stack.rotation.x = rr(-0.16, 0.16);
+    const nDisc = 6;
+    const mats = [];
+    for (let i = 0; i < nDisc; i++) {
+      const dmSide = std('grana', {
+        color: 0x123a18, roughness: 0.45, metalness: 0.05,
+        emissive: 0x1f5a26, emissiveIntensity: 0.06
+      }, { clip: false, animated: true });
+      const dmCap = std('grana', {
+        color: 0x1e5a24, roughness: 0.4, metalness: 0.04,
+        emissive: 0x2f8f3a, emissiveIntensity: 0.12
+      }, { clip: false, animated: true });
+      discMats.push(dmSide, dmCap);
+      const d = new THREE.Mesh(discGeo, [dmSide, dmCap, dmCap]);
+      d.position.y = (i - (nDisc - 1) / 2) * 0.0132;
+      stack.add(tag(d, 'grana'));
+      mats.push(dmCap);
+    }
+    gGrana.add(stack);
+    granaStacks.push({ g: stack, ph, mats, pos: new THREE.Vector3(sx, sy, sz) });
+
+    /* 光系统：盘缘的捕光复合体 */
+    for (let k = 0; k < 2; k++) {
+      const ang = k === 0 ? 0.6 : 3.4;
+      const psGeo = new THREE.SphereGeometry(0.0085, 8, 6);
+      const psMat = std('etc', {
+        color: 0xcfff9a, roughness: 0.2,
+        emissive: 0x8dff6a, emissiveIntensity: 0.7
+      }, { clip: false, animated: true });
+      const ps = new THREE.Mesh(psGeo, psMat);
+      ps.position.set(Math.cos(ang) * 0.037, 0.026, Math.sin(ang) * 0.037);
+      stack.add(tag(ps, 'etc'));
+      psNodes.push({ mesh: ps, mat: psMat, ph: ph + k * 1.7, stack });
+    }
+  });
+
+  /* 类囊体连接（基质片层） */
+  const lamMat = std('grana', {
+    color: 0x4a9a44, roughness: 0.5, transparent: true, opacity: 0.55,
+    emissive: 0x2f7a2a, emissiveIntensity: 0.4
+  }, { clip: false });
+  for (let i = 0; i < stackSpots.length - 1; i++) {
+    const a = stackSpots[i], b = stackSpots[i + 1];
+    const c = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(a[0], a[1] + 0.03, a[2]),
+      new THREE.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.055, (a[2] + b[2]) / 2),
+      new THREE.Vector3(b[0], b[1] + 0.028, b[2])
+    ]);
+    const m = new THREE.Mesh(new THREE.TubeGeometry(c, 14, 0.0025, 5, false), lamMat);
+    gGrana.add(m);
+  }
+
+  /* 电子传递链：一串小复合体 */
+  const etcNodes = [];
+  const etcPath = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.185, 0.052, 0.012),
+    new THREE.Vector3(-0.09, 0.070, 0.055),
+    new THREE.Vector3(0.01, 0.055, 0.062),
+    new THREE.Vector3(0.11, 0.058, 0.048),
+    new THREE.Vector3(0.198, 0.048, 0.012)
+  ]);
+  const etcMat = std('etc', {
+    color: 0x8ad9c0, roughness: 0.3, emissive: 0x54ffcf, emissiveIntensity: 0.6
+  }, { clip: false, animated: true });
+  for (let i = 0; i <= 6; i++) {
+    const p = etcPath.getPoint(i / 6);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.0085, 8, 6), etcMat);
+    m.position.copy(p);
+    gETC.add(tag(m, 'etc'));
+    etcNodes.push(m);
+  }
+
+  /* 卡尔文循环：环 + 三个碳节点 */
+  const ringMat = std('calvin', {
+    color: 0xe8a63c, roughness: 0.35, emissive: 0xb9741b, emissiveIntensity: 0.45
+  }, { clip: false, animated: true });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.0038, 6, 48), ringMat);
+  ring.position.set(0.075, -0.06, 0.06);
+  ring.rotation.set(0.9, 0.3, 0.2);
+  gCalvin.add(tag(ring, 'calvin'));
+
+  const carbonMat = std('calvin', {
+    color: 0xffcf7a, roughness: 0.28, emissive: 0xd9822a, emissiveIntensity: 0.7
+  }, { clip: false, animated: true });
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * Math.PI * 2;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.0095, 8, 6), carbonMat);
+    m.position.set(Math.cos(a) * 0.055, Math.sin(a) * 0.055, 0);
+    ring.add(m);
+  }
+  // 环的旋转轴标记
+  const hubMat = std('calvin', {
+    color: 0xffe6b0, roughness: 0.4, emissive: 0xa87a26, emissiveIntensity: 0.35
+  }, { clip: false, animated: true });
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(0.006, 8, 6), hubMat);
+  ring.add(hub);
+  gCalvin.userData.ring = ring;
+}
+
+/* ============================================================
+   7. 粒子系统（Points）
+   ============================================================ */
+function makePoints(count, opts = {}) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const size = new Float32Array(count);
+  const alpha = new Float32Array(count);
+  const col = new Float32Array(count * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+  geo.setAttribute('aAlpha', new THREE.BufferAttribute(alpha, 1));
+  geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: window.innerHeight * 0.5 } },
+    vertexShader: `
+      attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
+      varying float vA; varying vec3 vC;
+      uniform float uScale;
+      void main(){
+        vA = aAlpha; vC = aColor;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = clamp(aSize * uScale / max(0.001, -mv.z), 1.0, 26.0);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying float vA; varying vec3 vC;
+      void main(){
+        vec2 d = gl_PointCoord - 0.5;
+        float r = length(d);
+        if(r > 0.5) discard;
+        float a = smoothstep(0.5, 0.0, r);
+        a = pow(a, 1.7);
+        gl_FragColor = vec4(vC, a * vA);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  scene.add(pts);
+  return { pts, geo, pos, size, alpha, col, count, mat, opacity: 1 };
+}
+
+function flushPoints(s) {
+  s.geo.attributes.position.needsUpdate = true;
+  s.geo.attributes.aSize.needsUpdate = true;
+  s.geo.attributes.aAlpha.needsUpdate = true;
+  s.geo.attributes.aColor.needsUpdate = true;
+}
+
+/* ---------- 7.0 表面蜡质高光颗粒 ---------- */
+{
+  const g = makePoints(520);
+  for (let i = 0; i < 520; i++) {
+    g.pos[i * 3] = rr(-4.22, 4.22);
+    g.pos[i * 3 + 1] = 2.315 + rr(0, 0.012);
+    g.pos[i * 3 + 2] = rr(-3.12, -0.06);
+    g.size[i] = rr(0.006, 0.019);
+    g.alpha[i] = rr(0.06, 0.34);
+    const k = rr(0.85, 1.0);
+    g.col[i * 3] = 0.9 * k; g.col[i * 3 + 1] = 1.0 * k; g.col[i * 3 + 2] = 0.86 * k;
+  }
+  flushPoints(g);
+}
+
+/* ---------- 7.1 光子 ---------- */
+const N_PHOTON = 110;
+const photons = makePoints(N_PHOTON);
+const photonState = [];
+for (let i = 0; i < N_PHOTON; i++) {
+  photonState.push({ p: new THREE.Vector3(), v: new THREE.Vector3(), size: 0, alpha: 0 });
+  resetPhoton(photonState[i], true);
+  photons.col[i * 3] = 1.0; photons.col[i * 3 + 1] = 0.93; photons.col[i * 3 + 2] = 0.62;
+}
+function resetPhoton(s, randomY) {
+  s.p.set(rr(-6.5, 6.0), randomY ? rr(2.4, 8.0) : rr(6.0, 8.4), rr(-4.5, 2.6));
+  s.v.set(rr(-0.22, -0.08), -1, rr(0.06, 0.24)).normalize().multiplyScalar(rr(2.4, 3.6));
+  s.size = rr(0.055, 0.125);
+}
+function updatePhotons(dt) {
+  for (let i = 0; i < N_PHOTON; i++) {
+    const s = photonState[i];
+    s.p.addScaledVector(s.v, dt * (sunOn ? 1 : 0.0));
+    // 接近叶面时变亮，穿过后消失
+    const nearSurface = 2.31;
+    let a = 1;
+    if (s.p.y < nearSurface + 1.2) a = clamp01((s.p.y - nearSurface) / 1.2) * 0.95;
+    if (s.p.y < nearSurface + 0.02 && !s.hit) {
+      s.hit = true;
+      if (sunOn && s.p.y > nearSurface - 0.4) emitSpark(s.p);
+    }
+    if (s.p.y < nearSurface - 0.05 || s.p.y < 0) { s.hit = false; resetPhoton(s, false); }
+    photons.pos[i * 3] = s.p.x;
+    photons.pos[i * 3 + 1] = s.p.y;
+    photons.pos[i * 3 + 2] = s.p.z;
+    photons.size[i] = s.size * (sunOn ? 1 : 0.2);
+    photons.alpha[i] = a;
+  }
+  flushPoints(photons);
+}
+
+/* ---------- 7.15 光子击中叶面的闪光 ---------- */
+const N_SPARK = 24;
+const sparks = makePoints(N_SPARK);
+const sparkState = [];
+for (let i = 0; i < N_SPARK; i++) {
+  sparkState.push({ life: 1, p: new THREE.Vector3() });
+  sparks.col[i * 3] = 1.0; sparks.col[i * 3 + 1] = 0.98; sparks.col[i * 3 + 2] = 0.7;
+  sparks.alpha[i] = 0;
+}
+let sparkPtr = 0;
+function emitSpark(p) {
+  const s = sparkState[sparkPtr];
+  s.life = 0;
+  s.p.copy(p);
+  sparkPtr = (sparkPtr + 1) % N_SPARK;
+}
+function updateSparks(dt) {
+  for (let i = 0; i < N_SPARK; i++) {
+    const s = sparkState[i];
+    s.life = Math.min(1, s.life + dt * 2.6);
+    const k = 1 - s.life;
+    sparks.pos[i * 3] = s.p.x;
+    sparks.pos[i * 3 + 1] = s.p.y;
+    sparks.pos[i * 3 + 2] = s.p.z;
+    sparks.size[i] = 0.10 * (0.3 + k);
+    sparks.alpha[i] = Math.pow(k, 1.4) * 0.9;
+  }
+  flushPoints(sparks);
+}
+
+/* ---------- 7.2 水（木质部） ---------- */
+const N_WATER = 90;
+const waters = makePoints(N_WATER);
+const waterState = [];
+for (let i = 0; i < N_WATER; i++) {
+  waterState.push({ u: rnd(), tube: 0, rise: false, p: new THREE.Vector3(), size: 0, alpha: 0, seed: rnd() });
+  const s = waterState[i];
+  s.rise = rnd() < 0.35;
+  s.tube = Math.floor(rnd() * xylemTubes.length);
+  waters.col[i * 3] = 0.42; waters.col[i * 3 + 1] = 0.76; waters.col[i * 3 + 2] = 1.0;
+}
+function updateWaters(dt, t) {
+  for (let i = 0; i < N_WATER; i++) {
+    const s = waterState[i];
+    s.u += dt * (s.rise ? 0.28 : 0.13) * (sunOn ? 1 : 0.25);
+    if (s.u > 1) { s.u = 0; s.rise = rnd() < 0.35; s.tube = Math.floor(rnd() * xylemTubes.length); }
+    if (!s.rise) {
+      // 沿木质部长距离上升（x 方向）
+      const tube = xylemTubes[s.tube];
+      s.p.set(-4.3 + 8.6 * s.u, tube.y + Math.sin(t * 2 + s.seed * 9) * 0.012, tube.z + Math.sin(t * 1.4 + s.seed * 5) * 0.012);
+      s.alpha = Math.sin(s.u * Math.PI) * 0.95;
+    } else {
+      // 从叶脉分支向上进入叶肉
+      const x = -4.3 + 8.6 * s.u;
+      s.p.set(x, 0.95 + Math.sin(s.u * Math.PI) * 1.05, L.veinZ + Math.sin(t + s.seed * 7) * 0.08);
+      s.alpha = Math.sin(s.u * Math.PI) * 0.55;
+    }
+    s.size = 0.055;
+    waters.pos[i * 3] = s.p.x; waters.pos[i * 3 + 1] = s.p.y; waters.pos[i * 3 + 2] = s.p.z;
+    waters.size[i] = s.size; waters.alpha[i] = s.alpha;
+  }
+  flushPoints(waters);
+}
+
+/* ---------- 7.3 糖（韧皮部） ---------- */
+const N_SUGAR = 80;
+const sugars = makePoints(N_SUGAR);
+const sugarState = [];
+for (let i = 0; i < N_SUGAR; i++) {
+  const s = { u: rnd(), tube: Math.floor(rnd() * phloemTubes.length), p: new THREE.Vector3(), seed: rnd() };
+  sugarState.push(s);
+  sugars.col[i * 3] = 1.0; sugars.col[i * 3 + 1] = 0.72; sugars.col[i * 3 + 2] = 0.32;
+}
+function updateSugars(dt, t) {
+  for (let i = 0; i < N_SUGAR; i++) {
+    const s = sugarState[i];
+    s.u -= dt * 0.12 * (sunOn ? 1 : 0.4);   // 反向流动：向叶柄
+    if (s.u < 0) { s.u = 1; s.tube = Math.floor(rnd() * phloemTubes.length); }
+    const tube = phloemTubes[s.tube];
+    const x = 4.3 - 8.6 * s.u;
+    sugars.pos[i * 3] = x;
+    sugars.pos[i * 3 + 1] = tube.y + Math.sin(t * 2.2 + s.seed * 8) * 0.014;
+    sugars.pos[i * 3 + 2] = tube.z + Math.cos(t * 1.8 + s.seed * 4) * 0.014;
+    sugars.size[i] = 0.052;
+    sugars.alpha[i] = Math.sin(s.u * Math.PI) * 0.95;
+  }
+  flushPoints(sugars);
+}
+
+/* ---------- 7.4 CO₂ 从气孔渗入 ---------- */
+const N_CO2 = 60;
+const co2 = makePoints(N_CO2);
+const co2State = [];
+for (let i = 0; i < N_CO2; i++) {
+  const s = { u: rnd(), x: stomataHoles[Math.floor(rnd() * 2)], p: new THREE.Vector3(), seed: rnd() };
+  co2State.push(s);
+  co2.col[i * 3] = 0.78; co2.col[i * 3 + 1] = 0.86; co2.col[i * 3 + 2] = 0.95;
+}
+function updateCO2(dt, t) {
+  for (let i = 0; i < N_CO2; i++) {
+    const s = co2State[i];
+    s.u += dt * 0.26 * (sunOn ? 1 : 0.3);
+    if (s.u > 1) { s.u = 0; s.x = stomataHoles[Math.floor(rnd() * 2)]; }
+    const y = -0.55 + s.u * 1.75;
+    // 靠近气孔时被“吸”进去
+    const pinch = Math.min(1, s.u * 6);
+    co2.pos[i * 3] = s.x + Math.sin(t * 1.3 + s.seed * 9) * 0.12 * pinch;
+    co2.pos[i * 3 + 1] = y;
+    co2.pos[i * 3 + 2] = -0.34 + Math.sin(t * 0.9 + s.seed * 6) * 0.22 * pinch;
+    co2.size[i] = 0.05;
+    co2.alpha[i] = Math.sin(s.u * Math.PI) * 0.6;
+  }
+  flushPoints(co2);
+}
+
+/* ---------- 7.5 氧气泡（逸出） ---------- */
+const N_O2 = 26;
+const o2Geo = new THREE.SphereGeometry(1, 10, 8);
+const o2Mat = new THREE.MeshBasicMaterial({
+  color: 0xbdf8ff, transparent: true, opacity: 0.5,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+const o2Mesh = new THREE.InstancedMesh(o2Geo, o2Mat, N_O2);
+o2Mesh.frustumCulled = false;
+o2Mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N_O2 * 3), 3);
+scene.add(o2Mesh);
+const o2State = [];
+for (let i = 0; i < N_O2; i++) {
+  o2State.push({
+    t: rnd(), seed: rnd(), side: rnd() < 0.5 ? -1 : 1,
+    from: new THREE.Vector3(), dur: rr(3.4, 5.2)
+  });
+}
+const _dummy = new THREE.Object3D();
+const _c = new THREE.Color();
+function updateO2(dt, t) {
+  for (let i = 0; i < N_O2; i++) {
+    const s = o2State[i];
+    s.t += dt / s.dur * (sunOn ? 1 : 0.05);
+    if (s.t >= 1) {
+      s.t = 0;
+      s.side = rnd() < 0.5 ? -1 : 1;
+      s.from.set(CH_POS.x + rr(-0.18, 0.18), CH_POS.y + rr(-0.12, 0.14), CH_POS.z + rr(-0.1, 0.1));
+      s.dur = rr(3.4, 5.4);
+    }
+    const toStoma = 0.55;
+    let p;
+    if (s.t < toStoma) {
+      const k = easeInOut(s.t / toStoma);
+      const sx = s.side < 0 ? stomataHoles[0] : stomataHoles[1];
+      p = new THREE.Vector3(
+        lerp(s.from.x, sx, k),
+        lerp(s.from.y, 0.20, k) - Math.sin(k * Math.PI) * 0.12,
+        lerp(s.from.z, -0.34, k)
+      );
+    } else {
+      const k = (s.t - toStoma) / (1 - toStoma);
+      const sx = s.side < 0 ? stomataHoles[0] : stomataHoles[1];
+      p = new THREE.Vector3(
+        sx + Math.sin(k * 6 + s.seed * 9) * 0.06 * k,
+        0.20 - k * 1.05,
+        -0.34 + Math.cos(k * 5 + s.seed * 8) * 0.07
+      );
+    }
+    const grow = s.t < toStoma ? 0.007 + s.t * 0.013 : 0.020 + (s.t - toStoma) * 0.008;
+    _dummy.position.copy(p);
+    _dummy.scale.setScalar(grow);
+    _dummy.updateMatrix();
+    o2Mesh.setMatrixAt(i, _dummy.matrix);
+    const fade = s.t < 0.1 ? s.t / 0.1 : (s.t > 0.82 ? clamp01((1 - s.t) / 0.18) : 1);
+    _c.setRGB(0.62 * fade, 0.94 * fade, 1.0 * fade);
+    o2Mesh.setColorAt(i, _c);
+  }
+  o2Mesh.instanceMatrix.needsUpdate = true;
+  if (o2Mesh.instanceColor) o2Mesh.instanceColor.needsUpdate = true;
+}
+
+/* ---------- 7.6 叶绿体内的电子流 ---------- */
+const N_ELEC = 16;
+const elecs = makePoints(N_ELEC);
+elecs.pts.parent && elecs.pts.parent.remove(elecs.pts);
+gETC.add(elecs.pts);
+elecs.pts.position.set(0, 0, 0);
+const elecState = [];
+for (let i = 0; i < N_ELEC; i++) {
+  elecState.push({ u: rnd(), seed: rnd() });
+  elecs.col[i * 3] = 1.0; elecs.col[i * 3 + 1] = 0.9; elecs.col[i * 3 + 2] = 0.35;
+}
+const etcCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-0.185, 0.052, 0.012),
+  new THREE.Vector3(-0.09, 0.070, 0.055),
+  new THREE.Vector3(0.01, 0.055, 0.062),
+  new THREE.Vector3(0.11, 0.058, 0.048),
+  new THREE.Vector3(0.198, 0.048, 0.012)
+]);
+const _ev = new THREE.Vector3();
+function updateElectrons(dt) {
+  for (let i = 0; i < N_ELEC; i++) {
+    const s = elecState[i];
+    s.u += dt * 0.22 * (sunOn ? 1 : 0.1);
+    if (s.u > 1) s.u -= 1;
+    etcCurve.getPoint(s.u, _ev);
+    elecs.pos[i * 3] = _ev.x;
+    elecs.pos[i * 3 + 1] = _ev.y + Math.sin(s.u * 10 + s.seed) * 0.004;
+    elecs.pos[i * 3 + 2] = _ev.z;
+    elecs.size[i] = 0.024;
+    elecs.alpha[i] = Math.sin(s.u * Math.PI) * 0.95;
+  }
+  flushPoints(elecs);
+}
+
+/* ============================================================
+   8. 爆炸视图 / 标签
+   ============================================================ */
+const PARTS = [
+  { id: 'surface', name: '上表面 · 角质层与叶脉', desc: '蜡质角质层封住水分，叶脉网络把水送进来、把糖送出去。', dir: [0, 1, 0], dist: 1.5, anchor: [-4.3, 2.2, -0.42] },
+  { id: 'upperEpi', name: '上表皮', desc: '一层透明细胞，让阳光几乎无损地透进叶肉。', dir: [0, 1, 0], dist: 0.9, anchor: [4.3, 1.98, -0.42] },
+  { id: 'palisade', name: '栅栏组织', desc: '柱状细胞竖着排紧、塞满叶绿体，是捕光的主力。', dir: [0, 1, 0], dist: 0.35, anchor: [-4.3, 1.35, -0.42] },
+  { id: 'chloroplast', name: '叶绿体', desc: '光合作用的车间：膜上跑光反应，基质里造糖。', dir: [-0.85, 0.8, 1.1], dist: 2.0, anchor: [0.26, 0.2, 0.06], mini: false },
+  { id: 'grana', name: '类囊体基粒', desc: '堆叠的类囊体膜，光反应在这里把光子变成 ATP 与 NADPH。', dir: [0, 0.42, 0], dist: 0.5, anchor: [-0.18, 0.13, 0.02], mini: true },
+  { id: 'stroma', name: '基质', desc: '含满酶的液体，卡尔文循环就在这里把 CO₂ 变成糖。', dir: [0, -0.3, 0.3], dist: 0.55, anchor: [0.2, -0.16, 0.02], mini: true },
+  { id: 'calvin', name: '卡尔文循环', desc: '每秒转一圈：固定 CO₂，用 ATP 与 NADPH 造出糖。', dir: [0.45, -0.1, 0.55], dist: 0.7, anchor: [0.075, -0.14, 0.075], mini: true },
+  { id: 'etc', name: '光系统与电子链', desc: '光系统 II 劈开水、放出氧气，电子沿链跑去造 ATP。', dir: [-0.35, 0.42, 0.4], dist: 0.75, anchor: [-0.16, 0.1, 0.02], mini: true },
+  { id: 'spongy', name: '海绵组织', desc: '排列疏松、细胞间留出气隙，让 CO₂ 自由扩散。', dir: [0, -1, 0], dist: 0.25, anchor: [-4.3, 0.5, -0.9] },
+  { id: 'vein', name: '叶脉 · 维管束', desc: '木质部送水上行，韧皮部把糖送下。', dir: [0, -1, 0], dist: 1.2, anchor: [4.3, 0.86, -0.72] },
+  { id: 'lowerEpi', name: '下表皮', desc: '带气孔的底层，气体进出的大门。', dir: [0, -1, 0], dist: 1.75, anchor: [-4.3, 0.19, -0.62] },
+  { id: 'stoma', name: '气孔 · 保卫细胞', desc: '保卫细胞吸水膨胀撑开气孔，CO₂ 进、O₂ 与水汽出。', dir: [0, -1, 0], dist: 2.15, anchor: [3.0, 0.19, -0.34] }
+];
+
+PARTS.forEach(p => {
+  const g = groups[p.id];
+  if (!g) return;
+  g.userData.base = g.position.clone();
+  g.userData.offset = new THREE.Vector3(...p.dir).normalize().multiplyScalar(p.dist);
+  explodeParts.push(p);
+  p.group = g;
+});
+
+const labelEls = {};
+const labelsRoot = document.getElementById('labels');
+PARTS.forEach(p => {
+  const el = document.createElement('div');
+  el.className = 'label' + (p.mini ? ' mini' : '');
+  const dot = document.createElement('span'); dot.className = 'dt';
+  const tx = document.createElement('span'); tx.textContent = p.name;
+  el.appendChild(dot); el.appendChild(tx);
+  labelsRoot.appendChild(el);
+  labelEls[p.id] = el;
+});
+
+const _wv = new THREE.Vector3();
+function updateLabels() {
+  const camDist = camera.position.distanceTo(controls.target);
+  PARTS.forEach(p => {
+    const el = labelEls[p.id];
+    if (!el) return;
+    const show = explodeAmt > 0.08 && (!p.mini || camDist < 3.2);
+    if (!show) { el.style.opacity = 0; return; }
+    _wv.copy(p.anchor ? new THREE.Vector3(...p.anchor) : new THREE.Vector3());
+    p.group.localToWorld(_wv);
+    _wv.project(camera);
+    if (_wv.z > 1) { el.style.opacity = 0; return; }
+    const x = (_wv.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-_wv.y * 0.5 + 0.5) * window.innerHeight;
+    const leftSide = p.anchor[0] < 0;
+    el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(${leftSide ? 'calc(-100% - 14px)' : '14px'}, -50%)`;
+    const near = p.mini ? clamp01((3.2 - camDist) / 1.0) : 1;
+    el.style.opacity = (0.25 + explodeAmt * 0.75) * near;
+  });
+}
+
+/* ============================================================
+   9. 交互：悬停 / 爆炸 / 阳光
+   ============================================================ */
+let hoveredPart = null;
+const hoverAmt = {};
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2(-10, -10);
+let pointerActive = false;
+
+const tipEl = document.getElementById('tip');
+const tipName = tipEl.querySelector('.name');
+const tipDesc = tipEl.querySelector('.desc');
+let tipX = 0, tipY = 0;
+
+function setHover(id) {
+  if (hoveredPart === id) return;
+  hoveredPart = id;
+  if (id) {
+    const p = PARTS.find(x => x.id === id);
+    if (p) {
+      tipName.textContent = p.name;
+      tipDesc.textContent = p.desc;
+      tipEl.style.opacity = 1;
+    }
+  } else {
+    tipEl.style.opacity = 0;
+  }
+}
+
+canvas.addEventListener('pointermove', e => {
+  pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  pointerActive = true;
+  tipX = e.clientX; tipY = e.clientY;
+  tipEl.style.transform = `translate3d(${Math.min(tipX + 18, window.innerWidth - 350)}px, ${tipY + 20}px, 0)`;
+});
+canvas.addEventListener('pointerleave', () => { pointerActive = false; setHover(null); });
+
+let dragging = false;
+canvas.addEventListener('pointerdown', () => { dragging = true; });
+window.addEventListener('pointerup', () => { dragging = false; });
+
+function pick() {
+  if (!pointerActive || dragging) { setHover(null); return; }
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(pickables, false);
+  // 钻进叶绿体后，忽略包裹在外的叶片层，优先响应内部结构
+  const near = camera.position.distanceTo(controls.target) < 2.3;
+  let id = null;
+  for (const h of hits) {
+    const pt = h.object.userData.part;
+    if (!pt) continue;
+    if (near && (pt === 'palisade' || pt === 'spongy' || pt === 'upperEpi' || pt === 'lowerEpi')) continue;
+    id = pt; break;
+  }
+  setHover(id);
+}
+
+/* 爆炸 */
+let explodeTarget = 0, explodeAmt = 0;
+const btnExplode = document.getElementById('btnExplode');
+const explodeTxt = document.getElementById('explodeTxt');
+btnExplode.addEventListener('click', () => {
+  explodeTarget = explodeTarget > 0.5 ? 0 : 1;
+  const on = explodeTarget > 0.5;
+  btnExplode.classList.toggle('on', on);
+  explodeTxt.textContent = on ? '合拢复位' : '爆炸视图';
+  if (on) { controls.autoRotate = false; }
+  // 展开时相机略微后退，保证所有层都在画面里
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  const d = camera.position.distanceTo(controls.target);
+  const nd = on ? Math.max(d, 11) * 1.14 : Math.max(d / 1.14, 8.5);
+  camTween = {
+    t: 0, fromP: camera.position.clone(), toP: controls.target.clone().addScaledVector(dir, nd),
+    fromT: controls.target.clone(), toT: controls.target.clone()
+  };
+});
+
+/* 复位视角 */
+const btnReset = document.getElementById('btnReset');
+let camTween = null;
+btnReset.addEventListener('click', () => {
+  camTween = { t: 0, fromP: camera.position.clone(), toP: CAM_HOME.clone().add(TARGET), fromT: controls.target.clone(), toT: TARGET.clone() };
+});
+
+/* 阳光 */
+let sunOn = true;
+const sunToggle = document.getElementById('sunToggle');
+sunToggle.addEventListener('click', () => {
+  sunOn = !sunOn;
+  sunToggle.classList.toggle('off', !sunOn);
+  sunToggle.querySelector('span:last-child').textContent = sunOn ? '阳光照射中' : '暗处 · 反应暂停';
+  sunLight.intensity = sunOn ? 2.7 : 0.45;
+  rimLight.intensity = sunOn ? 1.15 : 0.35;
+  insideGlow.intensity = sunOn ? 0.45 : 0.1;
+  veinGlow.intensity = sunOn ? 0.7 : 0.2;
+  renderer.toneMappingExposure = sunOn ? 0.92 : 0.6;
+});
+
+/* ============================================================
+   10. 动画
+   ============================================================ */
+const barStoma = document.getElementById('barStoma');
+const valStoma = document.getElementById('valStoma');
+const clock = new THREE.Clock();
+let T = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  T += dt;
+
+  /* 爆炸缓动 */
+  explodeAmt += (explodeTarget - explodeAmt) * Math.min(1, dt * 4.2);
+  if (Math.abs(explodeTarget - explodeAmt) < 0.002) explodeAmt = explodeTarget;
+  const e = easeInOut(explodeAmt);
+  explodeParts.forEach(p => {
+    p.group.position.copy(p.group.userData.base).addScaledVector(p.group.userData.offset, e);
+  });
+  // 叶绿体作为"细节标本"在展开时放大
+  const cs = 1 + e * 0.55;
+  gChloro.scale.setScalar(cs);
+
+  /* 越靠近叶绿体，外层组织越透明，让内部结构看得清 */
+  const camDist = camera.position.distanceTo(controls.target);
+  const focus = clamp01((camDist - 1.5) / 3.6);
+  const fadeK = 0.02 + 0.98 * focus;
+
+  /* 悬停高亮 */
+  PARTS.forEach(p => {
+    const target = hoveredPart === p.id ? 1 : 0;
+    const cur = hoverAmt[p.id] || 0;
+    const next = cur + (target - cur) * Math.min(1, dt * 12);
+    hoverAmt[p.id] = next;
+    const b = partMats[p.id];
+    if (!b) return;
+    const fk = FADE_PARTS.has(p.id) ? fadeK : 1;
+    b.solid.forEach(it => {
+      if (!it.animated) it.mat.emissive.copy(it.base);
+      if (next > 0.002) it.mat.emissive.lerp(ACCENT, next * 0.42);
+      if (!it.animated) it.mat.emissiveIntensity = it.baseEI + next * 0.4;
+      if (it.mat.transparent) it.mat.opacity = it.op * fk;
+    });
+    b.line.forEach(it => {
+      it.mat.color.copy(it.base);
+      if (next > 0.002) it.mat.color.lerp(ACCENT, next * 0.85);
+      it.mat.opacity = (it.baseOp + next * 0.5) * fk;
+    });
+    const exBoost = (p.id === 'chloroplast' || p.id === 'grana') ? (1 + easeInOut(explodeAmt) * 1.2) : 1;
+    b.rim.forEach(it => {
+      it.mat.uniforms.uOpacity.value = (it.base + next * 0.55) * fk * exBoost;
+    });
+  });
+
+  /* 气孔开合 */
+  const breath = 0.5 + 0.5 * Math.sin(T * 0.85 - 1.2);      // 0..1
+  const openness = 0.18 + 0.82 * breath;
+  const stomaLabel = Math.round(openness * 100);
+  barStoma.style.width = stomaLabel + '%';
+  valStoma.textContent = stomaLabel + '%';
+
+  guardPairs.forEach(pair => {
+    pair.guards.forEach(g => {
+      const push = 0.152 + 0.03 * openness;
+      g.mesh.position.x = g.sgn * push;
+      g.mesh.scale.set(0.125 * (0.84 + 0.26 * openness), 0.185 * (0.95 + 0.09 * openness), 0.135);
+      if (g.shell) {
+        g.shell.position.x = g.mesh.position.x;
+        g.shell.scale.copy(g.mesh.scale).multiplyScalar(1.04);
+      }
+    });
+    if (pair.pore) {
+      pair.pore.scale.set(0.085 * (0.30 + 1.35 * openness), 0.17 * (0.82 + 0.32 * openness), 1);
+    }
+    if (pair.poreRim) {
+      pair.poreRim.scale.set(0.135 * (0.62 + 0.62 * openness), 0.21 * (0.86 + 0.26 * openness), 1);
+      pair.poreRim.material.opacity = 0.06 + 0.2 * openness;
+    }
+  });
+  // 背面气孔同步
+  stomataSurface.forEach(pair => {
+    pair.guards.forEach(g => {
+      g.mesh.position.x = g.sgn * (0.055 + 0.013 * openness);
+      g.mesh.scale.set(0.052 * (0.86 + 0.24 * openness), 0.088, 0.05);
+    });
+    if (pair.pore) pair.pore.scale.set(0.04 * (0.42 + 0.95 * openness), 0.085, 1);
+  });
+
+  /* 光反应：类囊体闪烁 + 光系统脉冲（越近越亮，像暗场里的荧光） */
+  const zoomK = 1 + (1 - focus) * 1.5;
+  const lightK = (sunOn ? 1 : 0.04) * zoomK;
+  discMats.forEach((m, i) => {
+    const f = 0.05 + 0.30 * lightK * (0.5 + 0.5 * Math.sin(T * 3.1 + i * 0.9)) + 0.30 * lightK * Math.pow(Math.max(0, Math.sin(T * 1.7 + i * 0.37)), 8);
+    m.emissiveIntensity = f;
+  });
+  psNodes.forEach((p, i) => {
+    const pulse = 0.35 + 1.5 * lightK * Math.pow(Math.max(0, Math.sin(T * 2.4 + p.ph)), 6);
+    p.mat.emissiveIntensity = pulse;
+    p.mesh.scale.setScalar(0.85 + 0.5 * lightK * Math.pow(Math.max(0, Math.sin(T * 2.4 + p.ph)), 6));
+  });
+
+  /* 卡尔文循环：约每秒一圈 */
+  if (gCalvin.userData.ring) {
+    gCalvin.userData.ring.rotation.z += dt * Math.PI * 2 * (sunOn ? 1.0 : 0.06);
+  }
+
+  /* 粒子 */
+  updatePhotons(dt);
+  updateSparks(dt);
+  updateWaters(dt, T);
+  updateSugars(dt, T);
+  updateCO2(dt, T);
+  updateO2(dt, T);
+  updateElectrons(dt);
+
+  /* 呼吸灯：叶脉与叶绿体 */
+  insideGlow.intensity = (sunOn ? 0.5 : 0.12) + Math.sin(T * 2.2) * 0.08;
+
+  /* 相机复位动画 */
+  if (camTween) {
+    camTween.t += dt / 0.95;
+    const k = easeInOut(clamp01(camTween.t));
+    camera.position.lerpVectors(camTween.fromP, camTween.toP, k);
+    controls.target.lerpVectors(camTween.fromT, camTween.toT, k);
+    if (camTween.t >= 1) camTween = null;
+  }
+
+  pick();
+  updateLabels();
+  controls.update();
+  if (composer) composer.render(); else renderer.render(scene, camera);
+}
+
+/* ============================================================
+   11. 启动
+   ============================================================ */
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (composer) composer.setSize(window.innerWidth, window.innerHeight);
+  [photons, waters, sugars, co2, elecs, sparks].forEach(s => s.mat.uniforms.uScale.value = window.innerHeight * 0.5);
+}
+window.addEventListener('resize', onResize);
+
+(async () => {
+  try {
+    const mod = await import('three/addons/environments/RoomEnvironment.js');
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const env = pmrem.fromScene(new mod.RoomEnvironment(), 0.04);
+    scene.environment = env.texture;
+    pmrem.dispose();
+  } catch (err) { /* 环境贴图不可用时退化为纯灯光 */ }
+
+  scene.add(makeSky());
+  initComposer();
+  window.__leaf = { camera, controls, scene, THREE, composer, skipTween: () => { camTween = null; } };
+  animate();
+  const loader = document.getElementById('loader');
+  setTimeout(() => { loader.classList.add('hide'); setTimeout(() => loader.remove(), 900); }, 260);
+})();
+</script>
+</body>
+</html>

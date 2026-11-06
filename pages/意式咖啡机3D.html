@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>意式咖啡机 · 交互式 3D 剖切与萃取流程</title>
+<link rel="icon" href="data:," />
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#07090c}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    color:#f2eee8;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(ellipse 78% 65% at 56% 2%, #302a26 0%, rgba(28,24,22,0) 62%),
+      radial-gradient(ellipse 90% 74% at 18% 98%, #241a13 0%, rgba(12,10,9,0) 58%),
+      linear-gradient(160deg,#0e1013 0%,#090a0c 48%,#050607 100%);
+  }
+  #c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab;outline:none}
+  #c:active{cursor:grabbing}
+
+  .panel{
+    position:fixed;z-index:20;
+    background:linear-gradient(180deg,rgba(30,26,24,.80),rgba(14,13,13,.74));
+    -webkit-backdrop-filter:blur(20px) saturate(135%);
+    backdrop-filter:blur(20px) saturate(135%);
+    border:1px solid rgba(232,168,96,.14);
+    border-radius:15px;
+    box-shadow:0 22px 58px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.055);
+  }
+
+  .hud-tl{left:26px;top:24px;padding:17px 22px 18px;max-width:326px}
+  .eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;letter-spacing:.3em;color:rgba(232,168,96,.78);font-weight:600}
+  .hud-tl h1{font-size:22px;font-weight:650;letter-spacing:.01em;margin:8px 0 7px;line-height:1.2}
+  .hud-tl h1 span{color:#9b9088;font-weight:400;font-size:14px;letter-spacing:.05em;margin-left:7px}
+  .hud-tl .sub{font-size:11px;line-height:1.75;color:rgba(216,203,190,.58)}
+  .hud-tl .sub em{font-style:normal;color:rgba(240,190,130,.9)}
+
+  .hud-tr{right:26px;top:24px;width:224px;padding:15px 17px 14px}
+  .cap{font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.26em;color:rgba(216,203,190,.4);margin-bottom:9px}
+  .bigline{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  .bigline b{font-family:ui-monospace,monospace;font-size:30px;font-weight:500;color:#f0b478;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .bigline i{font-style:normal;font-size:11px;color:rgba(216,203,190,.45);letter-spacing:.08em}
+  .rows{border-top:1px solid rgba(232,168,96,.13);padding-top:7px}
+  .rows div{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:10.5px;color:rgba(216,203,190,.48)}
+  .rows b{font-family:ui-monospace,monospace;font-size:11.5px;font-weight:500;color:#e9ded1;font-variant-numeric:tabular-nums}
+  .pbar{height:3px;border-radius:3px;background:rgba(255,255,255,.08);margin:11px 0 10px;overflow:hidden}
+  .pbar i{display:block;height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#8a4b28,#e0a05a,#f6c98a);transition:width .12s linear}
+  .phase{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.04em;color:#e0a86a}
+  .phase i{width:5px;height:5px;border-radius:50%;background:#e0a86a;box-shadow:0 0 9px #e0a86a;animation:bl 1.7s infinite}
+  @keyframes bl{0%,100%{opacity:1}50%{opacity:.28}}
+
+  .toolbar{left:50%;transform:translateX(-50%);bottom:26px;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 9px;border-radius:15px;flex-wrap:nowrap;max-width:calc(100vw - 32px)}
+  button{
+    font:inherit;font-size:11.5px;color:#e6dcd0;background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:7px 10px;cursor:pointer;
+    transition:all .16s;letter-spacing:.01em;white-space:nowrap;
+  }
+  button:hover{background:rgba(232,168,96,.14);border-color:rgba(232,168,96,.42);color:#fff4e6}
+  button:active{transform:translateY(1px)}
+  button.on{background:rgba(232,168,96,.17);border-color:rgba(232,168,96,.52);color:#ffd9a8;box-shadow:inset 0 0 16px rgba(232,168,96,.1)}
+  button.primary{background:linear-gradient(180deg,#d99a55,#b7732f);border-color:rgba(240,180,110,.55);color:#201207;font-weight:650;box-shadow:0 5px 18px rgba(183,115,47,.28)}
+  button.primary:hover{background:linear-gradient(180deg,#eeb06b,#c98035);color:#201207}
+  button.primary.on{background:linear-gradient(180deg,#4f8fb8,#2f6691);border-color:rgba(130,190,230,.55);color:#06131e;box-shadow:0 5px 18px rgba(47,102,145,.3)}
+  .sep{width:1px;height:21px;background:rgba(255,255,255,.1);margin:0 2px}
+
+  .hud-br{right:26px;bottom:26px;width:296px;padding:14px 17px 15px}
+  .hk{font-family:ui-monospace,monospace;font-size:8.5px;letter-spacing:.28em;color:rgba(232,168,96,.55)}
+  .hn{font-size:14.5px;font-weight:600;margin:8px 0 7px;color:#ffe7c6;letter-spacing:.02em}
+  .hd{font-size:11px;line-height:1.75;color:rgba(214,201,188,.66);min-height:38px}
+
+  .hint{position:fixed;left:26px;bottom:28px;z-index:20;font-size:10.5px;line-height:1.9;color:rgba(206,192,178,.36);letter-spacing:.03em;pointer-events:none}
+  .hint b{color:rgba(232,168,96,.75);font-weight:500}
+
+  #labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .lbl{
+    position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;
+    font-size:9.5px;letter-spacing:.04em;padding:3px 9px 3px 8px;border-radius:20px;
+    color:#ffe1bb;background:rgba(20,15,11,.9);
+    border:1px solid rgba(232,168,96,.46);
+    box-shadow:0 5px 18px rgba(0,0,0,.6);
+    opacity:0;transition:opacity .26s,color .18s,border-color .18s,background .18s;pointer-events:none;
+  }
+  .lbl::before{content:'';position:absolute;left:-3.5px;top:50%;width:5px;height:5px;border-radius:50%;background:#e0a05a;transform:translateY(-50%);box-shadow:0 0 8px #e0a05a}
+  .lbl.hot{color:#fff;border-color:rgba(255,206,140,.95);background:rgba(88,50,20,.94);box-shadow:0 0 0 1px rgba(255,206,140,.25),0 6px 22px rgba(0,0,0,.65)}
+
+  #loading{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:#07090c;color:#a08a72;font-size:12px;letter-spacing:.24em;transition:opacity .7s}
+  #loading.hide{opacity:0;pointer-events:none}
+  #err{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#07090c;color:#b6a18c;font-size:13px;text-align:center;padding:30px}
+
+  @media (max-width:1180px){.hint{display:none}.hud-br{width:250px}}
+  @media (max-width:860px){
+    .hud-tr{display:none}.hud-br{display:none}
+    .hud-tl{left:12px;top:12px;padding:11px 14px;max-width:210px}
+    .hud-tl h1{font-size:16px}.hud-tl h1 span{font-size:11px}.hud-tl .sub{font-size:9.5px}
+    .toolbar{bottom:12px;gap:5px;padding:7px 8px}
+    button{padding:7px 9px;font-size:11px}.sep{display:none}
+    .lbl{font-size:9px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+
+<div class="panel hud-tl">
+  <div class="eyebrow">INTERACTIVE 3D · ESPRESSO MACHINE</div>
+  <h1>意式咖啡机<span>剖切解剖</span></h1>
+  <div class="sub">振动泵把冷水泵入锅炉，<em>加热管</em>升温至 93°C；<em>9 bar</em> 热水经三通阀冲向冲煮头，被分水网洒匀，透过压实浸湿的粉饼，落成一道深色细流。</div>
+</div>
+
+<div class="panel hud-tr">
+  <div class="cap">实 时 读 数　L I V E</div>
+  <div class="bigline"><b id="roP">0.0</b><i>bar 冲煮压力</i></div>
+  <div class="rows">
+    <div><span>冲煮水温</span><b id="roT">88.0 °C</b></div>
+    <div><span>萃取时间</span><b id="roTime">0.0 / 25.0 s</b></div>
+    <div><span>杯中液量</span><b id="roVol">0.0 ml</b></div>
+    <div><span>锅炉状态</span><b id="roBoiler">保温</b></div>
+  </div>
+  <div class="pbar"><i id="roBar"></i></div>
+  <div class="phase"><i></i><span id="roPhase">待机 · 锅炉保温</span></div>
+</div>
+
+<div class="panel toolbar">
+  <button id="btnBrew" class="primary">开始萃取</button>
+  <button id="btnSteam">打开蒸汽棒</button>
+  <div class="sep"></div>
+  <button id="btnEx">爆炸视图</button>
+  <button id="btnXray" class="on">透视机身</button>
+  <div class="sep"></div>
+  <button id="btnPuck">钻进粉饼</button>
+  <button id="btnMute">静音</button>
+  <button id="btnReset">复位视角</button>
+</div>
+
+<div class="panel hud-br">
+  <div class="hk">H O V E R · 部 件 说 明</div>
+  <div class="hn" id="hName">整台咖啡机</div>
+  <div class="hd" id="hDesc">把指针移到任意部件上，它会高亮，并说明自己在这条水流与压力链里的作用。</div>
+</div>
+
+<div class="hint">
+  <b>拖拽</b> 环绕观察　·　<b>滚轮</b> 缩放，可一路钻进粉饼<br/>
+  <b>空格</b> 萃取 / 停止　<b>E</b> 爆炸　<b>S</b> 蒸汽　<b>R</b> 复位
+</div>
+
+<div id="loading">正在装配咖啡机…</div>
+<div id="err">无法加载三维渲染库<br/><span style="font-size:11px;opacity:.6">请检查网络后刷新页面（需要访问 unpkg.com）</span></div>
+
+<script>
+  window.addEventListener('error', function(){ if(!window.__ready){ document.getElementById('err').style.display='flex'; } });
+  setTimeout(function(){ if(!window.__ready){ document.getElementById('err').style.display='flex'; } }, 11000);
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ═══════════════════════════════════════════════════
+   1 · 渲染环境
+   ═══════════════════════════════════════════════════ */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.05, 240);
+const HOME = new THREE.Vector3(8.8, 9.2, 19.6);
+const TGT_HOME = new THREE.Vector3(0, 3.7, 1.15);
+camera.position.copy(HOME);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(TGT_HOME);
+controls.enableDamping = true;
+controls.dampingFactor = 0.065;
+controls.rotateSpeed = 0.82;
+controls.zoomSpeed = 0.92;
+controls.zoomToCursor = true;
+controls.minDistance = 0.55;
+controls.maxDistance = 48;
+controls.maxPolarAngle = Math.PI * 0.63;
+controls.update();
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.035).texture;
+
+scene.add(new THREE.HemisphereLight(0xbfd4f0, 0x1b1512, 0.62));
+const key = new THREE.DirectionalLight(0xfff0dc, 2.7);
+key.position.set(10, 17, 14);
+key.castShadow = true;
+key.shadow.mapSize.set(2048,2048);
+key.shadow.camera.near = 5; key.shadow.camera.far = 62;
+key.shadow.camera.left = -14; key.shadow.camera.right = 14;
+key.shadow.camera.top = 18; key.shadow.camera.bottom = -10;
+key.shadow.bias = -0.0011; key.shadow.normalBias = 0.026;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0x7ba4de, 1.35); fill.position.set(-13, 8, -8); scene.add(fill);
+const rim  = new THREE.DirectionalLight(0xff9d55, 1.05); rim.position.set(-8, 5, -14); scene.add(rim);
+const topL = new THREE.DirectionalLight(0xdcecff, 0.9); topL.position.set(0, 22, 3); scene.add(topL);
+const frontL= new THREE.DirectionalLight(0xffe2bd, 0.95); frontL.position.set(4, 7, 16); scene.add(frontL);
+const innerFill = new THREE.DirectionalLight(0xffead2, 1.25); innerFill.position.set(-7, 6, 15); scene.add(innerFill);
+const boilerLight = new THREE.PointLight(0xff8a3c, 3.4, 11, 1.8); boilerLight.position.set(-2.7, 4.5, 0.1); scene.add(boilerLight);
+const headLight = new THREE.PointLight(0xffd0a0, 2.4, 7, 1.8); headLight.position.set(0, 3.1, 3.6); scene.add(headLight);
+const boilerFront = new THREE.PointLight(0xffdcb0, 3.1, 10, 1.9); boilerFront.position.set(-2.7, 5.0, 2.2); scene.add(boilerFront);
+const steamLight = new THREE.PointLight(0xcfe6ff, 0, 5, 2.0); steamLight.position.set(4.15, 2.3, 2.25); scene.add(steamLight);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(140,140), new THREE.ShadowMaterial({opacity:0.36, transparent:true}));
+ground.rotation.x = -Math.PI/2; ground.position.y = 0.09; ground.receiveShadow = true; scene.add(ground);
+
+/* ═══════════════════════════════════════════════════
+   2 · 程序化纹理（无任何外部图片）
+   ═══════════════════════════════════════════════════ */
+function brushedTexture(){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const x = c.getContext('2d');
+  x.fillStyle = '#8f8f8f'; x.fillRect(0,0,512,512);
+  for(let i=0;i<3200;i++){
+    const y = Math.random()*512, v = 90 + Math.random()*130;
+    x.strokeStyle = 'rgba('+v+','+v+','+v+','+(0.04+Math.random()*0.22).toFixed(3)+')';
+    x.lineWidth = 0.25 + Math.random()*1.1;
+    x.beginPath(); x.moveTo(0,y); x.lineTo(512, y+(Math.random()-0.5)*1.6); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2,2); t.anisotropy = 8;
+  return t;
+}
+const BRUSH = brushedTexture();
+
+function gaugeTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const x = c.getContext('2d');
+  const cx=256, cy=256, R=244;
+  const pt = (th,r) => [cx - Math.sin(th)*r, cy - Math.cos(th)*r];
+  const thOf = bar => (135 - bar/16*270) * Math.PI/180;
+  const g = x.createRadialGradient(cx-70,cy-90,20,cx,cy,R);
+  g.addColorStop(0,'#fbf7ee'); g.addColorStop(0.72,'#eee7d8'); g.addColorStop(1,'#cfc6b4');
+  x.fillStyle=g; x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.fill();
+  x.strokeStyle='#8c8474'; x.lineWidth=5; x.beginPath(); x.arc(cx,cy,R-5,0,Math.PI*2); x.stroke();
+  x.strokeStyle='rgba(184,55,38,.82)'; x.lineWidth=12; x.beginPath();
+  for(let b=9;b<=16.001;b+=0.2){ const p=pt(thOf(b),R-30); if(b===9)x.moveTo(p[0],p[1]); else x.lineTo(p[0],p[1]); }
+  x.stroke();
+  x.strokeStyle='rgba(72,132,80,.75)'; x.lineWidth=11; x.beginPath();
+  for(let b=8;b<=9.5;b+=0.1){ const p=pt(thOf(b),R-30); if(b===8)x.moveTo(p[0],p[1]); else x.lineTo(p[0],p[1]); }
+  x.stroke();
+  for(let b=0;b<=16;b++){
+    const th=thOf(b), major=(b%2===0);
+    const a=pt(th,R-30), d=pt(th,R-(major?54:44));
+    x.strokeStyle= b>=9?'#a33b28':'#3c3a35'; x.lineWidth=major?4:2.2;
+    x.beginPath(); x.moveTo(a[0],a[1]); x.lineTo(d[0],d[1]); x.stroke();
+    if(major){
+      const n=pt(th,R-84);
+      x.fillStyle='#2e2c28'; x.font='600 27px ui-monospace,Menlo,monospace';
+      x.textAlign='center'; x.textBaseline='middle'; x.fillText(String(b),n[0],n[1]);
+    }
+  }
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillStyle='#6a6258'; x.font='600 21px ui-monospace,Menlo,monospace'; x.fillText('B A R',cx,cy+72);
+  x.fillStyle='#8b8172'; x.font='500 15px ui-monospace,Menlo,monospace'; x.fillText('9 BAR  ·  93°C',cx,cy+108);
+  x.fillStyle='#4a453c'; x.font='600 19px Georgia,serif'; x.fillText('ESPRESSO',cx,cy-92);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy=8;
+  return t;
+}
+function plateTexture(){
+  const c=document.createElement('canvas'); c.width=512; c.height=128;
+  const x=c.getContext('2d');
+  x.fillStyle='#191a1b'; x.fillRect(0,0,512,128);
+  x.strokeStyle='rgba(220,180,120,.5)'; x.lineWidth=2; x.strokeRect(6,6,500,116);
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillStyle='#d9bd93'; x.font='600 40px Georgia,serif'; x.fillText('MACCHINA  ·  9 BAR',256,52);
+  x.fillStyle='rgba(217,189,147,.55)'; x.font='500 18px ui-monospace,monospace'; x.fillText('SINGLE BOILER   /   93°C',256,94);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+/* ═══════════════════════════════════════════════════
+   3 · 材质
+   ═══════════════════════════════════════════════════ */
+const M = {
+  steel: new THREE.MeshStandardMaterial({color:0xd6dce1, metalness:0.93, roughness:0.24, envMapIntensity:2.1, side:THREE.DoubleSide}),
+  brushed: new THREE.MeshStandardMaterial({color:0xe0e5e9, metalness:0.9, roughness:0.34, roughnessMap:BRUSH, bumpMap:BRUSH, bumpScale:0.011, envMapIntensity:2.3, side:THREE.DoubleSide}),
+  edge: new THREE.MeshStandardMaterial({color:0xf0f3f5, metalness:0.98, roughness:0.13, envMapIntensity:2.5}),
+  dark: new THREE.MeshStandardMaterial({color:0x4b5055, metalness:0.85, roughness:0.4, envMapIntensity:1.3}),
+  black: new THREE.MeshStandardMaterial({color:0x1c1d20, metalness:0.18, roughness:0.55}),
+  wood: new THREE.MeshStandardMaterial({color:0x3b2418, metalness:0.08, roughness:0.42, envMapIntensity:1.1}),
+  brass: new THREE.MeshStandardMaterial({color:0xc79a58, metalness:0.93, roughness:0.29, envMapIntensity:1.45}),
+  copper: new THREE.MeshStandardMaterial({color:0xb9693f, metalness:0.92, roughness:0.32, envMapIntensity:1.4}),
+  heater: new THREE.MeshStandardMaterial({color:0xe98a45, metalness:0.6, roughness:0.3, emissive:0xff5212, emissiveIntensity:1.3}),
+  shell: new THREE.MeshStandardMaterial({color:0xc9d1d7, metalness:0.72, roughness:0.32, roughnessMap:BRUSH, bumpMap:BRUSH, bumpScale:0.01, transparent:true, opacity:0.14, depthWrite:false, side:THREE.DoubleSide, envMapIntensity:1.9}),
+  boilerGlass: new THREE.MeshStandardMaterial({color:0xd6e6ef, metalness:0.25, roughness:0.14, transparent:true, opacity:0.17, depthWrite:false, side:THREE.DoubleSide, envMapIntensity:2.0}),
+  water: new THREE.MeshStandardMaterial({color:0x65a9cf, metalness:0.05, roughness:0.1, transparent:true, opacity:0.26, depthWrite:false, side:THREE.DoubleSide}),
+  pipeCold: new THREE.MeshStandardMaterial({color:0x5d9ad0, metalness:0.7, roughness:0.28, transparent:true, opacity:0.55, depthWrite:false, emissive:0x123c66, emissiveIntensity:0.4, side:THREE.DoubleSide}),
+  pipeHot: new THREE.MeshStandardMaterial({color:0xd07945, metalness:0.7, roughness:0.28, transparent:true, opacity:0.58, depthWrite:false, emissive:0x6a2408, emissiveIntensity:0.5, side:THREE.DoubleSide}),
+  pipeSteam: new THREE.MeshStandardMaterial({color:0xb7c6d2, metalness:0.8, roughness:0.26, transparent:true, opacity:0.55, depthWrite:false, emissive:0x244050, emissiveIntensity:0.35, side:THREE.DoubleSide}),
+  glass: new THREE.MeshStandardMaterial({color:0xe4f0fa, metalness:0.06, roughness:0.06, transparent:true, opacity:0.2, depthWrite:false, side:THREE.DoubleSide, envMapIntensity:2.0}),
+  coffee: new THREE.MeshStandardMaterial({color:0x35180b, metalness:0.0, roughness:0.28, side:THREE.DoubleSide}),
+  crema: new THREE.MeshStandardMaterial({color:0xb77a3c, metalness:0.0, roughness:0.55, side:THREE.DoubleSide}),
+  puckDry: new THREE.MeshStandardMaterial({color:0x5b3620, metalness:0.0, roughness:0.96, side:THREE.DoubleSide}),
+  puckWet: new THREE.MeshStandardMaterial({color:0x2e160a, metalness:0.0, roughness:0.34, side:THREE.DoubleSide}),
+  cutDry: new THREE.MeshBasicMaterial({color:0x52321c, side:THREE.DoubleSide}),
+  cutWet: new THREE.MeshBasicMaterial({color:0x241209, side:THREE.DoubleSide}),
+  hole: new THREE.MeshStandardMaterial({color:0x14100d, metalness:0.3, roughness:0.9}),
+  gauge: new THREE.MeshStandardMaterial({map:gaugeTexture(), metalness:0.0, roughness:0.72}),
+  plate: new THREE.MeshStandardMaterial({map:plateTexture(), metalness:0.3, roughness:0.5}),
+  ledGreen: new THREE.MeshStandardMaterial({color:0x2f6b45, emissive:0x36d17a, emissiveIntensity:1.2, roughness:0.25}),
+  ledAmber: new THREE.MeshStandardMaterial({color:0x6b441d, emissive:0xff942e, emissiveIntensity:0.9, roughness:0.25}),
+  needle: new THREE.MeshStandardMaterial({color:0xa32a1c, metalness:0.35, roughness:0.42, side:THREE.DoubleSide}),
+  stream: new THREE.MeshStandardMaterial({color:0x2a0e04, metalness:0.05, roughness:0.18, transparent:true, opacity:0.88, side:THREE.DoubleSide})
+};
+M.shell.userData.shell = true;
+M.boilerGlass.userData.boilerShell = true;
+
+/* ═══════════════════════════════════════════════════
+   4 · 几何工具
+   ═══════════════════════════════════════════════════ */
+function box(w,h,d,mat,x=0,y=0,z=0){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); return m; }
+function cyl(rt,rb,h,mat,seg=32,open=false,ts=0,tl=Math.PI*2){ return new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg,1,open,ts,tl),mat); }
+function ball(r,mat,x=0,y=0,z=0,seg=20){ const m=new THREE.Mesh(new THREE.SphereGeometry(r,seg,Math.max(8,Math.floor(seg/2))),mat); m.position.set(x,y,z); return m; }
+function torus(R,r,mat,x=0,y=0,z=0){ const m=new THREE.Mesh(new THREE.TorusGeometry(R,r,10,48),mat); m.position.set(x,y,z); return m; }
+function tube(pts,r,mat,seg=64){
+  const curve = new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(p[0],p[1],p[2])));
+  const m = new THREE.Mesh(new THREE.TubeGeometry(curve,seg,r,9,false),mat);
+  return { mesh:m, curve };
+}
+function spring(parent,x,y,z,r,turns,h,mat){
+  const p=[];
+  for(let i=0;i<=turns*18;i++){ const t=i/(turns*18); p.push([x+Math.cos(t*turns*Math.PI*2)*r, y+t*h, z+Math.sin(t*turns*Math.PI*2)*r]); }
+  const c=new THREE.CatmullRomCurve3(p.map(q=>new THREE.Vector3(q[0],q[1],q[2])));
+  parent.add(new THREE.Mesh(new THREE.TubeGeometry(c,turns*18,0.035,6,false),mat));
+}
+
+/* ═══════════════════════════════════════════════════
+   5 · 部件注册（爆炸 / 悬停 / 标签）
+   ═══════════════════════════════════════════════════ */
+const root = new THREE.Group(); scene.add(root);
+const parts = [], pickables = [], shellMats = [], boilerMats = [];
+const labelsEl = document.getElementById('labels');
+
+function P(name, desc, obj, ex, opt={}){
+  obj.position.set(opt.pos?opt.pos[0]:0, opt.pos?opt.pos[1]:0, opt.pos?opt.pos[2]:0);
+  const p = {
+    name, desc, obj,
+    base: obj.position.clone(),
+    ex: new THREE.Vector3(ex[0],ex[1],ex[2]).multiplyScalar(1.4),
+    delay: opt.delay ?? 0,
+    labelOff: new THREE.Vector3(...(opt.labelOff||[0,0.55,0])),
+    idx: parts.length, _ei:0
+  };
+  const map = new Map();
+  obj.userData.part = p;
+  obj.traverse(o=>{
+    if(!o.isMesh) return;
+    o.userData.part = p;
+    const src = o.material, meta = src.userData || {};
+    if(!Array.isArray(src)){
+      if(!map.has(src)){
+        const c = src.clone();
+        if(meta.shell){ c.userData.baseOpacity = 0.2; shellMats.push(c); }
+        if(meta.boilerShell){ c.userData.baseOpacity = 0.22; boilerMats.push(c); }
+        map.set(src,c);
+      }
+      o.material = map.get(src);
+    }
+    o.userData.shell = !!meta.shell;
+    o.castShadow = !(meta.shell || meta.boilerShell);
+    o.receiveShadow = true;
+    pickables.push(o);
+  });
+  const el = document.createElement('div'); el.className='lbl'; el.textContent=name;
+  labelsEl.appendChild(el); p.el = el;
+  parts.push(p); root.add(obj);
+  return obj;
+}
+
+/* 关键坐标 */
+const Z = 3.25;
+const PUCK = new THREE.Vector3(0, 2.84, Z);
+const BX=-2.7, BY=4.6, BZ=-0.7;
+
+/* 需要在注册后取回的引用 */
+let needlePivot=null, ledReady=null, ledHeat=null, wetMat=null, wetFront=null, grainMat=null,
+    heaterMat=null, boilerWater=null, valveCore=null, steamWheel=null, pumpGroup=null,
+    coffeeLiquid=null, cremaTop=null, coffeeStream=null, coffeeLevel=0,
+    showerPart=null, handlePart=null, wandPart=null, boilerPart=null, puckPart=null;
+
+/* ═══════════════════════════════════════════════════
+   6 · 机身外观
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(8.9,0.42,7.1,M.dark,0,0.54,0));
+  g.add(box(9.0,0.09,7.2,M.edge,0,0.77,0));
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    const f=cyl(0.34,0.38,0.28,M.black,20); f.position.set(sx*3.85,0.24,sz*2.9); g.add(f);
+  }
+  P('底座与机脚','整机承重基座，内部留出泵、阀与排水管的空间，四只橡胶脚吸收振动泵的震动。',g,[0,-2.2,0.6],{delay:0.42,labelOff:[0,0.3,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(8.9,0.16,7.1,M.brushed,0,8.04,0));
+  g.add(box(9.0,0.07,7.2,M.edge,0,8.14,0));
+  for(let i=0;i<7;i++) g.add(box(7.6,0.055,0.09,M.edge,0,8.17,-2.6+i*0.78));
+  const rail=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-4.2,8.2,-3.2),new THREE.Vector3(-4.2,8.5,-3.2),
+    new THREE.Vector3(4.2,8.5,-3.2),new THREE.Vector3(4.2,8.2,-3.2)
+  ]),40,0.055,8,false),M.edge); g.add(rail);
+  P('顶板与温杯架','不锈钢顶盖兼作温杯盘，锅炉的余热透过它把杯子预热，避免萃取时咖啡骤冷。',g,[0,5.0,0],{delay:0.02,labelOff:[0,0.5,0]});
+})();
+
+function sidePanel(sgn){
+  const g=new THREE.Group();
+  g.add(box(0.12,7.2,6.9,M.shell,sgn*4.38,4.4,0));
+  g.add(box(0.055,7.25,0.06,M.edge,sgn*4.38,4.4,3.44));
+  g.add(box(0.055,7.25,0.06,M.edge,sgn*4.38,4.4,-3.44));
+  return g;
+}
+P('左侧板（拉丝钢）','拉丝不锈钢外壳，横向发丝纹由轧制抛光留下；在此切开透视，好让内部水路可见。',sidePanel(-1),[-6.2,0,0],{delay:0.06,labelOff:[0,0.6,0]});
+P('右侧板（拉丝钢）','与蒸汽棒相邻的一侧，外壳与内部锅炉之间留有隔热空气层。',sidePanel(1),[6.2,0,0],{delay:0.06,labelOff:[0,0.6,0]});
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(8.7,7.2,0.12,M.shell,0,4.4,-3.44));
+  for(let i=0;i<9;i++) g.add(box(8.4,0.035,0.02,M.edge,0,1.1+i*0.78,-3.36));
+  P('背板与散热槽','背板开槽排出锅炉与泵的余热，同时把电气区与高温水路隔开。',g,[0,0,-5.6],{delay:0.06,labelOff:[0,0.6,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(8.7,1.7,0.16,M.brushed,0,7.0,3.48));
+  g.add(box(8.8,0.07,0.09,M.edge,0,7.88,3.56));
+  g.add(box(8.8,0.07,0.09,M.edge,0,6.13,3.56));
+  const pl=new THREE.Mesh(new THREE.PlaneGeometry(2.9,0.72),M.plate); pl.position.set(-2.5,6.45,3.575); g.add(pl);
+  ledReady=ball(0.105,M.ledGreen,2.35,6.5,3.62,16); g.add(ledReady);
+  ledHeat =ball(0.105,M.ledAmber,2.75,6.5,3.62,16); g.add(ledHeat);
+  const knob=cyl(0.34,0.34,0.2,M.dark,28); knob.rotation.x=Math.PI/2; knob.position.set(-2.7,7.3,3.66); g.add(knob);
+  g.add(torus(0.33,0.045,M.edge,-2.7,7.3,3.77));
+  for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; g.add(box(0.05,0.11,0.03,M.edge,-2.7+Math.cos(a)*0.24,7.3+Math.sin(a)*0.24,3.78)); }
+  P('前面板与开关','面板上的电源灯、加热灯与蒸汽旋钮，是操作者与内部锅炉、阀门之间唯一的界面。',g,[0,1.1,4.6],{delay:0.1,labelOff:[0.6,0.8,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const shell=cyl(0.78,0.78,0.2,M.dark,48); shell.rotation.x=Math.PI/2; g.add(shell);
+  g.add(torus(0.72,0.085,M.edge,0,0,0.11));
+  const face=new THREE.Mesh(new THREE.CircleGeometry(0.66,64),M.gauge); face.position.z=0.125; g.add(face);
+  const glass=new THREE.Mesh(new THREE.CircleGeometry(0.66,64),M.glass); glass.position.z=0.145; g.add(glass);
+  needlePivot=new THREE.Group(); needlePivot.position.z=0.155;
+  const sh=new THREE.Shape(); sh.moveTo(-0.035,-0.12); sh.lineTo(0.035,-0.12); sh.lineTo(0.012,0.52); sh.lineTo(-0.012,0.52); sh.closePath();
+  needlePivot.add(new THREE.Mesh(new THREE.ShapeGeometry(sh),M.needle)); g.add(needlePivot);
+  g.add(ball(0.075,M.edge,0,0,0.17,16));
+  P('压力表','实时显示冲煮压力：指针升到 9 bar 的绿区才是合格萃取，超过红色刻度由泄压阀接管。',g,[0,2.0,3.2],{delay:0.14,labelOff:[0,1.0,0],pos:[0,7.0,3.66]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  for(const sx of [-1,1]) g.add(box(0.2,5.25,0.2,M.edge,sx*4.32,3.52,3.46));
+  g.add(box(8.8,0.14,0.2,M.edge,0,0.9,3.46));
+  g.add(box(8.8,0.1,0.18,M.edge,0,6.12,3.46));
+  P('机身框架','抛光钢立柱撑起外壳，前面板下半部刻意留空，把冲煮头与内部水路完整露出来。',g,[0,0,2.2],{delay:0.12,labelOff:[-1.2,1.6,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   7 · 冲煮头 / 分水网 / 手柄 / 粉饼 / 杯 / 滴水盘
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  const body=cyl(1.12,1.16,0.86,M.brushed,48); body.position.set(0,3.78,Z); g.add(body);
+  const flange=cyl(1.28,1.28,0.14,M.edge,48); flange.position.set(0,3.32,Z); g.add(flange);
+  const brassRing=torus(1.13,0.075,M.brass,0,3.47,Z); brassRing.rotation.x=Math.PI/2; g.add(brassRing);
+  const neck=cyl(0.32,0.32,0.6,M.brass,24); neck.position.set(0,4.42,Z); g.add(neck);
+  const cap=cyl(0.48,0.42,0.22,M.dark,28); cap.position.set(0,4.7,Z); g.add(cap);
+  for(const sx of [-1,1]){
+    g.add(box(0.42,0.22,0.5,M.steel,sx*1.22,3.3,Z));
+    const screw=cyl(0.1,0.1,0.08,M.edge,12); screw.rotation.x=Math.PI/2; screw.position.set(sx*1.22,3.3,Z+0.29); g.add(screw);
+  }
+  P('冲煮头','把 9 bar / 93°C 的热水导入手柄的黄铜铸体，底部卡口把手柄锁紧并密封住冲煮压力。',g,[0,2.6,1.5],{delay:0.2,labelOff:[0,0.9,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const disc=cyl(1.02,1.02,0.055,M.steel,56); disc.position.set(0,3.19,Z); g.add(disc);
+  const rim=torus(1.0,0.045,M.edge,0,3.19,Z); rim.rotation.x=Math.PI/2; g.add(rim);
+  for(let ri=0;ri<5;ri++){
+    const rr=0.16+ri*0.17, n=6+ri*7;
+    for(let i=0;i<n;i++){
+      const a=i/n*Math.PI*2+ri*0.28;
+      const h=cyl(0.024,0.024,0.062,M.hole,8);
+      h.position.set(Math.cos(a)*rr,3.19,Z+Math.sin(a)*rr); g.add(h);
+    }
+  }
+  const post=cyl(0.07,0.07,0.16,M.brass,12); post.position.set(0,3.28,Z); g.add(post);
+  showerPart=P('分水网','筛板上百个微孔把一股高压水流打散成均匀水帘，避免水柱把粉饼冲出通道造成萃取不均。',g,[0,3.9,0.8],{delay:0.26,labelOff:[0,0.6,0]}).userData.part;
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const TS=Math.PI/2, TL=Math.PI;
+  const bowl=cyl(0.98,0.86,0.7,M.steel,48,true,TS,TL); bowl.position.set(0,2.87,Z); g.add(bowl);
+  const bottom=cyl(0.86,0.86,0.05,M.steel,48,false,TS,TL); bottom.position.set(0,2.53,Z); g.add(bottom);
+  // 半圆口沿
+  const rimPts=[];
+  for(let i=0;i<=36;i++){ const a=Math.PI/2+i/36*Math.PI; rimPts.push(new THREE.Vector3(Math.sin(a)*0.98,3.21,Z+Math.cos(a)*0.98)); }
+  g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rimPts),48,0.055,8,false),M.edge));
+  for(const sx of [-1,1]) g.add(box(0.045,0.7,0.05,M.edge,sx*0.92,2.87,Z+0.005));
+  // 滤孔（只布在保留的后半圆）
+  for(let i=0;i<30;i++){
+    const a=Math.PI/2+Math.random()*Math.PI, r=0.32+Math.random()*0.46;
+    const h=cyl(0.026,0.026,0.062,M.hole,7);
+    h.position.set(Math.sin(a)*r,2.53,Z+Math.cos(a)*r); g.add(h);
+  }
+  for(const sx of [-1,1]) g.add(box(0.5,0.16,0.36,M.brass,sx*1.06,3.2,Z-0.08));
+  for(const sx of [-1,1]){
+    const sp=cyl(0.09,0.13,0.36,M.steel,16); sp.position.set(sx*0.3,2.34,Z-0.16); sp.rotation.z=sx*0.22; g.add(sp);
+    const tip=cyl(0.1,0.07,0.12,M.brass,14); tip.position.set(sx*0.22,2.14,Z-0.1); g.add(tip);
+  }
+  const collar=cyl(0.34,0.26,0.3,M.steel,24); collar.rotation.x=Math.PI/2; collar.position.set(0,2.86,Z+0.94); g.add(collar);
+  const neck=cyl(0.2,0.2,0.9,M.edge,20); neck.rotation.x=Math.PI/2; neck.position.set(0,2.86,Z+1.5); g.add(neck);
+  const grip=cyl(0.31,0.36,2.1,M.wood,28); grip.rotation.x=Math.PI/2; grip.position.set(0,2.86,Z+3.0); g.add(grip);
+  for(let i=0;i<7;i++) g.add(torus(0.325,0.012,M.black,0,2.86,Z+2.15+i*0.28));
+  const end=cyl(0.31,0.31,0.12,M.edge,24); end.rotation.x=Math.PI/2; end.position.set(0,2.86,Z+4.08); g.add(end);
+  handlePart=P('手柄（半剖粉碗）','锁紧在冲煮头里的手柄，碗壁被剖去一半以露出粉饼；底部双嘴把两份萃取液合成一道细流。',g,[0,-0.4,4.4],{delay:0.34,labelOff:[0,0.8,0]}).userData.part;
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const TS=Math.PI/2, TL=Math.PI;
+  const dry=cyl(0.86,0.8,0.30,M.puckDry,48,false,TS,TL); dry.position.set(0,2.68,Z); g.add(dry);
+  const wet=cyl(0.86,0.84,0.26,M.puckWet,48,false,TS,TL); wet.position.set(0,2.96,Z); wet.userData.isWet=true; g.add(wet);
+  const cutDry=new THREE.Mesh(new THREE.PlaneGeometry(1.68,0.30),M.cutDry); cutDry.position.set(0,2.68,Z+0.004); g.add(cutDry);
+  const cutWet=new THREE.Mesh(new THREE.PlaneGeometry(1.72,0.26),M.cutWet); cutWet.position.set(0,2.96,Z+0.004); g.add(cutWet);
+  const top=new THREE.Mesh(new THREE.CircleGeometry(0.86,48,0,Math.PI),M.puckWet);
+  top.rotation.x=-Math.PI/2; top.position.set(0,3.096,Z); g.add(top);
+  wetFront=box(1.7,0.022,0.012,new THREE.MeshBasicMaterial({color:0xd99052,transparent:true,opacity:0.85}),0,3.09,Z+0.012);
+  g.add(wetFront);
+  const grainGeo=new THREE.SphereGeometry(0.007,5,4);
+  const grains=new THREE.InstancedMesh(grainGeo,new THREE.MeshStandardMaterial({color:0x4a2b18, roughness:1, transparent:true, opacity:0.28}),260);
+  grains.userData.isGrain=true;
+  const dummy=new THREE.Object3D(), col=new THREE.Color();
+  for(let i=0;i<260;i++){
+    let x,y,z;
+    if(i<170){
+      x=(Math.random()*2-1)*0.83; y=2.54+Math.random()*0.55; z=Z+0.008+Math.random()*0.004;
+    }else{
+      const a=Math.random()*Math.PI, r=Math.sqrt(Math.random())*0.84;
+      x=Math.cos(a)*r; y=3.10+Math.random()*0.006; z=Z-Math.sin(a)*r;
+    }
+    dummy.position.set(x,y,z); dummy.scale.setScalar(0.6+Math.random()*1.1); dummy.updateMatrix();
+    grains.setMatrixAt(i,dummy.matrix);
+    const g=0.65+Math.random()*0.55;
+    col.setRGB(g,g*0.95,g*0.9);
+    grains.setColorAt(i,col);
+  }
+  grains.instanceMatrix.needsUpdate=true; grains.instanceColor.needsUpdate=true;
+  g.add(grains);
+  const pg=P('咖啡粉饼（压实／浸湿）','18 g 细粉被压成密实饼体；上半层已被 93°C 热水浸润膨胀，下半层仍干燥，水必须均匀穿过整块粉饼。',g,[0,0.6,6.0],{delay:0.4,labelOff:[0,0.65,0]});
+  puckPart=pg.userData.part;
+  pg.traverse(o=>{
+    if(o.userData.isWet) wetMat=o.material;
+    if(o.userData.isGrain) grainMat=o.material;
+  });
+  grains.castShadow=false;
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const wall=cyl(0.72,0.62,1.0,M.glass,40,true); wall.position.set(0,1.42,Z); g.add(wall);
+  const base=cyl(0.62,0.62,0.055,M.glass,40); base.position.set(0,0.94,Z); g.add(base);
+  const lip=torus(0.72,0.028,M.glass,0,1.92,Z); lip.rotation.x=Math.PI/2; g.add(lip);
+  const handle=new THREE.Mesh(new THREE.TorusGeometry(0.3,0.055,8,24,Math.PI*1.35),M.glass);
+  handle.position.set(0.78,1.42,Z); handle.rotation.z=-Math.PI*0.3; g.add(handle);
+  coffeeLiquid=cyl(0.66,0.6,1,M.coffee,40); coffeeLiquid.position.set(0,1.0,Z); coffeeLiquid.scale.y=0.001; g.add(coffeeLiquid);
+  cremaTop=new THREE.Mesh(new THREE.CircleGeometry(0.655,40),M.crema);
+  cremaTop.rotation.x=-Math.PI/2; cremaTop.position.set(0,0.96,Z); cremaTop.visible=false; g.add(cremaTop);
+  P('玻璃杯与 crema','25 秒萃出约 36 ml；表面那层金褐色泡沫是油脂、二氧化碳与细粉被高压乳化成的 crema。',g,[0,-1.2,2.6],{delay:0.36,labelOff:[0,0.8,0]});
+})();
+
+(()=>{
+  coffeeStream=cyl(0.032,0.042,1,M.stream,12);
+  coffeeStream.position.set(0,1.6,Z-0.08); coffeeStream.visible=false; root.add(coffeeStream);
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(6.9,0.16,3.5,M.dark,0,0.86,2.75));
+  g.add(box(7.0,0.06,3.6,M.edge,0,0.95,2.75));
+  for(let i=0;i<13;i++) g.add(box(6.6,0.055,0.12,M.edge,0,1.0,1.25+i*0.25));
+  for(const sx of [-1,1]) g.add(box(0.09,0.16,3.5,M.edge,sx*3.4,1.02,2.75));
+  const drain=cyl(0.2,0.2,0.03,M.hole,20); drain.position.set(0,1.005,2.2); g.add(drain);
+  P('滴水盘与格栅','承接三通阀泄压排出的残水、蒸汽棒冷凝水与溢出的咖啡，格栅下的空腔连到排水管。',g,[0,-2.6,3.4],{delay:0.44,labelOff:[0,0.5,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   8 · 内部：锅炉 / 加热管 / 泵 / 阀 / 蒸汽棒
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  // 后半壳不透明作背景、前半壳透视：剖开锅炉，加热管才有对比
+  const backShell=cyl(1.3,1.3,3.0,M.steel,48,true,Math.PI/2,Math.PI);
+  backShell.position.set(BX,BY,BZ); g.add(backShell);
+  const frontShell=cyl(1.3,1.3,3.0,M.boilerGlass,48,true,-Math.PI/2,Math.PI);
+  frontShell.position.set(BX,BY,BZ); g.add(frontShell);
+  const capTop=cyl(1.33,1.33,0.16,M.brushed,48); capTop.position.set(BX,6.14,BZ); g.add(capTop);
+  const capBot=cyl(1.33,1.33,0.16,M.brushed,48); capBot.position.set(BX,3.06,BZ); g.add(capBot);
+  for(const y of [3.12,6.08]){ const r=torus(1.31,0.055,M.edge,BX,y,BZ); r.rotation.x=Math.PI/2; g.add(r); }
+  for(let i=0;i<10;i++){
+    const a=i/10*Math.PI*2;
+    const b=cyl(0.07,0.07,0.1,M.edge,6); b.position.set(BX+Math.cos(a)*1.14,6.24,BZ+Math.sin(a)*1.14); g.add(b);
+  }
+  const band=cyl(1.36,1.36,0.2,M.dark,48,true); band.position.set(BX,4.6,BZ); g.add(band);
+  // 竖向加强筋与水位环：让半透明筒体的体积感读得出来
+  for(let i=0;i<8;i++){
+    const a=i/8*Math.PI*2;
+    const rib=box(0.055,2.86,0.055,M.steel,BX+Math.cos(a)*1.31,4.6,BZ+Math.sin(a)*1.31);
+    g.add(rib);
+  }
+  const wl=torus(1.31,0.035,M.brass,BX,4.94,BZ); wl.rotation.x=Math.PI/2; g.add(wl);
+  boilerPart=P('锅炉（竖式）','约 0.3 L 的铜／不锈钢锅炉，下半部是水、上半部留出饱和蒸汽空间；保温在 93°C 待命。',g,[-6.4,0.8,-1.6],{delay:0.3,labelOff:[0,1.7,0]}).userData.part;
+})();
+(()=>{
+  const g=new THREE.Group();
+  boilerWater=cyl(1.22,1.22,1.85,M.water,48,true); boilerWater.position.set(BX,4.02,BZ); g.add(boilerWater);
+  const surface=new THREE.Mesh(new THREE.CircleGeometry(1.22,48),new THREE.MeshStandardMaterial({color:0x9fd0e8,metalness:0.2,roughness:0.16,transparent:true,opacity:0.5,side:THREE.DoubleSide}));
+  surface.rotation.x=-Math.PI/2; surface.position.set(BX,4.94,BZ); g.add(surface);
+  P('锅炉存水','泵入的冷水在此被加热，水位之上保留蒸汽腔；水温决定萃取是否稳定在 93°C。',g,[-6.4,-0.6,-1.6],{delay:0.32,labelOff:[0,0.4,0]});
+})();
+(()=>{
+  const g=new THREE.Group();
+  const pts=[
+    [BX-0.68,3.32,BZ-0.32],[BX-0.72,3.72,BZ-0.32],[BX-0.66,4.4,BZ-0.3],
+    [BX-0.36,5.12,BZ-0.28],[BX+0.1,5.42,BZ-0.26],[BX+0.56,5.18,BZ-0.24],
+    [BX+0.7,4.5,BZ-0.24],[BX+0.68,3.72,BZ-0.26],[BX+0.6,3.32,BZ-0.28]
+  ];
+  const t=tube(pts,0.15,M.heater,90); t.mesh.userData.isHeater=true; g.add(t.mesh);
+  for(const sx of [-1,1]){
+    const term=cyl(0.14,0.14,0.34,M.brass,14); term.position.set(BX+sx*0.68,3.15,BZ-0.3); g.add(term);
+    const nut=cyl(0.2,0.2,0.09,M.edge,6); nut.position.set(BX+sx*0.68,3.02,BZ-0.3); g.add(nut);
+  }
+  const coil=cyl(0.06,0.06,0.5,M.copper,12); coil.rotation.z=Math.PI/2; coil.position.set(BX,5.42,BZ-0.26); g.add(coil);
+  const pg=P('加热管（U 形电热元件）','浸没在水里的 U 形电阻管，通电后把整锅水烧到 93°C 并维持恒温；温控器按温度通断。',g,[-8.6,0.4,-2.2],{delay:0.36,labelOff:[-0.4,1.1,0]});
+  pg.traverse(o=>{ if(o.userData.isHeater) heaterMat=o.material; });
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const body=cyl(0.52,0.52,1.9,M.dark,32); body.rotation.z=Math.PI/2; body.position.set(2.5,1.9,-1.8); g.add(body);
+  for(let i=0;i<9;i++){ const r=torus(0.525,0.018,M.steel,2.5-0.85+i*0.21,1.9,-1.8); r.rotation.y=Math.PI/2; g.add(r); }
+  const capL=cyl(0.55,0.55,0.2,M.brass,28); capL.rotation.z=Math.PI/2; capL.position.set(1.48,1.9,-1.8); g.add(capL);
+  const capR=cyl(0.5,0.5,0.26,M.brass,28); capR.rotation.z=Math.PI/2; capR.position.set(3.52,1.9,-1.8); g.add(capR);
+  const inlet=cyl(0.15,0.15,0.42,M.brass,16); inlet.rotation.z=Math.PI/2; inlet.position.set(3.82,1.9,-1.8); g.add(inlet);
+  const outlet=cyl(0.15,0.15,0.4,M.brass,16); outlet.rotation.z=Math.PI/2; outlet.position.set(1.24,1.9,-1.8); g.add(outlet);
+  for(const sx of [-1,1]) g.add(box(0.4,0.16,0.7,M.black,2.5+sx*0.62,1.3,-1.8));
+  g.add(box(1.7,0.09,0.9,M.steel,2.5,1.25,-1.8));
+  pumpGroup=P('振动泵（电磁柱塞泵）','以 50 Hz 往复的电磁柱塞把冷水加压到 9 bar 推入锅炉；那阵熟悉的「嗡嗡」声就是它。',g,[6.6,-1.0,-2.4],{delay:0.34,labelOff:[0,0.7,0]}).userData.part;
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const V=[0.9,3.95,1.7];
+  const body=cyl(0.42,0.42,0.72,M.brass,6); body.position.set(V[0],V[1],V[2]); g.add(body);
+  g.add(box(0.66,0.62,0.62,M.black,V[0]+0.12,V[1]+0.52,V[2]));
+  const portA=cyl(0.13,0.13,0.5,M.brass,14); portA.rotation.z=Math.PI/2; portA.position.set(V[0]-0.52,V[1],V[2]); g.add(portA);
+  const portB=cyl(0.13,0.13,0.5,M.brass,14); portB.rotation.z=Math.PI/2; portB.position.set(V[0]+0.52,V[1],V[2]); g.add(portB);
+  const portC=cyl(0.13,0.13,0.5,M.brass,14); portC.position.set(V[0],V[1]-0.53,V[2]); g.add(portC);
+  valveCore=ball(0.17,M.edge,V[0],V[1],V[2],16); g.add(valveCore);
+  const glass=cyl(0.44,0.44,0.2,M.glass,24); glass.position.set(V[0],V[1]+0.1,V[2]); g.add(glass);
+  P('三通电磁阀','通电时把锅炉热水导向冲煮头；按停止断电，阀芯换向把冲煮头余压泄向滴水盘，粉饼立刻停止滴漏。',g,[3.0,0.2,3.6],{delay:0.28,labelOff:[0,0.8,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const O=[2.9,4.3,-1.5];
+  const body=cyl(0.3,0.3,0.72,M.brass,24); body.position.set(O[0],O[1],O[2]); g.add(body);
+  const nut=cyl(0.36,0.36,0.14,M.brass,6); nut.position.set(O[0],O[1]+0.42,O[2]); g.add(nut);
+  spring(g,O[0],O[1]+0.52,O[2],0.19,6,0.55,M.steel);
+  const cap=cyl(0.22,0.22,0.16,M.edge,20); cap.position.set(O[0],O[1]+1.12,O[2]); g.add(cap);
+  const back=cyl(0.1,0.1,0.5,M.copper,14); back.rotation.z=Math.PI/2; back.position.set(O[0]-0.42,O[1]-0.2,O[2]); g.add(back);
+  P('泄压阀 OPV','弹簧预紧的超压保护：压力超过约 9 bar 时顶开，把多余热水旁路回进水侧，保证粉饼不被压穿。',g,[6.0,1.6,-2.0],{delay:0.4,labelOff:[0,1.3,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const S=[BX,6.42,BZ];
+  const body=cyl(0.34,0.34,0.5,M.brass,24); body.position.set(S[0],S[1],S[2]); g.add(body);
+  const stem=cyl(0.09,0.09,0.8,M.edge,14); stem.position.set(S[0],S[1]+0.55,S[2]); g.add(stem);
+  steamWheel=new THREE.Group(); steamWheel.position.set(S[0],S[1]+1.0,S[2]);
+  steamWheel.add(torus(0.36,0.055,M.dark,0,0,0));
+  for(let i=0;i<4;i++){ const sp=box(0.7,0.055,0.055,M.dark,0,0,0); sp.rotation.z=i/4*Math.PI; steamWheel.add(sp); }
+  steamWheel.add(ball(0.1,M.brass,0,0,0,14));
+  g.add(steamWheel);
+  const out=cyl(0.13,0.13,0.6,M.brass,14); out.rotation.z=Math.PI/2; out.position.set(S[0]+0.5,S[1]+0.12,S[2]); g.add(out);
+  P('蒸汽阀（锅炉顶部）','从锅炉顶部蒸汽腔取汽，而不是从热水里取；旋开手轮，饱和蒸汽经独立管路冲向蒸汽棒。',g,[-3.2,4.4,-1.2],{delay:0.44,labelOff:[0,1.2,0]});
+})();
+
+const steamTip=new THREE.Vector3(4.15,2.02,2.25);
+(()=>{
+  const g=new THREE.Group();
+  const pts=[[4.42,5.5,0.1],[4.45,4.6,0.35],[4.4,3.6,1.05],[4.28,2.7,1.8],[4.15,2.3,2.2],[4.15,2.12,2.25]];
+  g.add(tube(pts,0.11,M.steel,64).mesh);
+  g.add(ball(0.2,M.edge,4.42,5.5,0.1,20));
+  g.add(ball(0.17,M.brass,4.4,3.6,1.05,18));
+  const tip=cyl(0.16,0.13,0.24,M.brass,20); tip.position.set(4.15,2.12,2.25); tip.rotation.x=0.32; g.add(tip);
+  for(let i=0;i<4;i++){ const a=i/4*Math.PI*2; const h=cyl(0.026,0.026,0.26,M.hole,7); h.position.set(4.15+Math.cos(a)*0.08,2.02,2.25+Math.sin(a)*0.08); g.add(h); }
+  const grip=cyl(0.19,0.19,0.62,M.black,20); grip.rotation.x=0.55; grip.position.set(4.3,2.9,1.65); g.add(grip);
+  wandPart=P('蒸汽棒','末端四孔喷嘴把蒸汽高速打出，卷入空气打发牛奶；关节球可转动，不用时指向滴水盘。',g,[6.4,0,2.6],{delay:0.46,labelOff:[0,0.9,0]}).userData.part;
+})();
+
+/* ═══════════════════════════════════════════════════
+   9 · 管路（曲线同时供水流动画使用）
+   ═══════════════════════════════════════════════════ */
+const PATH={};
+function pipePart(name,desc,pts,r,mat,ex,delay){
+  const g=new THREE.Group();
+  const t=tube(pts,r,mat,90); g.add(t.mesh);
+  for(const pt of [pts[0],pts[pts.length-1]]){
+    const j=cyl(r*1.7,r*1.7,0.16,M.brass,14); j.position.set(pt[0],pt[1],pt[2]); g.add(j);
+  }
+  const part=P(name,desc,g,ex,{delay,labelOff:[0,0.5,0]}).userData.part;
+  return {curve:t.curve,part,mesh:t.mesh};
+}
+PATH.inlet = pipePart('冷水进水管','从水箱／自来水引入常温水，是整条水路的起点，蓝色粒子代表未加热的冷水。',
+  [[3.9,0.95,-3.0],[3.95,1.35,-2.5],[3.85,1.75,-1.95],[3.78,1.9,-1.8]],0.085,M.pipeCold,[4.0,-1.6,-3.4],0.5);
+PATH.pumpBoiler = pipePart('泵 → 锅炉水管','振动泵出口的 9 bar 冷水，经止回阀压入锅炉底部；止回阀防止热水倒灌回泵。',
+  [[1.24,1.9,-1.8],[0.4,2.05,-1.9],[-0.4,2.5,-1.5],[-0.85,3.05,-1.05],[BX,3.14,BZ]],0.09,M.pipeCold,[1.6,-1.6,-1.0],0.48);
+PATH.hot = pipePart('锅炉 → 冲煮头热水管','被加热到 93°C 的热水从锅炉上部引出，穿过三通阀，以 9 bar 抵达冲煮头。',
+  [[BX+1.15,5.45,BZ],[0.1,5.4,-0.1],[1.35,4.7,0.9],[0.9,3.95,1.7],[0.5,4.1,2.5],[0,4.55,Z],[0,4.7,Z]],0.1,M.pipeHot,[1.6,1.9,1.6],0.3);
+PATH.drain = pipePart('三通阀排水管','停止萃取后，阀芯换向，把冲煮头与粉饼上方的残余压力和水排进滴水盘。',
+  [[0.9,3.42,1.7],[0.95,2.4,2.0],[0.9,1.5,2.4],[0.4,1.05,2.7]],0.075,M.pipeCold,[1.4,-1.4,2.4],0.52);
+PATH.steam = pipePart('顶部蒸汽管','把锅炉蒸汽腔的饱和蒸汽引到机身右侧，全程向上再向下，避免冷凝水回流进锅炉。',
+  [[BX+0.5,6.54,BZ],[0.2,7.0,-0.6],[2.2,6.6,-0.3],[3.8,6.0,0.0],[4.42,5.5,0.1]],0.085,M.pipeSteam,[2.4,2.8,-0.4],0.46);
+PATH.opv = pipePart('泄压回流管','OPV 顶开后把超压热水旁送回进水侧，压力回落即由弹簧重新关死。',
+  [[2.48,4.1,-1.5],[1.9,3.4,-1.8],[1.5,2.5,-1.9],[1.4,2.05,-1.85]],0.065,M.pipeHot,[3.0,-0.6,-1.4],0.54);
+
+/* ═══════════════════════════════════════════════════
+   10 · 粒子系统（液滴 / 咖啡 / 蒸汽）
+   ═══════════════════════════════════════════════════ */
+const VSH = `
+  attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
+  uniform float uScale;
+  varying float vA; varying vec3 vC;
+  void main(){
+    vA=aAlpha; vC=aColor;
+    vec4 mv=modelViewMatrix*vec4(position,1.0);
+    gl_PointSize=clamp(aSize*uScale/max(0.001,-mv.z),1.0,48.0);
+    gl_Position=projectionMatrix*mv;
+  }`;
+const FSH = `
+  uniform float uSoft;
+  varying float vA; varying vec3 vC;
+  void main(){
+    float r=length(gl_PointCoord-0.5)*2.0;
+    float a = uSoft>0.5 ? pow(max(0.0,1.0-r),2.2) : smoothstep(1.0,0.68,r);
+    gl_FragColor=vec4(vC,a*vA);
+    if(gl_FragColor.a<0.008) discard;
+  }`;
+function makePoints(n,soft,blending){
+  const pos=new Float32Array(n*3), col=new Float32Array(n*3), siz=new Float32Array(n), alp=new Float32Array(n);
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.BufferAttribute(siz,1));
+  g.setAttribute('aAlpha',new THREE.BufferAttribute(alp,1));
+  const m=new THREE.ShaderMaterial({
+    uniforms:{uScale:{value:innerHeight/(2*Math.tan(38*Math.PI/360))},uSoft:{value:soft?1:0}},
+    vertexShader:VSH,fragmentShader:FSH,transparent:true,depthWrite:false,blending
+  });
+  const pts=new THREE.Points(g,m); pts.frustumCulled=false; pts.renderOrder=6; scene.add(pts);
+  return {n,pos,col,siz,alp,g,m,pts,slots:Array.from({length:n},()=>({on:false})),cur:0};
+}
+const LIQ=makePoints(300,false,THREE.NormalBlending);
+const GAS=makePoints(220,true,THREE.AdditiveBlending);
+const tmpV=new THREE.Vector3(), tmpOff=new THREE.Vector3();
+
+const C_COLD=[0.32,0.70,1.0], C_HOT=[1.0,0.46,0.16], C_DROP=[0.92,0.96,1.0],
+      C_COFFEE=[0.30,0.105,0.035], C_DRIP=[0.19,0.06,0.02], C_DRAIN=[0.52,0.72,0.84],
+      C_STEAM=[0.86,0.92,1.0], C_BUBBLE=[1.0,0.78,0.5];
+
+function emit(sys,o){
+  const i=sys.cur++%sys.n, s=sys.slots[i];
+  s.on=true; s.t=0; s.speed=o.speed||0.7; s.curve=o.curve||null;
+  s.origin=o.origin?o.origin.clone():null; s.dir=o.dir?o.dir.clone():null;
+  s.len=o.len||1; s.grav=o.grav||0; s.color=o.color; s.size=o.size||0.055;
+  s.alpha=o.alpha??0.9; s.part=o.part||null; s.grow=o.grow||0;
+  const j=o.jitter||0;
+  s.jx=(Math.random()-0.5)*j; s.jy=(Math.random()-0.5)*j; s.jz=(Math.random()-0.5)*j;
+}
+function stepParticles(sys,dt){
+  for(let i=0;i<sys.n;i++){
+    const s=sys.slots[i], k=i*3;
+    if(!s.on){ sys.alp[i]=0; continue; }
+    s.t+=dt*s.speed;
+    if(s.t>=1){ s.on=false; sys.alp[i]=0; continue; }
+    const t=s.t;
+    if(s.curve) s.curve.getPoint(t,tmpV);
+    else { tmpV.copy(s.origin).addScaledVector(s.dir,t*s.len); tmpV.y-=s.grav*t*t; }
+    tmpV.x+=s.jx; tmpV.y+=s.jy; tmpV.z+=s.jz;
+    if(s.part){ tmpOff.copy(s.part.obj.position).sub(s.part.base); tmpV.add(tmpOff); }
+    sys.pos[k]=tmpV.x; sys.pos[k+1]=tmpV.y; sys.pos[k+2]=tmpV.z;
+    sys.col[k]=s.color[0]; sys.col[k+1]=s.color[1]; sys.col[k+2]=s.color[2];
+    sys.siz[i]=s.size*1.35*(1+s.grow*t);
+    sys.alp[i]=s.alpha*Math.min(1,t*9)*Math.min(1,(1-t)*3.2);
+  }
+  sys.g.attributes.position.needsUpdate=true;
+  sys.g.attributes.aColor.needsUpdate=true;
+  sys.g.attributes.aSize.needsUpdate=true;
+  sys.g.attributes.aAlpha.needsUpdate=true;
+}
+
+/* ═══════════════════════════════════════════════════
+   11 · 声音（Web Audio 合成，无音频文件）
+   ═══════════════════════════════════════════════════ */
+let AC=null, steamGain=null, pumpGain=null, masterGain=null;
+function initAudio(){
+  if(AC){ if(AC.state==='suspended') AC.resume(); return; }
+  try{
+    AC = new (window.AudioContext||window.webkitAudioContext)();
+    masterGain=AC.createGain(); masterGain.gain.value=1; masterGain.connect(AC.destination);
+    const len=AC.sampleRate*2, buf=AC.createBuffer(1,len,AC.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=AC.createBufferSource(); src.buffer=buf; src.loop=true;
+    const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1500;
+    const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=5400; bp.Q.value=0.6;
+    const lfo=AC.createOscillator(); lfo.frequency.value=7.3;
+    const lfoGain=AC.createGain(); lfoGain.gain.value=900;
+    lfo.connect(lfoGain); lfoGain.connect(bp.frequency); lfo.start();
+    steamGain=AC.createGain(); steamGain.gain.value=0;
+    src.connect(hp); hp.connect(bp); bp.connect(steamGain); steamGain.connect(masterGain); src.start();
+    const o1=AC.createOscillator(); o1.type='sawtooth'; o1.frequency.value=57;
+    const o2=AC.createOscillator(); o2.type='sine'; o2.frequency.value=114;
+    const mix2=AC.createGain(); mix2.gain.value=0.28; o2.connect(mix2);
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=210;
+    pumpGain=AC.createGain(); pumpGain.gain.value=0;
+    o1.connect(lp); mix2.connect(lp); lp.connect(pumpGain); pumpGain.connect(masterGain);
+    o1.start(); o2.start();
+  }catch(e){ AC=null; }
+}
+function audioTick(){
+  if(!AC) return;
+  const n=AC.currentTime;
+  steamGain.gain.setTargetAtTime(state.steam?0.16:0,n,0.09);
+  pumpGain.gain.setTargetAtTime(state.brew?0.032:0,n,0.12);
+  masterGain.gain.setTargetAtTime(state.muted?0:1,n,0.05);
+}
+
+/* ═══════════════════════════════════════════════════
+   12 · 状态机
+   ═══════════════════════════════════════════════════ */
+const state = {
+  brew:false, steam:false, purge:0, t:0,
+  pressure:0, temp:88, volume:0,
+  explode:0, explodeTarget:0, xray:true, muted:false,
+  tween:null, time:0, appliedDolly:1
+};
+const CYCLE=25.0;
+const clamp01=v=>v<0?0:v>1?1:v;
+const smooth=t=>t*t*(3-2*t);
+const damp=(cur,tgt,k,dt)=>cur+(tgt-cur)*Math.min(1,dt*k);
+
+function startBrew(){
+  if(state.brew){ stopBrew(); return; }
+  state.brew=true; state.t=0; state.purge=0; state.volume=0; coffeeLevel=0;
+}
+function stopBrew(){
+  if(!state.brew && state.purge<=0) return;
+  state.brew=false; state.purge=1.9;
+}
+
+const acc={cold:0,hot:0,shower:0,drip:0,steam:0,drain:0,bubble:0,opv:0};
+function flow(dt){
+  const on=state.brew, t=state.t;
+  const strong=on?clamp01((t-1.6)/2.0):0;
+  const purging=state.purge>0;
+  acc.cold+=dt*(on?15:0);
+  while(acc.cold>=1){ acc.cold-=1;
+    emit(LIQ,{curve:PATH.inlet.curve,part:PATH.inlet.part,speed:0.9+Math.random()*0.3,color:C_COLD,size:0.075,alpha:0.95,jitter:0.02});
+    emit(LIQ,{curve:PATH.pumpBoiler.curve,part:PATH.pumpBoiler.part,speed:0.8+Math.random()*0.3,color:C_COLD,size:0.078,alpha:0.95,jitter:0.02});
+  }
+  acc.hot+=dt*(on?18:0);
+  while(acc.hot>=1){ acc.hot-=1;
+    emit(LIQ,{curve:PATH.hot.curve,part:PATH.hot.part,speed:0.72+Math.random()*0.25,color:C_HOT,size:0.082,alpha:0.95,jitter:0.025});
+  }
+  acc.shower+=dt*(on?Math.round(24*Math.max(0.25,strong)):0);
+  while(acc.shower>=1){ acc.shower-=1;
+    const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*0.92;
+    emit(LIQ,{origin:new THREE.Vector3(Math.cos(a)*r,3.16,Z+Math.sin(a)*r),dir:new THREE.Vector3(0,-1,0),len:0.2,
+      speed:2.4+Math.random(),color:C_DROP,size:0.035,alpha:0.72,part:showerPart});
+  }
+  const level=0.97+coffeeLevel;
+  acc.drip+=dt*(on?Math.round(3+strong*22):0);
+  while(acc.drip>=1){ acc.drip-=1;
+    emit(LIQ,{origin:new THREE.Vector3((Math.random()-0.5)*0.05,2.14,Z-0.08),
+      dir:new THREE.Vector3((Math.random()-0.5)*0.03,-1,0),len:2.14-level,
+      speed:1.1+Math.random()*0.35,color:Math.random()<0.35?C_DRIP:C_COFFEE,
+      size:0.045+Math.random()*0.02,alpha:0.98,part:handlePart});
+  }
+  acc.drain+=dt*(purging?26:0);
+  while(acc.drain>=1){ acc.drain-=1;
+    emit(LIQ,{curve:PATH.drain.curve,part:PATH.drain.part,speed:1.0+Math.random()*0.4,color:C_DRAIN,size:0.06,alpha:0.85,jitter:0.03});
+  }
+  acc.opv+=dt*(on && state.pressure>8.9?5:0);
+  while(acc.opv>=1){ acc.opv-=1;
+    emit(LIQ,{curve:PATH.opv.curve,part:PATH.opv.part,speed:1.1,color:C_HOT,size:0.05,alpha:0.8});
+  }
+  acc.bubble+=dt*(state.temp>85?9:0);
+  while(acc.bubble>=1){ acc.bubble-=1;
+    const a=Math.random()*Math.PI*2, r=Math.random()*1.0;
+    emit(LIQ,{origin:new THREE.Vector3(BX+Math.cos(a)*r,3.2,BZ+Math.sin(a)*r),dir:new THREE.Vector3(0,1,0),len:1.6,
+      speed:0.42+Math.random()*0.3,color:C_BUBBLE,size:0.05,alpha:0.5,jitter:0.05,part:boilerPart});
+  }
+  acc.steam+=dt*(state.steam?62:0);
+  while(acc.steam>=1){ acc.steam-=1;
+    const a=Math.random()*Math.PI*2, sp=0.5+Math.random()*1.2;
+    const dir=new THREE.Vector3(Math.cos(a)*0.8,-0.75,Math.sin(a)*0.8+0.25).normalize();
+    emit(GAS,{origin:steamTip.clone().add(new THREE.Vector3((Math.random()-0.5)*0.1,0,(Math.random()-0.5)*0.1)),
+      dir,len:1.4+sp,speed:0.55+Math.random()*0.35,color:C_STEAM,size:0.19+Math.random()*0.18,
+      alpha:0.58,grow:2.1,jitter:0.08,part:wandPart});
+    if(Math.random()<0.25) emit(LIQ,{origin:steamTip.clone(),dir:dir.clone(),len:0.9,speed:1.2,color:C_STEAM,size:0.035,alpha:0.5,part:wandPart});
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   13 · 交互：悬停 / 按钮 / 键盘 / 相机
+   ═══════════════════════════════════════════════════ */
+const ray=new THREE.Raycaster(), pointer=new THREE.Vector2(-10,-10);
+let hovered=null, pickList=[];
+const emiCache=new Map();
+function rebuildPick(){ pickList=pickables.filter(m=>!(m.userData.shell && state.xray)); }
+rebuildPick();
+
+function highlight(p,on){
+  p.obj.traverse(o=>{
+    if(!o.isMesh || !o.material || !o.material.emissive) return;
+    const m=o.material;
+    if(on){
+      if(!emiCache.has(m)) emiCache.set(m,{c:m.emissive.getHex(),i:m.emissiveIntensity});
+      m.emissive.setHex(0x7a4210); m.emissiveIntensity=0.85;
+    }else{
+      const s=emiCache.get(m); if(s){ m.emissive.setHex(s.c); m.emissiveIntensity=s.i; }
+    }
+  });
+}
+const hName=document.getElementById('hName'), hDesc=document.getElementById('hDesc');
+const DEF_DESC='把指针移到任意部件上，它会高亮，并说明自己在这条水流与压力链里的作用。';
+function applyHover(p){
+  if(hovered===p) return;
+  if(hovered){ highlight(hovered,false); hovered.el.classList.remove('hot'); }
+  hovered=p;
+  if(p){ highlight(p,true); p.el.classList.add('hot'); hName.textContent=p.name; hDesc.textContent=p.desc; }
+  else { hName.textContent='整台咖啡机'; hDesc.textContent=DEF_DESC; }
+}
+function onPointer(e){
+  const r=canvas.getBoundingClientRect();
+  pointer.x=((e.clientX-r.left)/r.width)*2-1;
+  pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+}
+canvas.addEventListener('pointermove',onPointer);
+canvas.addEventListener('pointerdown',e=>{canvas.style.cursor='grabbing';onPointer(e);});
+canvas.addEventListener('pointerup',()=>{canvas.style.cursor='grab';});
+canvas.addEventListener('pointerleave',()=>{pointer.set(-10,-10);applyHover(null);});
+
+const btnBrew=document.getElementById('btnBrew'), btnSteam=document.getElementById('btnSteam'),
+      btnEx=document.getElementById('btnEx'), btnXray=document.getElementById('btnXray'),
+      btnPuck=document.getElementById('btnPuck'), btnMute=document.getElementById('btnMute'),
+      btnReset=document.getElementById('btnReset');
+function syncButtons(){
+  btnBrew.textContent=state.brew?'停止萃取':'开始萃取';
+  btnBrew.classList.toggle('on',state.brew);
+  btnSteam.textContent=state.steam?'关闭蒸汽棒':'打开蒸汽棒';
+  btnSteam.classList.toggle('on',state.steam);
+  btnEx.classList.toggle('on',state.explodeTarget>0.5);
+  btnXray.classList.toggle('on',state.xray);
+  btnMute.classList.toggle('on',state.muted);
+}
+btnBrew.onclick=()=>{initAudio();startBrew();syncButtons();};
+btnSteam.onclick=()=>{initAudio();state.steam=!state.steam;syncButtons();};
+btnEx.onclick=()=>{state.explodeTarget=state.explodeTarget>0.5?0:1;syncButtons();};
+btnXray.onclick=()=>{state.xray=!state.xray;rebuildPick();syncButtons();};
+btnMute.onclick=()=>{state.muted=!state.muted;syncButtons();};
+function tweenTo(pos,tgt){ state.tween={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos.clone(),t1:tgt.clone(),k:0}; }
+btnPuck.onclick=()=>{
+  if(state.explodeTarget>0.5){ state.explodeTarget=0; syncButtons(); }
+  tweenTo(new THREE.Vector3(1.45,3.42,Z+2.75),new THREE.Vector3(0,2.87,Z));
+};
+btnReset.onclick=()=>{ state.explodeTarget=0; syncButtons(); tweenTo(HOME,TGT_HOME); };
+window.addEventListener('keydown',e=>{
+  if(e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  const k=e.key.toLowerCase();
+  if(e.code==='Space'){e.preventDefault();btnBrew.click();}
+  else if(k==='e')btnEx.click();
+  else if(k==='s')btnSteam.click();
+  else if(k==='r')btnReset.click();
+  else if(k==='p')btnPuck.click();
+});
+
+/* ═══════════════════════════════════════════════════
+   14 · 读数 / 动画主循环
+   ═══════════════════════════════════════════════════ */
+const roP=document.getElementById('roP'), roT=document.getElementById('roT'),
+      roTime=document.getElementById('roTime'), roVol=document.getElementById('roVol'),
+      roBoiler=document.getElementById('roBoiler'), roBar=document.getElementById('roBar'),
+      roPhase=document.getElementById('roPhase');
+function phaseText(){
+  if(state.purge>0) return '三通阀泄压 · 排残水';
+  if(state.brew && state.t<2.4) return '预浸润 · 低压润粉';
+  if(state.brew) return '9 bar 萃取 · 93°C';
+  if(state.steam) return '蒸汽阀开启 · 顶部供汽';
+  return '待机 · 锅炉保温 88°C';
+}
+
+const clock=new THREE.Clock();
+function tick(){
+  const dt=Math.min(clock.getDelta(),0.05);
+  state.time+=dt;
+  const dPuck=camera.position.distanceTo(PUCK);
+  const nearK=1-smooth(clamp01((dPuck-1.5)/4.8));
+
+  if(state.brew){
+    state.t+=dt;
+    state.volume=Math.min(36,state.volume+dt*1.45);
+    coffeeLevel=Math.min(0.72,state.volume/36*0.72);
+    if(state.t>=CYCLE) stopBrew();
+  }
+  if(state.purge>0) state.purge=Math.max(0,state.purge-dt);
+
+  let pTarget=0, tTarget=88;
+  if(state.brew){
+    pTarget=9.0*smooth(clamp01((state.t-0.35)/2.1))+(state.t>2.5?Math.sin(state.time*8)*0.06:0);
+    tTarget=88+5*clamp01(state.t/2.2);
+  }
+  state.pressure=damp(state.pressure,pTarget,state.brew?2.6:3.4,dt);
+  state.temp=damp(state.temp,tTarget,1.6,dt);
+  if(needlePivot) needlePivot.rotation.z=(135-state.pressure/16*270)*Math.PI/180;
+  const heatK=clamp01((state.temp-88)/5);
+  if(heaterMat) heaterMat.emissiveIntensity=1.0+heatK*1.4+Math.sin(state.time*3.4)*0.1;
+  boilerLight.intensity=2.4+heatK*2.0;
+  if(boilerWater) boilerWater.material.color.setRGB(0.25+heatK*0.45,0.52-heatK*0.18,0.72-heatK*0.4);
+  if(ledHeat) ledHeat.material.emissiveIntensity=0.35+heatK*1.3;
+  if(ledReady) ledReady.material.emissiveIntensity=state.brew?0.35:1.4;
+
+  if(coffeeLiquid){
+    coffeeLiquid.scale.y=Math.max(0.001,coffeeLevel);
+    coffeeLiquid.position.y=0.97+coffeeLevel/2;
+    cremaTop.visible=coffeeLevel>0.02;
+    cremaTop.position.y=0.97+coffeeLevel+0.004;
+  }
+  const level=0.97+coffeeLevel;
+  const streamOn=state.brew && state.t>2.1;
+  if(coffeeStream){
+    coffeeStream.visible=streamOn;
+    const L=Math.max(0.05,2.14-level);
+    coffeeStream.scale.y=L;
+    coffeeStream.position.y=(2.14+level)/2;
+    coffeeStream.material.opacity=0.72+Math.sin(state.time*14)*0.12;
+  }
+  const soak=state.brew?clamp01((state.t-0.6)/2.6):0;
+  if(wetFront){ wetFront.position.y=3.09-soak*0.55; wetFront.material.opacity=state.brew?0.9:0; }
+  if(wetMat){ wetMat.emissive.setHex(0x160a03); wetMat.emissiveIntensity=soak*0.55; }
+  if(grainMat) grainMat.opacity=0.2+nearK*0.42;
+
+  if(valveCore) valveCore.rotation.y+=dt*(state.purge>0?7:0.6);
+  if(steamWheel) steamWheel.rotation.z+=dt*(state.steam?1.8:0);
+  steamLight.intensity=state.steam?1.7+Math.sin(state.time*11)*0.25:0;
+  PATH.steam.mesh.material.emissiveIntensity=state.steam?1.1:0.35;
+
+  flow(dt);
+  stepParticles(LIQ,dt);
+  stepParticles(GAS,dt);
+  audioTick();
+
+  state.explode=damp(state.explode,state.explodeTarget,4.0,dt);
+  const eGlobal=smooth(clamp01(state.explode));
+  parts.forEach(p=>{
+    p._ei=smooth(clamp01((eGlobal-p.delay)/Math.max(0.001,1-p.delay)));
+    p.obj.position.copy(p.base).addScaledVector(p.ex,p._ei);
+  });
+  if(pumpGroup){
+    pumpGroup.obj.position.copy(pumpGroup.base).addScaledVector(pumpGroup.ex,pumpGroup._ei);
+    pumpGroup.obj.position.x+=state.brew?Math.sin(state.time*62)*0.012:0;
+  }
+
+  shellMats.forEach(m=>{
+    let op;
+    if(!state.xray) op=1-eGlobal*0.9;
+    else op=0.14-eGlobal*0.10-nearK*0.11;
+    m.opacity=Math.max(0.02,Math.min(1,op));
+    m.depthWrite=m.opacity>0.72;
+    m.transparent=m.opacity<0.999;
+  });
+  boilerMats.forEach(m=>{ m.opacity=Math.max(0.05,0.17-nearK*0.1-eGlobal*0.06); });
+
+  ray.setFromCamera(pointer,camera);
+  const hits=ray.intersectObjects(pickList,false);
+  applyHover(hits.length?hits[0].object.userData.part:null);
+
+  if(eGlobal>0.015){
+    const w=innerWidth,h=innerHeight,items=[],placed=[];
+    parts.forEach(p=>{
+      tmpV.copy(p.base).addScaledVector(p.ex,p._ei).add(p.labelOff).project(camera);
+      const x=(tmpV.x*0.5+0.5)*w, y=(-tmpV.y*0.5+0.5)*h;
+      const outside=tmpV.z>1||x<-90||x>w+90||y<-40||y>h+40;
+      items.push({el:p.el,x,y,outside});
+    });
+    items.sort((a,b)=>a.y-b.y);
+    items.forEach(it=>{
+      if(it.outside){ it.el.style.opacity='0'; return; }
+      let y=it.y;
+      for(let pass=0;pass<5;pass++){
+        for(const q of placed){ if(Math.abs(q.x-it.x)<156 && Math.abs(q.y-y)<26) y=q.y+26; }
+      }
+      placed.push({x:it.x,y});
+      it.el.style.opacity=String(Math.min(1,(eGlobal-0.015)*5));
+      it.el.style.transform='translate(-50%,-50%) translate('+it.x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+    });
+  }else{
+    for(const p of parts) if(p.el.style.opacity!=='0') p.el.style.opacity='0';
+  }
+
+  const dollyTarget=1+eGlobal*0.78;
+  if(!state.tween && Math.abs(dollyTarget-state.appliedDolly)>1e-5){
+    const off=camera.position.clone().sub(controls.target);
+    off.setLength(THREE.MathUtils.clamp(off.length()*(dollyTarget/state.appliedDolly),controls.minDistance,controls.maxDistance));
+    camera.position.copy(controls.target).add(off);
+    state.appliedDolly=dollyTarget;
+  }
+  if(state.tween){
+    const w=state.tween; w.k=Math.min(1,w.k+dt*1.5);
+    const s=smooth(w.k);
+    camera.position.lerpVectors(w.p0,w.p1,s);
+    controls.target.lerpVectors(w.t0,w.t1,s);
+    if(w.k>=1){ state.tween=null; state.appliedDolly=dollyTarget; }
+  }
+
+  roP.textContent=state.pressure.toFixed(1);
+  roT.textContent=state.temp.toFixed(1)+' °C';
+  roTime.textContent=state.t.toFixed(1)+' / 25.0 s';
+  roVol.textContent=state.volume.toFixed(1)+' ml';
+  roBoiler.textContent=state.steam?'供汽中':(state.brew?'加热 · 萃取':'保温');
+  roBar.style.width=(clamp01(state.t/CYCLE)*100).toFixed(1)+'%';
+  roPhase.textContent=phaseText();
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  const sc=innerHeight/(2*Math.tan(38*Math.PI/360));
+  LIQ.m.uniforms.uScale.value=sc; GAS.m.uniforms.uScale.value=sc;
+});
+
+syncButtons();
+rebuildPick();
+document.getElementById('loading').classList.add('hide');
+window.__ready=true;
+renderer.setAnimationLoop(tick);
+</script>
+</body>
+</html>

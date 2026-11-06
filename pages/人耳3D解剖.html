@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>人耳 · 交互式 3D 解剖</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#04080c}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:#e9f6f8;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(ellipse 95% 75% at 48% 40%,#10262e 0%,#08131c 48%,#03070b 100%);
+  }
+  #app{position:fixed;inset:0}
+  #app canvas{display:block;touch-action:none;cursor:grab}
+  #app canvas:active{cursor:grabbing}
+  #labels{position:absolute!important;inset:0;pointer-events:none;overflow:hidden}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse 80% 70% at 50% 46%,rgba(0,0,0,0) 42%,rgba(0,0,0,.58) 100%)}
+
+  .glass{position:fixed;z-index:20;
+    background:rgba(8,20,27,.62);
+    -webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
+    border:1px solid rgba(120,235,225,.13);border-radius:16px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06)}
+
+  .hud{left:26px;top:26px;padding:16px 22px 18px;pointer-events:none}
+  .eyebrow{font-size:10px;letter-spacing:.34em;color:rgba(140,255,240,.44);margin-bottom:9px}
+  .hud h1{font-size:25px;font-weight:600;letter-spacing:.06em;line-height:1.1;
+    background:linear-gradient(180deg,#fff 0%,#80f2df 130%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hud .sub{font-size:11px;color:rgba(200,230,238,.46);margin-top:9px;letter-spacing:.06em;line-height:1.7;max-width:340px}
+
+  .hint{position:fixed;right:28px;top:30px;z-index:20;text-align:right;
+    font-size:11.5px;line-height:2;color:rgba(190,220,230,.4);letter-spacing:.05em;pointer-events:none}
+  .hint b{color:rgba(120,255,235,.78);font-weight:500}
+  #zoomStage{color:#ffc978;text-shadow:0 0 12px rgba(255,180,80,.45)}
+
+  .info{left:26px;bottom:26px;max-width:340px;min-height:92px;
+    padding:15px 19px 16px;pointer-events:none;transition:border-color .25s,box-shadow .25s}
+  .info.live{border-color:rgba(120,255,235,.45);box-shadow:0 16px 44px rgba(0,0,0,.5),0 0 26px rgba(60,230,205,.16)}
+  .info .t{font-size:15px;font-weight:600;letter-spacing:.08em;color:#8ff6e5;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .info .t .bar{width:3px;height:13px;border-radius:2px;background:linear-gradient(180deg,#7ff5e0,#148a7c)}
+  .info .d{font-size:12.5px;line-height:1.8;color:rgba(214,236,242,.74);letter-spacing:.02em}
+
+  .panel{right:26px;top:104px;width:230px;padding:15px 15px 14px;z-index:20}
+  .panel .cap{font-size:10px;letter-spacing:.28em;color:rgba(140,255,240,.45);margin-bottom:10px}
+  .freq{font-size:29px;font-weight:600;letter-spacing:.02em;color:#fff;line-height:1;
+    font-variant-numeric:tabular-nums;text-shadow:0 0 22px rgba(110,240,220,.25)}
+  .freq small{font-size:12px;font-weight:400;color:rgba(190,230,235,.55);margin-left:6px;letter-spacing:.1em}
+  input[type=range]{width:100%;margin:15px 0 7px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;
+    background:linear-gradient(90deg,#ff9d5c 0%,#ffd27a 28%,#7ff0d8 66%,#55b8ff 100%)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid #132a30;box-shadow:0 0 0 1px rgba(140,255,235,.7),0 0 14px rgba(120,240,220,.6);margin-top:-5.5px}
+  input[type=range]::-moz-range-track{height:4px;border-radius:3px;background:linear-gradient(90deg,#ff9d5c,#ffd27a,#7ff0d8,#55b8ff)}
+  input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid #132a30}
+  .range-lbl{display:flex;justify-content:space-between;font-size:10.5px;color:rgba(190,225,232,.42);letter-spacing:.04em}
+  .presets{display:flex;gap:5px;margin-top:13px}
+  .presets button{flex:1;font-family:inherit;font-size:11px;color:rgba(220,244,248,.72);cursor:pointer;
+    padding:7px 0;border-radius:8px;border:1px solid rgba(255,255,255,.09);
+    background:rgba(255,255,255,.045);transition:.2s}
+  .presets button:hover{border-color:rgba(120,255,235,.45);color:#fff;background:rgba(120,255,235,.1)}
+  .peakline{margin-top:13px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07);
+    font-size:11px;color:rgba(195,228,235,.5);line-height:1.9;letter-spacing:.03em}
+  .peakline b{color:#ffce80;font-weight:600}
+  .chain{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:12px}
+  .chain span{font-size:10.5px;text-align:center;padding:6px 2px;border-radius:7px;
+    color:rgba(190,220,228,.4);border:1px solid rgba(255,255,255,.055);
+    background:rgba(255,255,255,.02);transition:.18s;letter-spacing:.04em}
+  .chain span.on{color:#04231f;background:linear-gradient(180deg,#7ff2dc,#25b39d);
+    border-color:rgba(160,255,240,.6);font-weight:600;box-shadow:0 0 18px rgba(60,230,200,.35)}
+
+  .dock{left:50%;bottom:24px;transform:translateX(-50%);z-index:20;
+    display:flex;gap:6px;padding:8px;border-radius:15px}
+  .dock button{
+    font-family:inherit;font-size:12.5px;letter-spacing:.05em;color:rgba(230,246,250,.82);cursor:pointer;
+    border:1px solid rgba(255,255,255,.09);border-radius:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015));
+    padding:10px 15px;display:flex;align-items:center;gap:7px;white-space:nowrap;
+    transition:transform .16s cubic-bezier(.2,.8,.3,1),background .2s,border-color .2s,box-shadow .25s,color .2s}
+  .dock button:hover{transform:translateY(-1px);border-color:rgba(120,255,235,.38);color:#fff}
+  .dock button:active{transform:translateY(0) scale(.98)}
+  .dock button.on{background:linear-gradient(180deg,#57e7ce,#148d80);border-color:rgba(150,255,240,.6);
+    color:#04241f;font-weight:600;box-shadow:0 8px 26px rgba(60,230,205,.3),inset 0 1px 0 rgba(255,255,255,.4)}
+  .dock button .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.45}
+  .dock button.on .dot{opacity:1;box-shadow:0 0 8px currentColor}
+  .dock .sep{width:1px;background:rgba(255,255,255,.08);margin:4px 2px}
+
+  .part-label{position:absolute;padding:4px 10px 5px;border-radius:999px;
+    font-size:11.5px;letter-spacing:.09em;white-space:nowrap;color:#cafff5;
+    background:rgba(6,22,26,.88);border:1px solid rgba(110,245,225,.36);
+    box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 18px rgba(60,230,205,.1);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    transition:opacity .2s;pointer-events:none}
+  .micro-label{position:absolute;font-size:10.5px;letter-spacing:.1em;white-space:nowrap;
+    color:rgba(255,214,140,.92);text-shadow:0 0 10px rgba(0,0,0,.95),0 0 18px rgba(255,170,60,.35);
+    pointer-events:none;transition:opacity .2s}
+  .peak-label{position:absolute;font-size:11px;letter-spacing:.08em;white-space:nowrap;
+    color:#ffe0a0;padding:3px 9px;border-radius:6px;
+    background:rgba(38,24,8,.78);border:1px solid rgba(255,190,90,.4);
+    text-shadow:0 0 10px rgba(0,0,0,.8);pointer-events:none}
+
+  .pulse-tag{position:fixed;right:30px;bottom:34px;z-index:20;font-size:11.5px;letter-spacing:.16em;
+    color:#8ff6e5;opacity:0;transform:translateY(6px);transition:opacity .18s,transform .25s;pointer-events:none;
+    text-shadow:0 0 14px rgba(90,240,215,.8)}
+  .pulse-tag.on{opacity:1;transform:translateY(0)}
+
+  @media (max-width:980px){
+    .panel{right:14px;top:86px;width:206px;padding:12px}
+    .hud.tl{left:14px;top:14px;padding:12px 15px 14px}
+    .hud h1{font-size:19px}
+    .hud .sub{font-size:10px;max-width:230px}
+    .hint{display:none}
+    .info{left:14px;bottom:86px;max-width:min(340px,calc(100vw - 28px));min-height:0;padding:12px 15px}
+    .info .d{font-size:11.5px;line-height:1.7}
+    .dock{bottom:12px;gap:4px;padding:6px}
+    .dock button{padding:9px 10px;font-size:11px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="vignette"></div>
+
+<div class="glass hud tl">
+  <div class="eyebrow">人耳 ／ 听觉传导</div>
+  <h1>人耳 · 交互解剖</h1>
+  <div class="sub">声波 → 耳道 → 鼓膜 → 听小骨 → 卵圆窗 → 淋巴液行波 → 基底膜 → 毛细胞 → 听神经</div>
+</div>
+
+<div class="hint">
+  <b>拖拽</b> 环绕观察 · <b>滚轮</b> 逐级放大<br>
+  一路可钻进 <b>单个毛细胞</b><br>
+  <b>悬停</b> 任一结构查看功能<br>
+  <span id="zoomStage">视野：全耳</span>
+</div>
+
+<div class="glass info" id="info">
+  <div class="t"><span class="bar"></span><span id="infoTitle">解剖导览</span></div>
+  <div class="d" id="infoDesc">这是一只右耳的剖面。外侧是耳廓与外耳道，鼓膜之后是含气的鼓室与三块听小骨，内侧是卷成蜗壳的耳蜗。把耳蜗展开，可以看见三道充满液体的管腔与一整条基底膜。</div>
+</div>
+
+<div class="glass panel">
+  <div class="cap">声音频率</div>
+  <div class="freq"><span id="freqVal">1000</span><small>赫兹</small></div>
+  <input type="range" id="pitch" min="0" max="1000" value="500" aria-label="声音频率" />
+  <div class="range-lbl"><span>低音 · 蜗顶</span><span>高音 · 蜗底</span></div>
+  <div class="presets">
+    <button data-f="200">低音</button>
+    <button data-f="1000">中音</button>
+    <button data-f="6000">高音</button>
+  </div>
+  <div class="peakline">
+    行波峰值位置<br><b id="peakVal">距蜗底 38 ％</b><br>
+    <span id="regionVal">中频区 · 膜宽中等</span>
+  </div>
+  <div class="chain" id="chain">
+    <span>声波入耳</span><span>鼓膜振动</span>
+    <span>听小骨杠杆</span><span>卵圆窗推进</span>
+    <span>淋巴液行波</span><span>基底膜共振</span>
+    <span>纤毛换能</span><span>神经放电</span>
+  </div>
+</div>
+
+<div class="glass dock">
+  <button id="btnExplode"><span class="dot"></span><span id="btnExplodeTxt">爆炸视图</span></button>
+  <div class="sep"></div>
+  <button id="btnCoil" class="on"><span class="dot"></span><span id="btnCoilTxt">展开耳蜗</span></button>
+  <button id="btnPlay" class="on"><span class="dot"></span><span id="btnPlayTxt">暂停发声</span></button>
+  <button id="btnSound" class="on"><span class="dot"></span><span id="btnSoundTxt">声音：开</span></button>
+  <button id="btnReset"><span class="dot"></span>重置视角</button>
+</div>
+
+<div class="pulse-tag" id="pulseTag">动作电位 → 脑干</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* =========================================================
+   0. 基础环境
+   ========================================================= */
+const appEl = document.getElementById('app');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.004, 300);
+camera.position.set(0.4, 2.15, 11.8);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+appEl.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.id = 'labels';
+appEl.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.8;
+controls.zoomSpeed = 0.9;
+controls.enablePan = false;
+controls.minDistance = 0.055;
+controls.maxDistance = 20;
+controls.target.set(-0.7, 0.05, 0);
+
+scene.add(new THREE.AmbientLight(0xdceeff, 0.5));
+scene.add(new THREE.HemisphereLight(0xcde9ff, 0x2a1418, 1.05));
+const keyLight = new THREE.DirectionalLight(0xfff2e4, 2.45); keyLight.position.set(4, 7, 9); scene.add(keyLight);
+const coolLight = new THREE.DirectionalLight(0x9fd9ff, 1.2); coolLight.position.set(-7, -3, 5); scene.add(coolLight);
+const rimLight = new THREE.DirectionalLight(0xffab7a, 1.05); rimLight.position.set(-3, 4, -8); scene.add(rimLight);
+
+/* =========================================================
+   1. 通用工具（全部程序化生成，不使用任何图片文件）
+   ========================================================= */
+const world = new THREE.Group(); scene.add(world);
+const macroGroup = new THREE.Group(); world.add(macroGroup);
+const detailGroup = new THREE.Group(); world.add(detailGroup);
+
+const parts = [], pickables = [], bendables = [], detailMats = [];
+const V = (x,y,z) => new THREE.Vector3(x,y,z);
+const clamp = THREE.MathUtils.clamp;
+const lerp = THREE.MathUtils.lerp;
+function smoothstep(a,b,x){ const t = clamp((x-a)/(b-a||1e-6),0,1); return t*t*(3-2*t); }
+
+function noiseTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'); const d = g.createImageData(256,256);
+  for(let i=0;i<d.data.length;i+=4){ const v = 108 + Math.random()*92; d.data[i]=d.data[i+1]=d.data[i+2]=v; d.data[i+3]=255; }
+  g.putImageData(d,0,0);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3,3); return t;
+}
+const skinBump = noiseTexture();
+
+function conchaTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(128,128,8,128,128,126);
+  grd.addColorStop(0,'rgba(48,20,18,.96)');
+  grd.addColorStop(.36,'rgba(104,51,43,.92)');
+  grd.addColorStop(.72,'rgba(184,118,98,.86)');
+  grd.addColorStop(1,'rgba(214,155,132,0)');
+  g.fillStyle = grd; g.fillRect(0,0,256,256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+function fresnelAlpha(mat, minA, maxA, power){
+  mat.transparent = true; mat.opacity = 1; mat.depthWrite = false;
+  mat.onBeforeCompile = (sh) => {
+    const code = 'float _f = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));\n' +
+      'gl_FragColor.a *= mix(' + minA.toFixed(3) + ',' + maxA.toFixed(3) + ',pow(clamp(_f,0.0,1.0),' + (power||2).toFixed(2) + '));';
+    sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', code + '\n#include <dithering_fragment>');
+  };
+  mat.customProgramCacheKey = () => 'fr'+minA+'_'+maxA+'_'+power;
+  return mat;
+}
+
+function cylinderBetween(p1,p2,r,mat,seg,r2){
+  const dir = new THREE.Vector3().subVectors(p2,p1); const len = dir.length();
+  const geo = new THREE.CylinderGeometry(r2===undefined?r:r2, r, len, seg||10, 1, false);
+  const m = new THREE.Mesh(geo, mat);
+  m.position.copy(p1).add(p2).multiplyScalar(.5);
+  m.quaternion.setFromUnitVectors(V(0,1,0), dir.normalize());
+  return m;
+}
+function tubeFrom(points, radius, mat, seg, radial){
+  const curve = new THREE.CatmullRomCurve3(points.map(p=>V(p[0],p[1],p[2])));
+  const m = new THREE.Mesh(new THREE.TubeGeometry(curve, seg||48, radius, radial||10, false), mat);
+  return { mesh:m, curve };
+}
+function taperedTube(curve, seg, radial, rFn, mat){
+  const fr = curve.computeFrenetFrames(seg, false);
+  const pos=[], nor=[], uv=[], idx=[];
+  for(let i=0;i<=seg;i++){
+    const t=i/seg, p=curve.getPointAt(t), r=rFn(t), N=fr.normals[i], Bv=fr.binormals[i];
+    for(let j=0;j<=radial;j++){
+      const a=j/radial*Math.PI*2, c=Math.cos(a), s=Math.sin(a);
+      const nx=c*N.x+s*Bv.x, ny=c*N.y+s*Bv.y, nz=c*N.z+s*Bv.z;
+      pos.push(p.x+r*nx, p.y+r*ny, p.z+r*nz); nor.push(nx,ny,nz); uv.push(t,j/radial);
+    }
+  }
+  for(let i=0;i<seg;i++) for(let j=0;j<radial;j++){
+    const a=i*(radial+1)+j, b=a+1, c=a+radial+1, d=c+1;
+    idx.push(a,c,b,b,c,d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor,3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);
+  return new THREE.Mesh(g, mat);
+}
+
+/* ---------------- 部件系统 ---------------- */
+function makePart(cfg){
+  const g = new THREE.Group(); g.name = cfg.id;
+  g.userData = {
+    id:cfg.id, name:cfg.name, desc:cfg.desc,
+    explode:V(cfg.ex[0],cfg.ex[1],cfg.ex[2]),
+    delay:cfg.delay||0, meshes:[], anchor:cfg.anchor||null,
+    ghostBase:!!cfg.ghost, ghost:!!cfg.ghost, hi:false
+  };
+  const el = document.createElement('div');
+  el.className = 'part-label'; el.textContent = cfg.name;
+  const lab = new CSS2DObject(el);
+  if(cfg.label) lab.position.set(cfg.label[0],cfg.label[1],cfg.label[2]);
+  lab.visible = false; g.add(lab);
+  g.userData.label = lab; g.userData.labelEl = el;
+  (cfg.detail ? detailGroup : macroGroup).add(g);
+  parts.push(g);
+  return g;
+}
+function addPick(part, mesh){
+  mesh.userData.part = part;
+  part.userData.meshes.push(mesh);
+  pickables.push(mesh);
+  return mesh;
+}
+function addMesh(part, mesh, pick){
+  part.add(mesh);
+  if(pick !== false) addPick(part, mesh);
+  return mesh;
+}
+function regDetail(mat){ detailMats.push({mat, base:mat.opacity}); return mat; }
+
+/* =========================================================
+   2. 耳蜗坐标系：一条直管 ↔ 2.5 圈蜗壳
+   所有微观结构都先画在「直管空间」(x = 0…L，y 上下，z 左右)，
+   再按弧长逐点弯到螺旋中心线上，因此展开是真正的连续形变。
+   ========================================================= */
+const L = 5.7;
+const B0 = V(-0.55, -0.12, -0.25);
+const R0 = 1.62, TURNS = 2.5, TAPER = 0.86, COIL_SCALE = 0.60;
+const Y_BM = -0.055, Y_TM = 0.115, Y_RM = 0.055;
+
+function ry(u){ return 0.44 - 0.22*u; }
+function rz(u){ return 0.50 - 0.10*u; }
+function halfW(u){ return 0.06 + 0.30*u; }
+
+function spiralPoint(u, out){
+  const th = Math.PI + Math.PI*2*TURNS*u;
+  const r = R0*(1 - TAPER*u);
+  return out.set(R0 + r*Math.cos(th), r*Math.sin(th), 0.75*u*u);
+}
+
+const NB = 300;
+const FP = [], FN = [], FB = [], FT = [];
+for(let i=0;i<=NB;i++){ FP.push(new THREE.Vector3()); FN.push(new THREE.Vector3()); FB.push(new THREE.Vector3()); FT.push(new THREE.Vector3()); }
+const _sp = new THREE.Vector3(), _st = new THREE.Vector3(), _bp = new THREE.Vector3(), _bn = new THREE.Vector3();
+let coilK = 1, crossScale = COIL_SCALE, framesDirty = true;
+
+function buildFrames(k){
+  crossScale = lerp(1, COIL_SCALE, k);
+  for(let i=0;i<=NB;i++){
+    const u = i/NB;
+    _st.set(L*u, 0, 0);
+    spiralPoint(u, _sp).multiplyScalar(COIL_SCALE);
+    FP[i].copy(_st).lerp(_sp, k);
+  }
+  const Z = V(0,0,1);
+  for(let i=0;i<=NB;i++){
+    FT[i].subVectors(FP[Math.min(NB,i+1)], FP[Math.max(0,i-1)]).normalize();
+    FN[i].crossVectors(Z, FT[i]).normalize();
+    FB[i].crossVectors(FT[i], FN[i]).normalize();
+  }
+}
+function frameIndex(x){ return clamp(Math.round(clamp(x/L,0,1)*NB), 0, NB); }
+function bendPoint(x,y,z,out){
+  const i = frameIndex(x), P = FP[i], N = FN[i], Bv = FB[i], s = crossScale;
+  return out.copy(B0).add(P).addScaledVector(N, s*y).addScaledVector(Bv, s*z);
+}
+function bendNormal(i,nx,ny,nz,out){
+  const T = FT[i], N = FN[i], Bv = FB[i];
+  return out.set(T.x*nx+N.x*ny+Bv.x*nz, T.y*nx+N.y*ny+Bv.y*nz, T.z*nx+N.z*ny+Bv.z*nz).normalize();
+}
+function basisAt(u,out){
+  const i = frameIndex(u*L);
+  return out.makeBasis(FT[i], FN[i], FB[i]);
+}
+
+function registerBend(mesh, opts){
+  opts = opts || {};
+  const g = mesh.geometry;
+  const b = {
+    mesh, g,
+    p:g.attributes.position.array.slice(),
+    n:g.attributes.normal ? g.attributes.normal.array.slice() : null,
+    wave:opts.wave||null, dynamic:!!opts.dynamic, colorFn:opts.colorFn||null, colArr:null, colorAttr:null
+  };
+  if(opts.colorFn){
+    b.colArr = new Float32Array(b.p.length);
+    b.colorAttr = new THREE.BufferAttribute(b.colArr,3);
+    g.setAttribute('color', b.colorAttr);
+  }
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 60);
+  mesh.frustumCulled = false;
+  bendables.push(b);
+  return mesh;
+}
+function applyBend(b){
+  const pos = b.g.attributes.position.array, base = b.p, nrm = b.n;
+  const outN = b.g.attributes.normal ? b.g.attributes.normal.array : null;
+  const col = b.colArr;
+  for(let i=0;i<base.length;i+=3){
+    const x=base[i], y0=base[i+1], z=base[i+2];
+    const idx=frameIndex(x), u=clamp(x/L,0,1);
+    const y = y0 + (b.wave ? b.wave(u,z,x) : 0);
+    bendPoint(x,y,z,_bp);
+    pos[i]=_bp.x; pos[i+1]=_bp.y; pos[i+2]=_bp.z;
+    if(nrm && outN){
+      bendNormal(idx,nrm[i],nrm[i+1],nrm[i+2],_bn);
+      outN[i]=_bn.x; outN[i+1]=_bn.y; outN[i+2]=_bn.z;
+    }
+    if(col) b.colorFn(u,z,y,col,i);
+  }
+  b.g.attributes.position.needsUpdate = true;
+  if(outN) b.g.attributes.normal.needsUpdate = true;
+  if(col) b.colorAttr.needsUpdate = true;
+}
+function updateAnchors(){
+  for(const p of parts){
+    const a = p.userData.anchor;
+    if(a){ bendPoint(a[0],a[1],a[2],_bp); p.userData.label.position.copy(_bp); }
+  }
+}
+function updateBend(){
+  if(framesDirty){
+    buildFrames(coilK); framesDirty = false;
+    for(const b of bendables) applyBend(b);
+    updateAnchors();
+  } else {
+    for(const b of bendables) if(b.dynamic) applyBend(b);
+  }
+}
+
+/* 截面沿 x 扫掠：section(u) 返回闭合多边形的 [y,z] 点列 */
+function sectionTube(seg, sectionFn){
+  const M = sectionFn(0).length, pos=[], idx=[];
+  for(let i=0;i<=seg;i++){
+    const u=i/seg, x=L*u, s=sectionFn(u);
+    for(let j=0;j<M;j++) pos.push(x, s[j][0], s[j][1]);
+  }
+  for(let i=0;i<seg;i++) for(let j=0;j<M;j++){
+    const a=i*M+j, b=i*M+(j+1)%M, c=(i+1)*M+j, d=(i+1)*M+(j+1)%M;
+    idx.push(a,c,b, b,c,d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+/* 沿 x 的带状面：zFn(u,q) 给横向位置，yFn(u,z,q) 给高度 */
+function ribbon(seg, across, yFn, zFn){
+  const pos=[], idx=[], M=across+1;
+  for(let i=0;i<=seg;i++){
+    const u=i/seg;
+    for(let j=0;j<=across;j++){
+      const q=j/across, z=zFn(u,q);
+      pos.push(L*u, yFn(u,z,q), z);
+    }
+  }
+  for(let i=0;i<seg;i++) for(let j=0;j<across;j++){
+    const a=i*M+j, b=a+1, c=a+M, d=c+1;
+    idx.push(a,c,b, b,c,d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+
+/* =========================================================
+   3. 材质
+   ========================================================= */
+const MAT = {
+  skin: new THREE.MeshPhysicalMaterial({color:0xd9a189, roughness:.62, clearcoat:.22, clearcoatRoughness:.6,
+    sheen:.55, sheenColor:new THREE.Color(0xff9c7a), bumpMap:skinBump, bumpScale:.016, side:THREE.DoubleSide}),
+  skinRidge: new THREE.MeshPhysicalMaterial({color:0xe0aa92, roughness:.58, clearcoat:.3, bumpMap:skinBump, bumpScale:.012}),
+  skinDark: new THREE.MeshStandardMaterial({color:0xa9695a, roughness:.82, side:THREE.DoubleSide}),
+  drum: new THREE.MeshPhysicalMaterial({color:0xf0ded0, roughness:.32, metalness:.02,
+    transparent:true, opacity:.76, side:THREE.DoubleSide, emissive:0x3a2b26, emissiveIntensity:.25, depthWrite:false}),
+  bone: new THREE.MeshPhysicalMaterial({color:0xe7dcc2, roughness:.42, clearcoat:.28, clearcoatRoughness:.5,
+    emissive:0x3a3222, emissiveIntensity:.16}),
+  boneLight: new THREE.MeshPhysicalMaterial({color:0xf3ead4, roughness:.36, clearcoat:.35}),
+  membrane: new THREE.MeshPhysicalMaterial({color:0xf7d2a8, roughness:.45, transparent:true,
+    opacity:.62, side:THREE.DoubleSide, depthWrite:false, emissive:0x50301a, emissiveIntensity:.22}),
+  tube: new THREE.MeshPhysicalMaterial({color:0xc98f79, roughness:.72, transparent:true,
+    opacity:.72, side:THREE.DoubleSide, depthWrite:false}),
+  gold: new THREE.MeshStandardMaterial({color:0xffc46a, emissive:0xff9a30, emissiveIntensity:.55,
+    roughness:.35, transparent:true, opacity:.92}),
+  cyan: new THREE.MeshStandardMaterial({color:0x7ff0dd, emissive:0x28bfa8, emissiveIntensity:.6,
+    roughness:.4, transparent:true, opacity:.9})
+};
+
+/* =========================================================
+   4. 外耳：耳廓 + 外耳道
+   ========================================================= */
+const pinna = makePart({
+  id:'pinna', name:'耳廓',
+  desc:'用层层褶皱收集声波并做方向滤波，帮我们判断声音从哪儿来。',
+  ex:[-1.25,.65,.95], delay:0, label:[-5.85,1.52,0.65]
+});
+const pinnaGrp = new THREE.Group(); pinnaGrp.position.set(-5.45,0.05,0.15); pinna.add(pinnaGrp);
+{
+  const s = new THREE.Shape();
+  s.moveTo(-0.30,-1.02);
+  s.bezierCurveTo(-0.55,-0.78,-0.70,-0.28,-0.67,0.20);
+  s.bezierCurveTo(-0.65,0.78,-0.40,1.12,-0.04,1.18);
+  s.bezierCurveTo(0.36,1.24,0.68,0.98,0.71,0.58);
+  s.bezierCurveTo(0.76,0.22,0.56,0.02,0.47,-0.16);
+  s.bezierCurveTo(0.40,-0.34,0.52,-0.50,0.40,-0.68);
+  s.bezierCurveTo(0.26,-0.92,0.00,-1.06,-0.30,-1.02);
+  const flesh = new THREE.Mesh(new THREE.ExtrudeGeometry(s,{
+    depth:.15, bevelEnabled:true, bevelSize:.085, bevelThickness:.085, bevelSegments:3, curveSegments:26
+  }), MAT.skin);
+  flesh.position.z = -0.05; pinnaGrp.add(flesh); addPick(pinna,flesh);
+
+  const helix = tubeFrom([
+    [-0.16,-0.94,0.19],[-0.47,-0.72,0.25],[-0.60,-0.30,0.27],[-0.61,0.18,0.26],
+    [-0.53,0.70,0.24],[-0.26,1.02,0.22],[0.12,1.06,0.20],[0.46,0.86,0.19],
+    [0.60,0.52,0.19],[0.55,0.20,0.20],[0.44,0.00,0.22]
+  ], 0.082, MAT.skinRidge, 72, 10).mesh;
+  pinnaGrp.add(helix); addPick(pinna,helix);
+
+  const anti1 = tubeFrom([
+    [0.02,-0.62,0.20],[-0.12,-0.24,0.23],[-0.16,0.22,0.23],[-0.04,0.58,0.22],[0.26,0.78,0.20]
+  ], 0.062, MAT.skinRidge, 48, 9).mesh;
+  const anti2 = tubeFrom([[-0.15,0.22,0.23],[0.06,0.34,0.22],[0.34,0.44,0.20]], 0.055, MAT.skinRidge, 28, 9).mesh;
+  pinnaGrp.add(anti1,anti2); addPick(pinna,anti1); addPick(pinna,anti2);
+
+  const bowl = new THREE.Mesh(new THREE.CircleGeometry(1,56),
+    new THREE.MeshStandardMaterial({map:conchaTexture(), transparent:true, roughness:.85,
+      side:THREE.DoubleSide, depthWrite:false}));
+  bowl.scale.set(.43,.53,1); bowl.position.set(0.10,-0.22,0.175);
+  pinnaGrp.add(bowl); addPick(pinna,bowl);
+
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(.155,40),
+    new THREE.MeshBasicMaterial({color:0x1c0d0e, side:THREE.DoubleSide}));
+  hole.position.set(0.19,-0.27,0.185); pinnaGrp.add(hole); addPick(pinna,hole);
+
+  const tragus = new THREE.Mesh(new THREE.SphereGeometry(1,20,14), MAT.skinRidge);
+  tragus.scale.set(.135,.20,.11); tragus.position.set(-0.20,-0.42,0.27);
+  const antitragus = new THREE.Mesh(new THREE.SphereGeometry(1,16,12), MAT.skinRidge);
+  antitragus.scale.set(.11,.10,.085); antitragus.position.set(0.31,-0.63,0.24);
+  const lobule = new THREE.Mesh(new THREE.SphereGeometry(1,22,16), MAT.skin);
+  lobule.scale.set(.30,.32,.16); lobule.position.set(-0.16,-0.97,0.07);
+  pinnaGrp.add(tragus,antitragus,lobule);
+  addPick(pinna,tragus); addPick(pinna,antitragus); addPick(pinna,lobule);
+}
+
+const canal = makePart({
+  id:'canal', name:'外耳道',
+  desc:'约 2.5 厘米的共振管，天然放大 2～5 千赫的声音，把声压送到鼓膜。',
+  ex:[-.85,.20,.70], delay:.12, label:[-3.95,0.42,0.62]
+});
+const canalPts = [[-5.25,-0.19,0.28],[-4.78,-0.22,0.02],[-4.10,-0.25,-0.26],[-3.38,-0.23,-0.28],[-2.70,-0.20,-0.14]];
+const canalCurve = new THREE.CatmullRomCurve3(canalPts.map(p=>V(p[0],p[1],p[2])));
+{
+  const wallMat = new THREE.MeshPhysicalMaterial({color:0xc98d75, roughness:.7, side:THREE.DoubleSide,
+    transparent:true, opacity:1, depthWrite:false, bumpMap:skinBump, bumpScale:.01});
+  fresnelAlpha(wallMat, 0.055, 0.60, 1.7);
+  const wall = new THREE.Mesh(new THREE.TubeGeometry(canalCurve, 96, .335, 22, false), wallMat);
+  addMesh(canal, wall);
+  const lumen = new THREE.Mesh(new THREE.TubeGeometry(canalCurve, 96, .278, 20, false),
+    new THREE.MeshStandardMaterial({color:0x6b3c32, roughness:.9, side:THREE.BackSide,
+      transparent:true, opacity:.62, depthWrite:false}));
+  addMesh(canal, lumen, false);
+  const hairMat = new THREE.MeshStandardMaterial({color:0x4a2a22, roughness:1});
+  for(let i=0;i<14;i++){
+    const t = .12 + Math.random()*.24;
+    const p = canalCurve.getPointAt(t); const tan = canalCurve.getTangentAt(t);
+    const ang = Math.random()*Math.PI*2;
+    const off = V(0, Math.cos(ang), Math.sin(ang)).multiplyScalar(.272);
+    const inner = p.clone().add(off.clone().multiplyScalar(.62));
+    const h = cylinderBetween(p.clone().add(off), inner, .0035, hairMat, 4, .001);
+    addMesh(canal, h, false);
+  }
+}
+
+/* =========================================================
+   5. 鼓膜
+   ========================================================= */
+const drum = makePart({
+  id:'drum', name:'鼓膜',
+  desc:'绷在耳道尽头的锥形纤维膜，声压把它推成同频率的往复振动。',
+  ex:[-.55,.85,.60], delay:.22, label:[-2.70,.62,.55]
+});
+const drumPivot = new THREE.Group(); drumPivot.position.set(-2.68,-0.20,-0.14); drum.add(drumPivot);
+{
+  const g = new THREE.ConeGeometry(.325,.17,56,1,false); g.rotateZ(-Math.PI/2);
+  const m = new THREE.Mesh(g, MAT.drum);
+  drumPivot.add(m); addPick(drum,m);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.325,.021,8,52), MAT.boneLight.clone());
+  ring.rotation.y = Math.PI/2; ring.position.x = -.085;
+  drumPivot.add(ring); addPick(drum,ring);
+  const seg = [];
+  for(let i=0;i<48;i++){
+    const a=i/48*Math.PI*2;
+    seg.push(.085,0,0, -.085, .325*Math.cos(a), .325*Math.sin(a));
+  }
+  const fg = new THREE.BufferGeometry(); fg.setAttribute('position',new THREE.Float32BufferAttribute(seg,3));
+  const fibers = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({color:0xffe9d2,transparent:true,opacity:.34}));
+  drumPivot.add(fibers);
+}
+
+/* =========================================================
+   6. 鼓室（含气腔）+ 咽鼓管 + 圆窗
+   ========================================================= */
+const cavity = makePart({
+  id:'cavity', name:'鼓室',
+  desc:'充满空气的中耳腔，让听小骨能自由摆动，不被液体阻尼掉。',
+  ex:[0,.20,-.95], delay:.10, ghost:true, label:[-1.85,.95,-.2]
+});
+{
+  const cm = new THREE.MeshPhysicalMaterial({color:0x86e0d6, roughness:.15, side:THREE.DoubleSide,
+    transparent:true, opacity:1, depthWrite:false});
+  fresnelAlpha(cm, .018, .22, 2.1);
+  const c = new THREE.Mesh(new THREE.SphereGeometry(1,48,32), cm);
+  c.position.set(-1.82,-0.04,-0.14); c.scale.set(1.20,.96,.82);
+  addMesh(cavity,c);
+}
+
+const eustachian = makePart({
+  id:'eustachian', name:'咽鼓管',
+  desc:'连通鼻咽部，平衡鼓膜两侧气压，让鼓膜始终保持松弛可动。',
+  ex:[.05,-1.15,.65], delay:.62, label:[-1.10,-2.30,.55]
+});
+{
+  const pts = [[-1.92,-.80,-.18],[-1.62,-1.32,-.08],[-1.15,-1.90,.12],[-.62,-2.22,.32]];
+  const cu = new THREE.CatmullRomCurve3(pts.map(p=>V(p[0],p[1],p[2])));
+  const t = taperedTube(cu, 64, 14, tt=>.105+.085*tt, MAT.tube);
+  addMesh(eustachian,t);
+  const inner = taperedTube(cu, 64, 12, tt=>.078+.070*tt,
+    new THREE.MeshStandardMaterial({color:0x502a2c,side:THREE.BackSide,roughness:.9,transparent:true,opacity:.7,depthWrite:false}));
+  addMesh(eustachian,inner,false);
+}
+
+const windows = makePart({
+  id:'windows', name:'卵圆窗与圆窗',
+  desc:'镫骨足板把力压进卵圆窗；圆窗向外鼓出，为不可压缩的淋巴液让出空间。',
+  ex:[.35,.45,.80], delay:.48, label:[-.95,.55,.90]
+});
+{
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.135,.024,10,36), MAT.gold);
+  ring.rotation.y = Math.PI/2; ring.position.set(-1.02,-.18,-.14);
+  const membrane = new THREE.Mesh(new THREE.CircleGeometry(.13,36), MAT.membrane);
+  membrane.rotation.y = Math.PI/2; membrane.position.set(-1.025,-.18,-.14);
+  const vestibule = new THREE.Mesh(new THREE.SphereGeometry(.30,26,18),
+    new THREE.MeshPhysicalMaterial({color:0x9fd9ec, roughness:.2, transparent:true, opacity:.20,
+      side:THREE.DoubleSide, depthWrite:false}));
+  vestibule.scale.set(1.0,.82,.85); vestibule.position.set(-.78,-.14,-.22);
+  [ring,membrane,vestibule].forEach(m=>addMesh(windows,m));
+
+  const rring = new THREE.Mesh(new THREE.TorusGeometry(.082,.016,8,28), MAT.cyan);
+  rring.rotation.y = Math.PI/2; rring.position.set(-.96,-.63,-.14);
+  const rmem = new THREE.Mesh(new THREE.CircleGeometry(.08,28), MAT.membrane);
+  rmem.rotation.y = Math.PI/2; rmem.position.set(-.965,-.63,-.14);
+  addMesh(windows,rring); addMesh(windows,rmem);
+}
+
+/* =========================================================
+   7. 三块听小骨：锤骨 → 砧骨 → 镫骨
+   ========================================================= */
+function bonePivot(part,p){ const g=new THREE.Group(); g.position.set(p[0],p[1],p[2]); part.add(g); return g; }
+function boneBar(pivot,part,p1,p2,r,r2){
+  const m = cylinderBetween(V(p1[0],p1[1],p1[2]),V(p2[0],p2[1],p2[2]),r,MAT.bone.clone(),10,r2);
+  m.position.sub(pivot.position); pivot.add(m); addPick(part,m); return m;
+}
+function boneBall(pivot,part,p,r,scale,mat){
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r,20,14), (mat||MAT.boneLight).clone());
+  m.position.set(p[0],p[1],p[2]).sub(pivot.position);
+  if(scale) m.scale.set(scale[0],scale[1],scale[2]);
+  pivot.add(m); addPick(part,m); return m;
+}
+
+const malleus = makePart({
+  id:'malleus', name:'锤骨',
+  desc:'柄部牢牢嵌在鼓膜上，把膜的位移转换成杠杆的转动。',
+  ex:[-.40,1.10,.55], delay:.30, label:[-2.35,.92,.55]
+});
+const malleusPivot = bonePivot(malleus, [-2.26,.46,-.16]);
+{
+  boneBar(malleusPivot,malleus,[-2.52,-.20,-.14],[-2.30,.32,-.16],.052,.032);
+  boneBar(malleusPivot,malleus,[-2.30,.32,-.16],[-2.26,.44,-.16],.050);
+  boneBall(malleusPivot,malleus,[-2.26,.46,-.16],.125,[1,1.12,.9]);
+  boneBar(malleusPivot,malleus,[-2.31,.27,-.16],[-2.46,.30,.01],.028,.018);
+}
+
+const incus = makePart({
+  id:'incus', name:'砧骨',
+  desc:'夹在锤骨与镫骨之间的转接杠杆，改变力臂并传递振动。',
+  ex:[-.06,1.38,.62], delay:.38, label:[-1.85,1.02,.55]
+});
+const incusPivot = bonePivot(incus, [-1.99,.50,-.16]);
+{
+  boneBall(incusPivot,incus,[-1.99,.50,-.16],.145,[1.05,.95,.82]);
+  boneBar(incusPivot,incus,[-1.99,.50,-.16],[-1.74,.70,-.30],.052,.034);
+  boneBar(incusPivot,incus,[-1.94,.42,-.16],[-1.66,.04,-.16],.048,.030);
+  boneBar(incusPivot,incus,[-1.66,.04,-.16],[-1.50,-.08,-.16],.030,.026);
+  boneBall(incusPivot,incus,[-1.50,-.08,-.16],.046);
+}
+
+const stapes = makePart({
+  id:'stapes', name:'镫骨',
+  desc:'人体最小的骨，足板像活塞一样把放大约 20 倍的力压进卵圆窗。',
+  ex:[.22,.95,.78], delay:.46, label:[-1.25,-.62,.75]
+});
+const stapesGrp = bonePivot(stapes, [0,0,0]);
+{
+  boneBall(stapesGrp,stapes,[-1.44,-.10,-.16],.066);
+  boneBar(stapesGrp,stapes,[-1.40,-.06,-.12],[-1.22,.02,-.09],.030,.022);
+  boneBar(stapesGrp,stapes,[-1.22,.02,-.09],[-1.07,-.06,-.10],.026,.020);
+  boneBar(stapesGrp,stapes,[-1.40,-.14,-.21],[-1.22,-.36,-.22],.030,.022);
+  boneBar(stapesGrp,stapes,[-1.22,-.36,-.22],[-1.07,-.30,-.19],.026,.020);
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(.125,.125,.032,28), MAT.boneLight.clone());
+  foot.rotation.z = Math.PI/2; foot.scale.set(.72,1,1); foot.position.set(-1.06,-.18,-.14);
+  stapesGrp.add(foot); addPick(stapes,foot);
+}
+
+/* =========================================================
+   8. 行波模型（Greenwood 频率－位置函数）
+   ========================================================= */
+const sim = {
+  freq:1000, peak:0.38, playing:true, soundOn:true,
+  phase:0, waveT:1, active:0, gateFront:0, peakEnergy:0,
+  cycleCount:0, pulseT:1
+};
+function greenwood(f){ return clamp(1 - Math.log10(f/165.4 + 0.88)/2.1, 0.035, 0.95); }
+function envAt(u){ const d=u-sim.peak, s=d<0?0.20:0.062; return Math.exp(-(d*d)/(2*s*s)); }
+function gateAt(u){ return clamp((sim.gateFront + 0.14 - u)/0.20, 0, 1); }
+function energyAt(u){ return envAt(u)*sim.active*gateAt(u); }
+function waveDisp(u,z){
+  const across = Math.cos(clamp(z/(halfW(u)+1e-4),-1,1)*Math.PI*.5);
+  const ph = Math.PI*2*(3.0*u + 2.0*u*u) - Math.PI*2*5.0*sim.waveT;
+  return 0.135*energyAt(u)*Math.sin(ph)*across;
+}
+
+/* =========================================================
+   9. 耳蜗外壳与三道液体管腔
+   ========================================================= */
+const shellMat = new THREE.MeshPhysicalMaterial({color:0xdcd0b4, roughness:.38, metalness:.02,
+  transparent:true, opacity:.17, side:THREE.DoubleSide, depthWrite:false});
+const cochleaShell = makePart({
+  id:'shell', name:'耳蜗（骨迷路）',
+  desc:'卷成 2.5 圈的锥形骨管，里面盘着约 35 毫米长的膜迷路。',
+  ex:[.90,-.15,-1.00], delay:.16, ghost:true, anchor:[L*.50,.50,0]
+});
+{
+  const geo = sectionTube(160, u=>{
+    const a=[], RY=ry(u), RZ=rz(u);
+    for(let j=0;j<28;j++){ const t=j/28*Math.PI*2; a.push([RY*Math.cos(t), RZ*Math.sin(t)]); }
+    return a;
+  });
+  const m = new THREE.Mesh(geo, shellMat);
+  addMesh(cochleaShell,m); registerBend(m);
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(.30,.028,8,36), MAT.boneLight.clone());
+  lip.rotation.y = Math.PI/2; lip.position.copy(B0);
+  addMesh(cochleaShell,lip,false);
+}
+
+function upperSection(u){
+  const a=[], R=ry(u), Z=rz(u);
+  for(let j=0;j<=12;j++){ const t=Math.PI*j/12; a.push([Y_RM+(R-Y_RM)*Math.sin(t), .94*Z*Math.cos(t)]); }
+  for(let j=1;j<4;j++) a.push([Y_RM, .94*Z*(-1+2*j/4)]);
+  return a;
+}
+function lowerSection(u){
+  const a=[], R=ry(u), Z=rz(u);
+  for(let j=0;j<=12;j++){ const t=Math.PI*j/12; a.push([Y_BM-(R-.055)*Math.sin(t), .94*Z*Math.cos(t)]); }
+  for(let j=1;j<4;j++) a.push([Y_BM, .94*Z*(-1+2*j/4)]);
+  return a;
+}
+function mediaSection(u){
+  const Z=rz(u);
+  return [[Y_RM,-.22*Z],[Y_RM,.16*Z],[Y_BM,.74*Z],[Y_BM,-.06*Z]];
+}
+
+const svPart = makePart({
+  id:'scalaV', name:'前庭阶（外淋巴）', detail:true,
+  desc:'上方的外淋巴通道，把卵圆窗的压力波一路传向蜗顶。',
+  ex:[.75,.95,.10], delay:.80, ghost:true, anchor:[L*.72,.26,0]
+});
+{
+  const mat = regDetail(new THREE.MeshPhysicalMaterial({color:0x59bde8, roughness:.15,
+    transparent:true, opacity:.20, side:THREE.DoubleSide, depthWrite:false,
+    emissive:0x0d3b55, emissiveIntensity:.35}));
+  const m = new THREE.Mesh(sectionTube(140, upperSection), mat);
+  addMesh(svPart,m); registerBend(m);
+}
+
+const smPart = makePart({
+  id:'scalaM', name:'蜗管／中阶（内淋巴）', detail:true,
+  desc:'夹在中间的内淋巴腔，高钾环境为毛细胞提供换能的电化学驱动力。',
+  ex:[.75,.50,.38], delay:.92, ghost:true, anchor:[L*.72,.02,.28]
+});
+{
+  const mat = regDetail(new THREE.MeshPhysicalMaterial({color:0xffb44c, roughness:.22,
+    transparent:true, opacity:.27, side:THREE.DoubleSide, depthWrite:false,
+    emissive:0x5a2e06, emissiveIntensity:.4}));
+  const m = new THREE.Mesh(sectionTube(140, mediaSection), mat);
+  addMesh(smPart,m); registerBend(m);
+  const rmMat = regDetail(new THREE.MeshStandardMaterial({color:0x8fe8ff, roughness:.5,
+    transparent:true, opacity:.30, side:THREE.DoubleSide, depthWrite:false}));
+  const rm = new THREE.Mesh(ribbon(140,4,()=>Y_RM,(u,q)=>lerp(-.22*rz(u),.16*rz(u),q)), rmMat);
+  addMesh(smPart,rm,false); registerBend(rm);
+}
+
+const stPart = makePart({
+  id:'scalaT', name:'鼓阶（外淋巴）', detail:true,
+  desc:'下方通道，行波经蜗孔折返后，由圆窗鼓出释放压力。',
+  ex:[.75,-.95,.10], delay:1.04, ghost:true, anchor:[L*.72,-.28,0]
+});
+{
+  const mat = regDetail(new THREE.MeshPhysicalMaterial({color:0x3fdcc4, roughness:.15,
+    transparent:true, opacity:.19, side:THREE.DoubleSide, depthWrite:false,
+    emissive:0x0b4a42, emissiveIntensity:.35}));
+  const m = new THREE.Mesh(sectionTube(140, lowerSection), mat);
+  addMesh(stPart,m); registerBend(m);
+}
+
+/* =========================================================
+   10. 基底膜：窄而硬 → 宽而软，天然频谱分析器
+   ========================================================= */
+const bmPart = makePart({
+  id:'basilar', name:'基底膜', detail:true,
+  desc:'从蜗底的窄而硬渐变到蜗顶的宽而软，不同频率在不同位置掀起峰值。',
+  ex:[.75,.04,.65], delay:1.16, anchor:[L*.50,Y_BM-.10,0]
+});
+const bmMat = regDetail(new THREE.MeshStandardMaterial({
+  vertexColors:true, roughness:.38, metalness:.05, side:THREE.DoubleSide,
+  transparent:true, opacity:.97, emissive:0x081c20, emissiveIntensity:.35
+}));
+{
+  const geo = ribbon(180, 12, ()=>Y_BM, (u,q)=>lerp(-halfW(u),halfW(u),q));
+  const m = new THREE.Mesh(geo, bmMat);
+  addMesh(bmPart,m);
+  registerBend(m, {
+    dynamic:true, wave:(u,z)=>waveDisp(u,z),
+    colorFn:(u,z,y,col,i)=>{
+      const e = Math.pow(clamp(energyAt(u),0,1), .72);
+      const stiff = u;
+      col[i]   = lerp(.07,.16,stiff) + e*.90;
+      col[i+1] = lerp(.34,.52,stiff) + e*.32;
+      col[i+2] = lerp(.46,.40,stiff) - e*.24;
+    }
+  });
+  /* 三条沿膜流动的亮线，让行波的起伏更清楚 */
+  const lp=[];
+  for(const q of [-.62,0,.62]){
+    for(let i=0;i<180;i++){
+      const u0=i/180, u1=(i+1)/180;
+      lp.push(L*u0, .008, q*halfW(u0), L*u1, .008, q*halfW(u1));
+    }
+  }
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.Float32BufferAttribute(lp,3));
+  const lm = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({
+    color:0xffd58a, transparent:true, opacity:.55, depthWrite:false}));
+  regDetail(lm.material);
+  addMesh(bmPart,lm,false);
+  registerBend(lm, {dynamic:true, wave:(u,z)=>Y_BM+.012+waveDisp(u,z)});
+}
+
+/* 行波包络示意曲线 + 峰值标记 */
+const fxGroup = new THREE.Group(); world.add(fxGroup);
+const envPositions = [];
+for(let i=0;i<=180;i++) envPositions.push(L*i/180, 0, 0);
+const envGeo = new THREE.BufferGeometry();
+envGeo.setAttribute('position', new THREE.Float32BufferAttribute(envPositions,3));
+const envLine = new THREE.Line(envGeo, new THREE.LineBasicMaterial({
+  color:0xffbe62, transparent:true, opacity:.85, depthWrite:false}));
+fxGroup.add(envLine);
+registerBend(envLine, {dynamic:true, wave:(u)=>0.60+0.36*energyAt(u)});
+
+const peakMark = new THREE.Mesh(new THREE.SphereGeometry(.055,14,10),
+  new THREE.MeshBasicMaterial({color:0xffd070,transparent:true,opacity:.95,depthWrite:false}));
+fxGroup.add(peakMark);
+const peakEl = document.createElement('div'); peakEl.className='peak-label';
+const peakLabel = new CSS2DObject(peakEl); peakLabel.position.set(0,.16,0); peakMark.add(peakLabel);
+const peakDrop = new THREE.BufferGeometry();
+peakDrop.setAttribute('position', new THREE.Float32BufferAttribute([0,0,0,0,0,0],3));
+const dropLine = new THREE.Line(peakDrop, new THREE.LineBasicMaterial({color:0xffb45a,transparent:true,opacity:.55}));
+fxGroup.add(dropLine);
+
+/* =========================================================
+   11. 柯蒂氏器、毛细胞、盖膜
+   ========================================================= */
+const corti = makePart({
+  id:'corti', name:'柯蒂氏器', detail:true,
+  desc:'坐在基底膜上的感受器，支柱细胞把膜的上下位移变成纤毛的剪切。',
+  ex:[.75,.22,.72], delay:1.26, anchor:[L*.30,.06,-.14]
+});
+{
+  const rlMat = regDetail(new THREE.MeshStandardMaterial({color:0xf2c98f, roughness:.45,
+    transparent:true, opacity:.34, side:THREE.DoubleSide, depthWrite:false}));
+  const rl = new THREE.Mesh(ribbon(150,6,()=>Y_BM+.090,(u,q)=>lerp(-halfW(u),halfW(u),q)), rlMat);
+  addMesh(corti,rl,false); registerBend(rl,{dynamic:true,wave:(u,z)=>waveDisp(u,z)});
+  const rodMat = regDetail(new THREE.MeshStandardMaterial({color:0xd8e8d0, roughness:.5,
+    transparent:true, opacity:.72, side:THREE.DoubleSide}));
+  for(const zc of [-.028,.028]){
+    const g = sectionTube(150, u=>{
+      const a=[], cy=Y_BM+.046;
+      for(let j=0;j<8;j++){ const t=j/8*Math.PI*2; a.push([cy+.009*Math.cos(t), zc+.009*Math.sin(t)]); }
+      return a;
+    });
+    const rod = new THREE.Mesh(g, rodMat);
+    addMesh(corti,rod,false); registerBend(rod,{dynamic:true,wave:(u,z)=>waveDisp(u,z)});
+  }
+}
+
+const hcPart = makePart({
+  id:'haircells', name:'毛细胞', detail:true,
+  desc:'一排内毛细胞＋三排外毛细胞；纤毛一弯，机械门控通道就打开。',
+  ex:[.75,.38,.95], delay:1.36, anchor:[L*.44,.18,.12]
+});
+const NCELL = 48, ROWS = 4, HC_COUNT = NCELL*ROWS;
+const ROW_Z = [-.34,.10,.36,.62];
+const hcU = [], hcZ = [];
+for(let r=0;r<ROWS;r++) for(let i=0;i<NCELL;i++){
+  const u = .045 + .93*i/(NCELL-1);
+  hcU.push(u); hcZ.push(ROW_Z[r]*halfW(u));
+}
+let hcBody, hcCilia, hcTip;
+{
+  const prof = [[0,0],[.008,0],[.012,.014],[.012,.050],[.009,.068],[.008,.072],[0,.072]];
+  const bodyGeo = new THREE.LatheGeometry(prof.map(p=>new THREE.Vector2(p[0],p[1])), 10);
+  const parts2 = [];
+  [[-.013,.032,4],[0,.044,4],[.013,.058,4]].forEach(row=>{
+    for(let i=0;i<4;i++){
+      const g = new THREE.CylinderGeometry(.0015,.0024,row[1],5,1);
+      g.translate((i-1.5)*.0095, row[1]/2, row[0]);
+      parts2.push(g);
+    }
+  });
+  const bundleGeo = mergeGeometries(parts2,false);
+  const bodyMat = regDetail(new THREE.MeshStandardMaterial({color:0xffd9a4, roughness:.48,
+    emissive:0x6b3408, emissiveIntensity:.4, transparent:true, opacity:.95}));
+  const ciliaMat = regDetail(new THREE.MeshStandardMaterial({color:0xfff1cf, roughness:.34,
+    emissive:0x9a6412, emissiveIntensity:.55, transparent:true, opacity:.96}));
+  const tipMat = regDetail(new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.95}));
+  hcBody = new THREE.InstancedMesh(bodyGeo, bodyMat, HC_COUNT);
+  hcCilia = new THREE.InstancedMesh(bundleGeo, ciliaMat, HC_COUNT);
+  hcTip = new THREE.InstancedMesh(new THREE.SphereGeometry(.0038,7,5), tipMat, HC_COUNT);
+  hcBody.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  hcCilia.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  hcTip.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  hcBody.frustumCulled = hcCilia.frustumCulled = hcTip.frustumCulled = false;
+  hcPart.add(hcBody,hcCilia,hcTip);
+  /* 拾取代理：只覆盖毛细胞所在的窄带，略高于基底膜 */
+  const proxyMat = new THREE.MeshBasicMaterial({transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false});
+  const proxy = new THREE.Mesh(ribbon(120,3,()=>Y_BM+.085,
+    (u,q)=>lerp(-.42*halfW(u),.70*halfW(u),q)), proxyMat);
+  addMesh(hcPart,proxy); registerBend(proxy,{dynamic:true,wave:(u,z)=>waveDisp(u,z)});
+}
+
+const tmPart = makePart({
+  id:'tectorial', name:'盖膜', detail:true,
+  desc:'覆在纤毛上方的胶状膜，与基底膜错位滑动时把静纤毛拨弯。',
+  ex:[.75,.72,1.10], delay:1.44, anchor:[L*.55,Y_TM+.05,.10]
+});
+{
+  const mat = regDetail(new THREE.MeshPhysicalMaterial({color:0xf0cf94, roughness:.3,
+    transparent:true, opacity:.42, side:THREE.DoubleSide, depthWrite:false,
+    emissive:0x4a3410, emissiveIntensity:.3}));
+  const g = sectionTube(150, u=>{
+    const a = -.30*halfW(u)-.006, b = .82*halfW(u)+.008;
+    return [[Y_TM-.013,a],[Y_TM+.013,a],[Y_TM+.013,b],[Y_TM-.013,b]];
+  });
+  const m = new THREE.Mesh(g, mat);
+  addMesh(tmPart,m); registerBend(m);
+}
+
+/* =========================================================
+   12. 听神经：沿整条基底膜汇集的纤维 + 神经干
+   ========================================================= */
+const nerve = makePart({
+  id:'nerve', name:'听神经',
+  desc:'沿耳蜗全长汇集的传入纤维，把「哪个位置兴奋」编码成动作电位送往脑干。',
+  ex:[.75,-.78,.80], delay:1.52, label:[-1.60,-1.30,1.10]
+});
+const nerveCurve = new THREE.CatmullRomCurve3([
+  V(-.30,-.30,-.58), V(.35,.06,-.92), V(1.25,.62,-1.06), V(2.20,1.16,-.92), V(3.00,1.46,-.62)
+]);
+{
+  const trunkMat = new THREE.MeshPhysicalMaterial({color:0xf0d69c, roughness:.42,
+    transparent:true, opacity:.62, emissive:0x6a4a10, emissiveIntensity:.42, side:THREE.DoubleSide});
+  const trunk = taperedTube(nerveCurve, 60, 12, t=>.048+.030*t, trunkMat);
+  addMesh(nerve,trunk);
+  for(let i=0;i<7;i++){
+    const a=i/7*Math.PI*2;
+    const pts = nerveCurve.points.map((p,j)=>V(
+      p.x + Math.cos(a+j*.4)*.045, p.y + Math.sin(a+j*.4)*.045, p.z + Math.cos(a)*.035));
+    const cu = new THREE.CatmullRomCurve3(pts);
+    const strand = taperedTube(cu, 44, 6, ()=>.007, trunkMat);
+    addMesh(nerve,strand,false);
+  }
+  /* 沿蜗管全长走行的树突纤维 */
+  const fp=[], fc=[];
+  const NF = 22, NS = 26;
+  for(let f=0;f<NF;f++){
+    const u0 = .04 + .92*f/(NF-1);
+    const z0 = (f%2? .42 : -.28)*halfW(u0);
+    const pAt = (u0,t)=>[
+      L*u0*(1-t),
+      lerp(Y_BM+.085, -.19, Math.pow(t,.72)) + .012*Math.sin(t*9+f),
+      lerp(z0, .30, t)
+    ];
+    for(let s=0;s<NS;s++){
+      const t0=s/NS, t1=(s+1)/NS;
+      const A=pAt(u0,t0), B=pAt(u0,t1);
+      fp.push(A[0],A[1],A[2], B[0],B[1],B[2]);
+      fc.push(1,.76,.34, 1,.76,.34, .34,.86,.82, .34,.86,.82);
+    }
+  }
+  const fg = new THREE.BufferGeometry();
+  fg.setAttribute('position', new THREE.Float32BufferAttribute(fp,3));
+  fg.setAttribute('color', new THREE.Float32BufferAttribute(fc,3));
+  const fib = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({
+    vertexColors:true, transparent:true, opacity:.62, depthWrite:false}));
+  addMesh(nerve,fib,false); registerBend(fib);
+}
+
+/* =========================================================
+   13. 单个毛细胞特写（滚轮一路放大后看到的结构）
+   ========================================================= */
+const U_HERO = .38, X_HERO = L*U_HERO, Z_HERO = .10;
+const hero = new THREE.Group(); hero.matrixAutoUpdate = false; detailGroup.add(hero);
+const heroCilia = new THREE.Group(); hero.add(heroCilia);
+const heroChannels = [];
+const microLabels = [];
+{
+  const prof=[[0,0],[.013,0],[.018,.018],[.019,.062],[.016,.098],[.015,.112],[0,.112]];
+  const cellMat = new THREE.MeshPhysicalMaterial({color:0xffcf95, roughness:.42, clearcoat:.3,
+    transparent:true, opacity:.95, emissive:0x5a2c06, emissiveIntensity:.3});
+  const body = new THREE.Mesh(new THREE.LatheGeometry(prof.map(p=>new THREE.Vector2(p[0],p[1])),16), cellMat);
+  hero.add(body);
+  const nucleus = new THREE.Mesh(new THREE.SphereGeometry(.011,14,10),
+    new THREE.MeshStandardMaterial({color:0xa8642c,transparent:true,opacity:.65,roughness:.6}));
+  nucleus.position.y=.045; hero.add(nucleus);
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(.016,.016,.007,16),
+    new THREE.MeshStandardMaterial({color:0xffe6b0,roughness:.35}));
+  plate.position.y=.112; hero.add(plate);
+
+  const ciliaMat = new THREE.MeshStandardMaterial({color:0xfff2d2,emissive:0xa9761c,emissiveIntensity:.6,roughness:.3});
+  const linkSeg=[];
+  const heights=[.030,.044,.060];
+  for(let r=0;r<3;r++) for(let i=0;i<5;i++){
+    const x=(i-2)*.0072, z=(r-1)*.014;
+    const g=new THREE.CylinderGeometry(.0016,.0025,heights[r],6,1);
+    const c=new THREE.Mesh(g,ciliaMat);
+    c.position.set(x,.116+heights[r]/2,z); heroCilia.add(c);
+    if(r<2) linkSeg.push(x,.116+heights[r],z, x,.116+heights[r+1]*.80,(r)*.014);
+    if(r===2){
+      const ch=new THREE.Mesh(new THREE.SphereGeometry(.0034,8,6),
+        new THREE.MeshBasicMaterial({color:0x66e8ff,transparent:true,opacity:.9}));
+      ch.position.set(x,.116+heights[r],z); heroCilia.add(ch); heroChannels.push(ch);
+    }
+  }
+  const lkg=new THREE.BufferGeometry();
+  lkg.setAttribute('position',new THREE.Float32BufferAttribute(linkSeg,3));
+  heroCilia.add(new THREE.LineSegments(lkg,new THREE.LineBasicMaterial({color:0xffd98a,transparent:true,opacity:.7})));
+
+  const supMat = new THREE.MeshStandardMaterial({color:0xbfd8c4,transparent:true,opacity:.55,roughness:.7});
+  for(const s of [-1,1]){
+    const sup=new THREE.Mesh(new THREE.ConeGeometry(.013,.100,10),supMat);
+    sup.position.set(s*.036,.050,0); sup.rotation.z=s*.20; hero.add(sup);
+  }
+  const bouton = new THREE.Mesh(new THREE.SphereGeometry(.019,16,12),
+    new THREE.MeshStandardMaterial({color:0xffc46a,emissive:0xb86a10,emissiveIntensity:.6,roughness:.4}));
+  bouton.scale.set(1,.55,1); bouton.position.y=-.014; hero.add(bouton);
+  const fiber = cylinderBetween(V(0,-.020,0),V(0,-.070,.022),.006,
+    new THREE.MeshStandardMaterial({color:0xf1d49a,emissive:0x8a5a10,emissiveIntensity:.4}),8);
+  hero.add(fiber);
+
+  const notes = [
+    ['静纤毛（三排高低梯度）',[0,.205,0]],
+    ['机械门控通道',[.075,.175,0]],
+    ['毛细胞体',[.075,.055,0]],
+    ['听神经末梢／带状突触',[.085,-.035,0]],
+    ['盖膜在上方剪切',[-.085,.150,0]]
+  ];
+  notes.forEach(n=>{
+    const el=document.createElement('div'); el.className='micro-label'; el.textContent=n[0];
+    const o=new CSS2DObject(el); o.position.set(n[1][0],n[1][1],n[1][2]);
+    o.visible=false; hero.add(o); microLabels.push({obj:o,el});
+  });
+}
+
+/* =========================================================
+   14. 声波、压力波与神经脉冲的可视化
+   ========================================================= */
+world.add(nerve);   // 神经不随宏观结构在深度缩放时淡出
+const canalRings = [];
+for(let i=0;i<10;i++){
+  const m = new THREE.Mesh(new THREE.TorusGeometry(.225,.010,6,32),
+    new THREE.MeshBasicMaterial({color:0xffd184,transparent:true,opacity:0,
+      blending:THREE.AdditiveBlending,depthWrite:false}));
+  fxGroup.add(m); canalRings.push(m);
+}
+const waveHead = new THREE.Mesh(new THREE.SphereGeometry(.055,12,9),
+  new THREE.MeshBasicMaterial({color:0xfff0c0,transparent:true,opacity:0,
+    blending:THREE.AdditiveBlending,depthWrite:false}));
+fxGroup.add(waveHead);
+
+const ovalRings = [];
+for(let i=0;i<4;i++){
+  const m = new THREE.Mesh(new THREE.TorusGeometry(.135,.012,6,30),
+    new THREE.MeshBasicMaterial({color:0x8fe8ff,transparent:true,opacity:0,
+      blending:THREE.AdditiveBlending,depthWrite:false}));
+  m.rotation.y=Math.PI/2; m.position.set(-1.02,-.18,-.14);
+  fxGroup.add(m); ovalRings.push(m);
+}
+function fiberPulsePoint(t,out){
+  const u = lerp(sim.peak, .005, t);
+  return bendPoint(L*u, lerp(Y_BM+.09,-.19,Math.pow(t,.75)), lerp(.10,.30,t), out);
+}
+const nerveDots=[], trunkDots=[];
+const dotGeo = new THREE.SphereGeometry(.030,10,8);
+for(let i=0;i<9;i++){
+  const m=new THREE.Mesh(dotGeo,new THREE.MeshBasicMaterial({color:0xffd070,transparent:true,opacity:0,
+    blending:THREE.AdditiveBlending,depthWrite:false}));
+  fxGroup.add(m); nerveDots.push(m);
+}
+for(let i=0;i<9;i++){
+  const m=new THREE.Mesh(dotGeo,new THREE.MeshBasicMaterial({color:0x9ff5e0,transparent:true,opacity:0,
+    blending:THREE.AdditiveBlending,depthWrite:false}));
+  fxGroup.add(m); trunkDots.push(m);
+}
+
+/* =========================================================
+   15. 交互状态与控制
+   ========================================================= */
+const state = { explodeT:0, explodeTarget:0, kTarget:1, focus:0, autoCoilDone:false };
+const el = id => document.getElementById(id);
+const freqVal = el('freqVal'), peakVal = el('peakVal'), regionVal = el('regionVal');
+const pitchEl = el('pitch'), chainEls = [...document.querySelectorAll('#chain span')];
+const pulseTag = el('pulseTag'), zoomStage = el('zoomStage');
+const btnExplode = el('btnExplode'), btnCoil = el('btnCoil'), btnPlay = el('btnPlay');
+const btnSound = el('btnSound'), btnReset = el('btnReset');
+
+function setFreq(f){
+  sim.freq = clamp(f,100,10000);
+  sim.peak = greenwood(sim.freq);
+  freqVal.textContent = Math.round(sim.freq);
+  peakVal.textContent = '距蜗底 ' + Math.round(sim.peak*100) + ' ％';
+  regionVal.textContent = sim.peak<.30 ? '高频区 · 膜窄而硬'
+    : (sim.peak>.70 ? '低频区 · 膜宽而软' : '中频区 · 膜宽中等');
+  peakEl.textContent = '行波峰值 · ' + Math.round(sim.freq) + ' 赫兹';
+}
+function freqToSlider(f){ return clamp(Math.log10(f/100)/2*1000,0,1000); }
+function setCoil(target){
+  state.kTarget = target;
+  const coiled = target>0.5;
+  btnCoil.classList.toggle('on', !coiled);
+  el('btnCoilTxt').textContent = coiled ? '展开耳蜗' : '卷回蜗壳';
+}
+pitchEl.addEventListener('input', e=>{
+  setFreq(100*Math.pow(100, (+e.target.value)/1000));
+  state.autoCoilDone = true;
+});
+document.querySelectorAll('.presets button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const f=+b.dataset.f; setFreq(f); pitchEl.value=freqToSlider(f);
+    state.autoCoilDone = true;
+  });
+});
+btnCoil.addEventListener('click', ()=>{ state.autoCoilDone=true; setCoil(state.kTarget>0.5?0:1); });
+btnPlay.addEventListener('click', ()=>{
+  sim.playing=!sim.playing;
+  btnPlay.classList.toggle('on',sim.playing);
+  el('btnPlayTxt').textContent = sim.playing?'暂停发声':'继续发声';
+});
+btnSound.addEventListener('click', ()=>{
+  sim.soundOn=!sim.soundOn;
+  btnSound.classList.toggle('on',sim.soundOn);
+  el('btnSoundTxt').textContent = '声音：' + (sim.soundOn?'开':'关');
+  if(sim.soundOn) ensureAudio();
+});
+btnReset.addEventListener('click', ()=>{
+  state.explodeTarget=0; btnExplode.classList.remove('on'); el('btnExplodeTxt').textContent='爆炸视图';
+  setCoil(0); state.autoCoilDone=true;
+  camera.position.set(.4,2.15,11.8); controls.target.set(-.7,.05,0); state.focus=0;
+});
+btnExplode.addEventListener('click', ()=>{
+  state.explodeTarget = state.explodeTarget>0.5 ? 0 : 1;
+  const on = state.explodeTarget>0.5;
+  btnExplode.classList.toggle('on',on);
+  el('btnExplodeTxt').textContent = on?'合拢复位':'爆炸视图';
+  if(on){ state.autoCoilDone=true; setCoil(0); setHovered(null); }
+});
+
+/* ---------------- 真实的一声短音（每秒一次） ---------------- */
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(AC) audioCtx = new AC();
+  }
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+addEventListener('pointerdown', ensureAudio);
+addEventListener('keydown', ensureAudio);
+function beep(){
+  if(!sim.soundOn || !audioCtx || audioCtx.state!=='running') return;
+  const now = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(sim.freq, now);
+  const vol = .045*(1 - .62*clamp(sim.freq/10000,0,1));
+  g.gain.setValueAtTime(0,now);
+  g.gain.linearRampToValueAtTime(vol,now+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,now+.17);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(now); o.stop(now+.19);
+}
+
+/* ---------------- 悬停高亮与一行说明 ---------------- */
+function setHighlight(part,on){
+  if(!part || part.userData.hi===on) return;
+  part.userData.hi=on;
+  part.userData.meshes.forEach(m=>{
+    const mats = Array.isArray(m.material)?m.material:[m.material];
+    mats.forEach(mat=>{
+      if(!mat) return;
+      if(mat.emissive){
+        if(on){
+          if(mat.userData._e===undefined){ mat.userData._e=mat.emissive.clone(); mat.userData._ei=mat.emissiveIntensity||1; }
+          mat.emissive.setHex(0x1ff0cc); mat.emissiveIntensity=1.0;
+        } else if(mat.userData._e!==undefined){
+          mat.emissive.copy(mat.userData._e); mat.emissiveIntensity=mat.userData._ei;
+        }
+      } else if(mat.color){
+        if(on){ if(mat.userData._c===undefined) mat.userData._c=mat.color.clone(); mat.color.setHex(0x8ffff0); }
+        else if(mat.userData._c!==undefined) mat.color.copy(mat.userData._c);
+      }
+    });
+  });
+}
+let hovered=null;
+const infoBox=el('info'), infoTitle=el('infoTitle'), infoDesc=el('infoDesc');
+const defTitle=infoTitle.textContent, defDesc=infoDesc.textContent;
+function setHovered(part){
+  if(hovered===part) return;
+  if(hovered) setHighlight(hovered,false);
+  hovered=part;
+  if(part){
+    setHighlight(part,true);
+    infoTitle.textContent=part.userData.name;
+    infoDesc.textContent=part.userData.desc;
+    infoBox.classList.add('live');
+    renderer.domElement.style.cursor='pointer';
+  } else {
+    infoTitle.textContent=defTitle; infoDesc.textContent=defDesc;
+    infoBox.classList.remove('live');
+    renderer.domElement.style.cursor='grab';
+  }
+}
+const raycaster=new THREE.Raycaster();
+const pointer=new THREE.Vector2(-10,-10);
+let pointerActive=false;
+renderer.domElement.addEventListener('pointermove',e=>{
+  const r=renderer.domElement.getBoundingClientRect();
+  pointer.x=((e.clientX-r.left)/r.width)*2-1;
+  pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+  pointerActive=true;
+});
+renderer.domElement.addEventListener('pointerleave',()=>{ pointerActive=false; pointer.set(-10,-10); });
+function pickPart(){
+  raycaster.setFromCamera(pointer,camera);
+  const hits=raycaster.intersectObjects(pickables,false);
+  if(!hits.length) return null;
+  for(const h of hits){
+    const p=h.object.userData.part;
+    if(p && !p.userData.ghost) return p;
+  }
+  return hits[0].object.userData.part || null;
+}
+
+/* ---------------- 爆炸视图 ---------------- */
+function updateExplode(dt){
+  const remain=state.explodeTarget-state.explodeT;
+  if(Math.abs(remain)>0.0005) state.explodeT += Math.sign(remain)*Math.min(Math.abs(remain),dt/1.35);
+  else state.explodeT=state.explodeTarget;
+  const T=state.explodeT;
+  parts.forEach(p=>{
+    const u=p.userData;
+    const d=Math.min(1,u.delay/1.75)*.48;
+    const local=clamp((T-d)/(1-d),0,1);
+    const e=local*local*(3-2*local);
+    p.position.copy(u.explode).multiplyScalar(e);
+    const vis=e>.04;
+    if(u.label.visible!==vis) u.label.visible=vis;
+    if(vis) u.labelEl.style.opacity=String(Math.min(1,e*1.5));
+  });
+  fxGroup.visible = T<0.06;
+  world.scale.setScalar(1 - 0.42*T);
+  world.position.y = -0.06*T;
+}
+
+/* =========================================================
+   16. 每帧更新
+   ========================================================= */
+const drumBaseX = drumPivot.position.x;
+const _b1=new THREE.Vector3(), _b2=new THREE.Vector3(), _b3=new THREE.Vector3();
+const _basis=new THREE.Matrix4(), _mtx=new THREE.Matrix4(), _tilt=new THREE.Matrix4(), _col=new THREE.Color();
+const _heroWorld=new THREE.Vector3(), _desired=new THREE.Vector3(), _delta=new THREE.Vector3();
+
+function updateStages(){
+  const p=sim.phase;
+  sim.active = smoothstep(.30,.46,p)*(1-smoothstep(.80,1.0,p));
+  sim.gateFront = clamp((p-.30)/.50,0,1.35);
+  sim.waveT = clamp((p-.30)/.68,0,1);
+  sim.peakEnergy = envAt(sim.peak)*sim.active*gateAt(sim.peak);
+  sim.pulseT = clamp((p-.68)/.32,0,1);
+
+  const env = smoothstep(.12,.24,p)*(1-smoothstep(.52,.68,p));
+  const osc = Math.sin(Math.PI*2*6*p);
+  drumPivot.position.x = drumBaseX + .048*osc*env;
+  MAT.drum.emissiveIntensity = .25 + .85*env*Math.abs(osc);
+  malleusPivot.rotation.z =  .115*osc*env;
+  incusPivot.rotation.z   = -.082*osc*env;
+  stapesGrp.position.x    =  .082*osc*env;
+
+  const idx = p<.14?0 : p<.24?1 : p<.34?2 : p<.44?3 : p<.56?4 : p<.70?5 : p<.82?6 : 7;
+  chainEls.forEach((c,i)=>c.classList.toggle('on',i===idx && sim.playing));
+  pulseTag.classList.toggle('on', sim.playing && p>.68 && p<.90);
+}
+
+function updateHairCells(){
+  let idx=0;
+  for(let i=0;i<HC_COUNT;i++){
+    const u=hcU[i], z=hcZ[i], x=L*u;
+    const w=waveDisp(u,z), e=energyAt(u);
+    const base=Y_BM+w+.012;
+    bendPoint(x,base,z,_b1);
+    basisAt(u,_basis);
+    _mtx.copy(_basis); _mtx.setPosition(_b1);
+    /* 特写位置附近清出一小块空地 */
+    const clear = Math.abs(u-U_HERO)<.035 ? 0.0001 : 1;
+    _mtx.scale(V(clear,clear,clear));
+    hcBody.setMatrixAt(i,_mtx);
+
+    bendPoint(x,base+.070,z,_b2);
+    _tilt.makeRotationX(-.40*e);
+    _mtx.copy(_basis); _mtx.setPosition(_b2); _mtx.multiply(_tilt); _mtx.scale(V(clear,clear,clear));
+    hcCilia.setMatrixAt(i,_mtx);
+
+    bendPoint(x,base+.070+.052,z,_b3);
+    _mtx.makeTranslation(_b3.x,_b3.y,_b3.z);
+    _mtx.scale(V(clear,clear,clear));
+    hcTip.setMatrixAt(i,_mtx);
+    _col.setRGB(.28+.72*e, .72+.28*e, 1.0-.72*e);
+    hcTip.setColorAt(i,_col);
+  }
+  hcBody.instanceMatrix.needsUpdate=true;
+  hcCilia.instanceMatrix.needsUpdate=true;
+  hcTip.instanceMatrix.needsUpdate=true;
+  if(hcTip.instanceColor) hcTip.instanceColor.needsUpdate=true;
+}
+
+function updateHero(){
+  bendPoint(X_HERO, Y_BM+waveDisp(U_HERO,Z_HERO)+.012, Z_HERO, _b1);
+  basisAt(U_HERO,_basis);
+  hero.matrix.copy(_basis); hero.matrix.setPosition(_b1);
+  hero.matrixWorldNeedsUpdate=true;
+  heroCilia.rotation.x = -.48*sim.peakEnergy;
+  const open=clamp(sim.peakEnergy,0,1);
+  heroChannels.forEach(ch=>{
+    ch.material.color.setRGB(.35+.65*open,.85+.15*open,1-.75*open);
+    ch.scale.setScalar(1+1.7*open);
+  });
+}
+
+function updateFX(){
+  const p=sim.phase;
+  const ct=clamp(p/.22,0,1);
+  canalRings.forEach((m,i)=>{
+    const tt=ct-i*.026;
+    if(sim.playing && tt>0 && tt<1){
+      const pt=canalCurve.getPointAt(tt), tan=canalCurve.getTangentAt(tt);
+      m.position.copy(pt);
+      m.quaternion.setFromUnitVectors(V(0,0,1),tan);
+      m.material.opacity=(1-i/12)*.75*Math.sin(tt*Math.PI);
+      m.scale.setScalar(.55+.55*tt);
+    } else m.material.opacity=0;
+  });
+  if(sim.playing && ct>0 && ct<1){
+    waveHead.position.copy(canalCurve.getPointAt(ct));
+    waveHead.material.opacity=.9*Math.sin(ct*Math.PI);
+  } else waveHead.material.opacity=0;
+
+  const ot=clamp((p-.26)/.38,0,1);
+  ovalRings.forEach((m,i)=>{
+    const tt=ot-i*.14;
+    if(sim.playing && tt>0 && tt<1){
+      m.scale.setScalar(.7+2.3*tt); m.material.opacity=(1-tt)*.55;
+    } else m.material.opacity=0;
+  });
+
+  const pt=sim.pulseT;
+  nerveDots.forEach((m,i)=>{
+    const tt=pt-i*.055;
+    if(sim.playing && pt<1 && tt>0 && tt<1){
+      fiberPulsePoint(tt,_b1); m.position.copy(_b1);
+      m.material.opacity=(1-i/10)*.95; m.scale.setScalar(.7+.5*(1-i/10));
+    } else m.material.opacity=0;
+  });
+  trunkDots.forEach((m,i)=>{
+    const tt=pt-i*.055-.28;
+    if(sim.playing && pt<1 && tt>0 && tt<1){
+      m.position.copy(nerveCurve.getPointAt(clamp(tt,0,1)));
+      m.material.opacity=(1-i/10)*.95; m.scale.setScalar(.8+.5*(1-i/10));
+    } else m.material.opacity=0;
+  });
+
+  const up=sim.peak;
+  bendPoint(L*up, .60+.36*energyAt(up), 0, _b1);
+  peakMark.position.copy(_b1);
+  bendPoint(L*up, Y_BM+.02, 0, _b2);
+  const dp=dropLine.geometry.attributes.position;
+  dp.setXYZ(0,_b1.x,_b1.y,_b1.z); dp.setXYZ(1,_b2.x,_b2.y,_b2.z); dp.needsUpdate=true;
+  dropLine.geometry.boundingSphere=new THREE.Sphere(new THREE.Vector3(),60);
+  peakMark.scale.setScalar(.8+.45*sim.peakEnergy);
+  const show = detailGroup.visible && state.explodeT<.08 && sim.playing;
+  envLine.visible=show; peakMark.visible=show; dropLine.visible=show; peakLabel.visible=show;
+}
+
+function updateFocus(dt){
+  const dist=camera.position.distanceTo(controls.target);
+  const want=clamp((3.6-dist)/3.5,0,1);
+  state.focus += (want-state.focus)*Math.min(1,dt*2.0);
+  if(state.focus<.004) state.focus=0;
+
+  bendPoint(X_HERO, Y_BM+.06, Z_HERO, _heroWorld);
+  _desired.set(lerp(.80,-.90,coilK), .05, 0).lerp(_heroWorld, smoothstep(.18,.92,state.focus));
+  _desired.multiplyScalar(world.scale.x);
+  _delta.copy(_desired).sub(controls.target).multiplyScalar(Math.min(1,dt*1.8));
+  controls.target.add(_delta); camera.position.add(_delta);
+
+  const fade = 1-smoothstep(.12,.82,coilK);
+  for(const d of detailMats) d.mat.opacity=d.base*fade;
+  detailGroup.visible = fade>.015;
+  shellMat.opacity = .17*(1-.78*state.focus);
+  macroGroup.visible = state.focus<.60;
+  fxGroup.visible = state.explodeT<.06 && state.focus<.55;
+
+  const micro = state.focus>.56 && coilK<.5;
+  microLabels.forEach(o=>{ o.obj.visible=micro; o.el.style.opacity=micro?'1':'0'; });
+  zoomStage.textContent = state.focus>.86 ? '视野：单个毛细胞'
+    : state.focus>.58 ? '视野：柯蒂氏器与纤毛'
+    : state.focus>.26 ? '视野：展开的耳蜗管腔'
+    : state.focus>.05 ? '视野：中耳与耳蜗' : '视野：全耳';
+}
+
+/* 爆炸标签的屏幕空间避让：先复位再测量，避免逐帧累积漂移 */
+function relaxLabels(){
+  const active = state.explodeT > 0.08;
+  const items = [];
+  for(const p of parts){
+    const e = p.userData.labelEl;
+    e.style.translate = '';
+    if(!active || !p.userData.label.visible) continue;
+    const r = e.getBoundingClientRect();
+    if(r.width < 1) continue;
+    items.push({e, l:r.left, t:r.top, w:r.width, h:r.height, s:0});
+  }
+  for(let pass=0; pass<4; pass++){
+    items.sort((a,b)=>(a.t+a.s)-(b.t+b.s));
+    for(let i=0;i<items.length;i++) for(let j=i+1;j<items.length;j++){
+      const a=items[i], b=items[j];
+      const dx=Math.abs((a.l+a.w/2)-(b.l+b.w/2));
+      const dy=Math.abs((a.t+a.s)-(b.t+b.s));
+      if(dx < (a.w+b.w)/2+8 && dy < a.h+6) b.s += Math.min(a.h+6-dy, a.h+6);
+    }
+  }
+  for(const o of items) o.e.style.translate = o.s>0.5 ? ('0px '+o.s.toFixed(1)+'px') : '';
+}
+
+/* =========================================================
+   17. 主循环
+   ========================================================= */
+const clock=new THREE.Clock();
+setFreq(1000); setCoil(1);
+buildFrames(1);
+for(const b of bendables) applyBend(b);
+updateAnchors(); framesDirty=false;
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.05);
+  const t=clock.elapsedTime;
+
+  if(!state.autoCoilDone && t>2.1){ state.autoCoilDone=true; setCoil(0); }
+  if(state.focus>.28 && state.kTarget>.5) setCoil(0);
+
+  const prevK=coilK;
+  coilK += (state.kTarget-coilK)*Math.min(1,dt*2.4);
+  if(Math.abs(coilK-prevK)>1e-5) framesDirty=true;
+
+  if(sim.playing){
+    const prev=sim.phase;
+    sim.phase=(sim.phase+dt/1.05)%1;
+    if(sim.phase<prev){ sim.cycleCount++; beep(); }
+  }
+
+  updateStages();
+  updateExplode(dt);
+  updateFocus(dt);
+  updateBend();
+  updateHairCells();
+  updateHero();
+  updateFX();
+
+  if(pointerActive) setHovered(pickPart());
+  else setHovered(null);
+
+  controls.update();
+  renderer.render(scene,camera);
+  labelRenderer.render(scene,camera);
+  relaxLabels();
+}
+animate();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  labelRenderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>

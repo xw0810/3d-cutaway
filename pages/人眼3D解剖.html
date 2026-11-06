@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>人眼 · 交互式 3D 解剖</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#04070c}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:#e8f4f7;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(ellipse 90% 70% at 50% 38%,#0f2230 0%,#081019 46%,#03060a 100%);
+  }
+  #app{position:fixed;inset:0}
+  #app canvas{display:block;touch-action:none;cursor:grab}
+  #app canvas:active{cursor:grabbing}
+  #labels{position:absolute!important;inset:0;pointer-events:none;overflow:hidden}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse 78% 68% at 50% 46%,rgba(0,0,0,0) 40%,rgba(0,0,0,.55) 100%)}
+
+  .hud{position:fixed;z-index:20;
+    background:rgba(9,20,28,.55);
+    -webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
+    border:1px solid rgba(120,235,225,.12);border-radius:16px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06);
+    pointer-events:none}
+  .hud.tl{left:26px;top:26px;padding:16px 22px 18px}
+  .eyebrow{font-size:10px;letter-spacing:.34em;color:rgba(140,255,240,.42);margin-bottom:9px}
+  .hud h1{font-size:25px;font-weight:600;letter-spacing:.05em;line-height:1.1;
+    background:linear-gradient(180deg,#fff 0%,#7ff2df 130%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hud .sub{font-size:11.5px;color:rgba(200,230,238,.45);margin-top:9px;letter-spacing:.08em}
+
+  .hint{position:fixed;right:28px;top:30px;z-index:20;text-align:right;
+    font-size:11.5px;line-height:2;color:rgba(190,220,230,.38);letter-spacing:.06em;pointer-events:none}
+  .hint b{color:rgba(120,255,235,.75);font-weight:500}
+
+  .dock{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:20;
+    display:flex;gap:7px;padding:8px;border-radius:15px;
+    background:rgba(8,18,26,.72);border:1px solid rgba(120,235,225,.14);
+    -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+    box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .dock button{
+    font-family:inherit;font-size:12.5px;letter-spacing:.05em;color:rgba(230,246,250,.8);cursor:pointer;
+    border:1px solid rgba(255,255,255,.09);border-radius:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015));
+    padding:10px 17px;display:flex;align-items:center;gap:7px;white-space:nowrap;
+    transition:transform .16s cubic-bezier(.2,.8,.3,1),background .2s,border-color .2s,box-shadow .25s,color .2s}
+  .dock button:hover{transform:translateY(-1px);border-color:rgba(120,255,235,.35);color:#fff}
+  .dock button:active{transform:translateY(0) scale(.98)}
+  .dock button.on{
+    background:linear-gradient(180deg,#4fe6cd,#128d80);border-color:rgba(150,255,240,.6);
+    color:#04241f;font-weight:600;box-shadow:0 8px 26px rgba(60,230,205,.32),inset 0 1px 0 rgba(255,255,255,.4)}
+  .dock button .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.45}
+  .dock button.on .dot{opacity:1;box-shadow:0 0 8px currentColor}
+  .dock .sep{width:1px;background:rgba(255,255,255,.08);margin:4px 3px}
+
+  .info{position:fixed;left:26px;bottom:26px;z-index:20;max-width:352px;min-height:96px;
+    padding:15px 19px 16px;border-radius:15px;
+    background:rgba(8,18,26,.7);border:1px solid rgba(120,235,225,.14);
+    -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+    box-shadow:0 16px 44px rgba(0,0,0,.5);pointer-events:none;
+    transition:border-color .25s,box-shadow .25s}
+  .info.live{border-color:rgba(120,255,235,.45);box-shadow:0 16px 44px rgba(0,0,0,.5),0 0 26px rgba(60,230,205,.16)}
+  .info .t{font-size:15px;font-weight:600;letter-spacing:.08em;color:#8ff6e5;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .info .t .bar{width:3px;height:13px;border-radius:2px;background:linear-gradient(180deg,#7ff5e0,#148a7c)}
+  .info .d{font-size:12.5px;line-height:1.85;color:rgba(214,236,242,.72);letter-spacing:.03em}
+
+  .pulse-tag{position:fixed;right:30px;bottom:34px;z-index:20;font-size:11.5px;letter-spacing:.16em;
+    color:#8ff6e5;opacity:0;transform:translateY(6px);
+    transition:opacity .18s,transform .25s;pointer-events:none;
+    text-shadow:0 0 14px rgba(90,240,215,.8)}
+  .pulse-tag.on{opacity:1;transform:translateY(0)}
+
+  .part-label{
+    position:absolute;padding:4px 10px 5px;border-radius:999px;
+    font-size:11.5px;letter-spacing:.1em;white-space:nowrap;color:#c6fff5;
+    background:rgba(6,22,26,.86);border:1px solid rgba(110,245,225,.34);
+    box-shadow:0 6px 18px rgba(0,0,0,.55),0 0 18px rgba(60,230,205,.1);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    transition:opacity .2s;pointer-events:none}
+  .note-label{
+    position:absolute;font-size:11px;letter-spacing:.14em;color:rgba(255,214,130,.85);
+    text-shadow:0 0 12px rgba(0,0,0,.9);white-space:nowrap;pointer-events:none}
+
+  @media (max-width:820px){
+    .hud.tl{left:14px;top:14px;padding:12px 16px 14px}
+    .hud h1{font-size:19px}
+    .hint{display:none}
+    .info{left:14px;right:14px;bottom:88px;max-width:none;min-height:0;padding:12px 15px}
+    .info .d{font-size:11.5px;line-height:1.7}
+    .dock{bottom:14px;gap:5px;padding:6px}
+    .dock button{padding:9px 11px;font-size:11px}
+    .pulse-tag{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="vignette"></div>
+
+<div class="hud tl">
+  <div class="eyebrow">HUMAN EYE / ANATOMY</div>
+  <h1>人眼 · 交互解剖</h1>
+  <div class="sub">光 → 角膜 → 瞳孔 → 晶状体 → 视网膜 → 视神经</div>
+</div>
+
+<div class="hint">
+  <b>拖拽</b> 环绕观察 · <b>滚轮</b> 放大<br>
+  继续放大可一路 <b>钻进视网膜</b><br>
+  <b>悬停</b> 任一结构查看说明
+</div>
+
+<div class="info" id="info">
+  <div class="t"><span class="bar"></span><span id="infoTitle">解剖导览</span></div>
+  <div class="d" id="infoDesc">这是一只右眼。外层是半透明的巩膜与角膜，内部依次是虹膜、睫状体、晶状体、玻璃体，后壁为视网膜，视神经从后方穿出，六条眼外肌牵动眼球。</div>
+</div>
+
+<div class="dock">
+  <button id="btnExplode"><span class="dot"></span><span id="btnExplodeTxt">爆炸视图</span></button>
+  <div class="sep"></div>
+  <button id="btnLight"><span class="dot"></span>强光</button>
+  <button id="btnFocus"><span class="dot"></span>看近</button>
+  <button id="btnRay" class="on"><span class="dot"></span>光路</button>
+</div>
+
+<div class="pulse-tag" id="pulseTag">⚡ 信号脉冲</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* =========================================================
+   0. 基础环境
+   ========================================================= */
+const appEl = document.getElementById('app');
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.03, 300);
+camera.position.set(2.3, 1.45, 7.2);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+appEl.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+labelRenderer.domElement.id = 'labels';
+appEl.appendChild(labelRenderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.enablePan = false;
+controls.minDistance = 0.6;
+controls.maxDistance = 16;
+controls.target.set(0, 0, 0);
+
+/* ---------------- 灯光 ---------------- */
+const ambient = new THREE.AmbientLight(0xdcefff, 0.45);
+scene.add(ambient);
+scene.add(new THREE.HemisphereLight(0xcde9ff, 0x301820, 1.15));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+keyLight.position.set(5, 7, 9);
+scene.add(keyLight);
+
+const coolLight = new THREE.DirectionalLight(0x9fd9ff, 1.15);
+coolLight.position.set(-7, -3, 4);
+scene.add(coolLight);
+
+const rimLight = new THREE.DirectionalLight(0xffb08a, 1.0);
+rimLight.position.set(-3, 4, -8);
+scene.add(rimLight);
+
+/* =========================================================
+   1. 程序化贴图（不使用任何图片文件）
+   ========================================================= */
+function makeVesselTexture(size, base, vein, roots, alpha, mottle) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = size / 2;
+  const g = c.getContext('2d');
+
+  g.fillStyle = base;
+  g.fillRect(0, 0, c.width, c.height);
+
+  // 底色斑驳
+  for (let i = 0; i < mottle; i++) {
+    const x = Math.random() * c.width;
+    const y = Math.random() * c.height;
+    const r = 22 + Math.random() * 110;
+    const grd = g.createRadialGradient(x, y, 0, x, y, r);
+    const a = 0.03 + Math.random() * 0.07;
+    grd.addColorStop(0, 'rgba(255,244,238,' + a.toFixed(3) + ')');
+    grd.addColorStop(1, 'rgba(255,244,238,0)');
+    g.fillStyle = grd;
+    g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  }
+
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+
+  function branch(x, y, ang, len, w, dpt) {
+    if (dpt <= 0 || len < 3.5 || w < 0.32) return;
+    const nx = x + Math.cos(ang) * len;
+    const ny = y + Math.sin(ang) * len;
+    const cx = x + Math.cos(ang + (Math.random() - 0.5) * 0.55) * len * 0.55;
+    const cy = y + Math.sin(ang + (Math.random() - 0.5) * 0.55) * len * 0.55;
+
+    g.beginPath();
+    g.moveTo(x, y);
+    g.quadraticCurveTo(cx, cy, nx, ny);
+    g.strokeStyle = vein;
+    g.globalAlpha = alpha * (0.22 + 0.6 * (dpt / 5));
+    g.lineWidth = w;
+    g.stroke();
+
+    branch(nx, ny, ang + (Math.random() - 0.5) * 0.65, len * 0.75, w * 0.72, dpt - 1);
+    if (Math.random() < 0.82) branch(nx, ny, ang + (Math.random() - 0.5) * 1.7, len * 0.6, w * 0.62, dpt - 1);
+    if (Math.random() < 0.34) branch(nx, ny, ang + (Math.random() - 0.5) * 2.5, len * 0.48, w * 0.5, dpt - 1);
+  }
+
+  for (let i = 0; i < roots; i++) {
+    const x = Math.random() * c.width;
+    const y = c.height * (0.1 + Math.random() * 0.8);
+    const dir = Math.random() < 0.5 ? 0 : Math.PI;
+    branch(x, y, dir + (Math.random() - 0.5) * 1.0, 55 + Math.random() * 95, 3.2 + Math.random() * 4.2, 5);
+  }
+  g.globalAlpha = 1;
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+const scleraTex = makeVesselTexture(2048, '#fdfaf6', '#6b0f16', 34, 1.0, 200);
+const retinaTex = makeVesselTexture(1024, '#a94a37', '#6a1c18', 20, 0.85, 260);
+
+/* =========================================================
+   2. 部件系统
+   ========================================================= */
+const parts = [];
+const pickables = [];
+const world = new THREE.Group();        // 爆炸时整体缩放取景
+scene.add(world);
+const eyeGroup = new THREE.Group();     // 随注视点转动
+const orbitGroup = new THREE.Group();   // 眼外肌、视神经远端
+world.add(eyeGroup, orbitGroup);
+
+function makePart(cfg) {
+  const g = new THREE.Group();
+  g.name = cfg.id;
+  g.userData = {
+    id: cfg.id,
+    name: cfg.name,
+    desc: cfg.desc,
+    explode: new THREE.Vector3(cfg.explode[0], cfg.explode[1], cfg.explode[2]),
+    delay: cfg.delay || 0,
+    meshes: [],
+    ghostBase: !!cfg.ghost,
+    ghost: !!cfg.ghost,
+    hi: false
+  };
+  const el = document.createElement('div');
+  el.className = 'part-label';
+  el.textContent = cfg.name;
+  const lab = new CSS2DObject(el);
+  lab.position.set(cfg.label[0], cfg.label[1], cfg.label[2]);
+  lab.visible = false;
+  g.add(lab);
+  g.userData.label = lab;
+  g.userData.labelEl = el;
+  parts.push(g);
+  return g;
+}
+
+function addPick(part, mesh) {
+  mesh.userData.part = part;
+  part.userData.meshes.push(mesh);
+  pickables.push(mesh);
+  return mesh;
+}
+
+function cylinderBetween(p1, p2, r, mat, seg) {
+  const dir = new THREE.Vector3().subVectors(p2, p1);
+  const len = dir.length();
+  const geo = new THREE.CylinderGeometry(r, r, len, seg || 6, 1, false);
+  const m = new THREE.Mesh(geo, mat);
+  m.position.copy(p1).add(p2).multiplyScalar(0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  return m;
+}
+
+/* 边缘不透明、正面通透 —— 让眼球既有实体轮廓又能看进内部 */
+function applyFresnelAlpha(mat, minA, maxA, power) {
+  mat.transparent = true;
+  mat.opacity = 1;
+  mat.depthWrite = false;
+  mat.onBeforeCompile = (shader) => {
+    const inject = [
+      'float _fres = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));',
+      'gl_FragColor.a *= mix(' + minA.toFixed(3) + ', ' + maxA.toFixed(3) + ', pow(clamp(_fres,0.0,1.0), ' + (power || 2.0).toFixed(2) + '));'
+    ].join('\n');
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      inject + '\n#include <dithering_fragment>'
+    );
+  };
+  mat.customProgramCacheKey = () => 'fres' + minA + '_' + maxA + '_' + power;
+  return mat;
+}
+
+/* 柔光贴图（程序生成，用于角膜高光） */
+let _glowTex = null;
+function glowTexture() {
+  if (_glowTex) return _glowTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grd.addColorStop(0.0, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.25, 'rgba(230,250,255,0.55)');
+  grd.addColorStop(0.6, 'rgba(200,240,255,0.12)');
+  grd.addColorStop(1.0, 'rgba(200,240,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 128, 128);
+  _glowTex = new THREE.CanvasTexture(c);
+  _glowTex.colorSpace = THREE.SRGBColorSpace;
+  return _glowTex;
+}
+
+function makeMaculaTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(128, 128, 4, 128, 128, 126);
+  grd.addColorStop(0.0, 'rgba(238,196,104,0.98)');
+  grd.addColorStop(0.42, 'rgba(214,160,72,0.92)');
+  grd.addColorStop(0.78, 'rgba(168,112,44,0.55)');
+  grd.addColorStop(1.0, 'rgba(150,96,38,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const maculaTex = makeMaculaTexture();
+
+function makeMuscleTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#a4473a'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 150; i++) {
+    const y = Math.random() * 256;
+    g.beginPath();
+    g.moveTo(0, y);
+    g.bezierCurveTo(64, y + (Math.random() - 0.5) * 14, 192, y + (Math.random() - 0.5) * 14, 256, y);
+    g.strokeStyle = Math.random() < 0.5 ? 'rgba(122,40,32,0.35)' : 'rgba(198,110,92,0.22)';
+    g.lineWidth = 0.6 + Math.random() * 2.2;
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 1);
+  return t;
+}
+const muscleTex = makeMuscleTexture();
+
+function addGlint(parent, x, y, z, size, opacity) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture(),
+    color: 0xffffff,
+    transparent: true,
+    opacity: opacity,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false
+  }));
+  sp.position.set(x, y, z);
+  sp.scale.set(size, size, 1);
+  sp.renderOrder = 9;
+  parent.add(sp);
+  return sp;
+}
+
+/* =========================================================
+   3. 巩膜（白色、布满血管）
+   ========================================================= */
+const scleraPart = makePart({
+  id: 'sclera', name: '巩膜',
+  desc: '白色坚韧的外层纤维膜，包住眼球后 5/6，维持形状并保护内部结构；致密而不透光，所以眼白是白的。',
+  explode: [2.85, 0.35, -0.7], delay: 0.0, label: [1.4, 1.5, -0.55], ghost: true
+});
+{
+  const R = 2.2;
+  const geo = new THREE.SphereGeometry(R, 132, 96, 0, Math.PI * 2, 0.56, Math.PI - 0.56);
+  geo.rotateX(Math.PI / 2); // 缺口朝 +Z（前方）
+  const mat = new THREE.MeshPhysicalMaterial({
+    map: scleraTex,
+    color: 0xffffff,
+    roughness: 0.44,
+    metalness: 0.0,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.38,
+    side: THREE.FrontSide,
+    sheen: 0.6,
+    sheenColor: new THREE.Color(0xffe6dd)
+  });
+  applyFresnelAlpha(mat, 0.42, 0.95, 1.6);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 3;
+  scleraPart.add(addPick(scleraPart, mesh));
+  scleraPart.userData.shellMat = mat;
+}
+eyeGroup.add(scleraPart);
+
+/* =========================================================
+   4. 角膜（前方隆起、透明）
+   ========================================================= */
+const corneaPart = makePart({
+  id: 'cornea', name: '角膜',
+  desc: '前方透明的屈光窗口，屈光力约 43D，占全眼的三分之二；没有血管，靠泪液与房水供养，因此始终清亮。',
+  explode: [0, 0.05, 2.5], delay: 0.35, label: [0, 1.16, 2.35], ghost: true
+});
+{
+  const geo = new THREE.SphereGeometry(1.30, 80, 52, 0, Math.PI * 2, 0, 1.02);
+  geo.rotateX(Math.PI / 2);
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xdff4ff,
+    roughness: 0.03,
+    metalness: 0.0,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.015,
+    ior: 1.376,
+    side: THREE.DoubleSide,
+    specularIntensity: 1.0
+  });
+  applyFresnelAlpha(mat, 0.05, 0.7, 2.6);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.z = 1.30;
+  mesh.renderOrder = 5;
+  corneaPart.add(addPick(corneaPart, mesh));
+
+  // 角膜光反射（真实眼睛里最先被看到的东西）
+  addGlint(corneaPart, 0.40, 0.50, 2.44, 0.55, 0.85);
+  addGlint(corneaPart, 0.52, 0.62, 2.30, 1.7, 0.22);
+  addGlint(corneaPart, -0.52, -0.55, 2.28, 0.9, 0.16);
+
+  // 角膜缘（与巩膜的交界环）
+  const limbus = new THREE.Mesh(
+    new THREE.TorusGeometry(1.115, 0.028, 10, 128),
+    new THREE.MeshStandardMaterial({ color: 0xd8b3ab, roughness: 0.7, transparent: true, opacity: 0.75 })
+  );
+  limbus.position.z = 1.955;
+  limbus.renderOrder = 4;
+  corneaPart.add(limbus);
+}
+eyeGroup.add(corneaPart);
+
+/* =========================================================
+   5. 虹膜 + 瞳孔（着色器，可收缩）
+   ========================================================= */
+const irisPart = makePart({
+  id: 'iris', name: '虹膜与瞳孔',
+  desc: '含色素的隔膜。瞳孔括约肌收缩使瞳孔变小、开大肌收缩使其变大——强光下缩小、暗处放大，把进光量控制在合适范围。',
+  explode: [-2.45, 1.32, 0.95], delay: 0.55, label: [-0.85, 0.7, 1.62]
+});
+const irisUniforms = { uPupil: { value: 0.34 }, uHi: { value: 0.0 } };
+{
+  const irisMat = new THREE.ShaderMaterial({
+    uniforms: irisUniforms,
+    vertexShader: `
+      varying vec2 vUv;
+      void main(){
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      varying vec2 vUv;
+      uniform float uPupil;
+      uniform float uHi;
+
+      void main(){
+        vec2 p = vUv * 2.0 - 1.0;
+        float r = length(p);
+        if (r > 1.0) discard;
+
+        float ang = atan(p.y, p.x);
+        float n1 = sin(ang * 47.0 + sin(ang * 13.0) * 2.4 + r * 5.0) * 0.5 + 0.5;
+        float n2 = sin(ang * 111.0 + r * 13.0) * 0.5 + 0.5;
+        float n3 = sin(ang * 29.0 - r * 3.0) * 0.5 + 0.5;
+        float fib = mix(n1, n2, 0.42) * 0.75 + n3 * 0.25;
+        fib = pow(fib, 1.25);
+
+        vec3 deep = vec3(0.035, 0.135, 0.20);
+        vec3 mid  = vec3(0.115, 0.50, 0.575);
+        vec3 lite = vec3(0.62, 0.94, 0.86);
+
+        vec3 col = mix(deep, mid, smoothstep(0.02, 0.72, fib));
+        col = mix(col, lite, smoothstep(0.60, 1.0, fib) * 0.72);
+
+        float pr = uPupil;
+
+        // 领环（collarette）
+        float coll = smoothstep(pr + 0.008, pr + 0.055, r) * (1.0 - smoothstep(pr + 0.055, pr + 0.30, r));
+        col = mix(col, vec3(0.40, 0.60, 0.45), coll * 0.32);
+
+        // 外缘暗环
+        col *= (1.0 - smoothstep(0.855, 1.0, r) * 0.86);
+
+        // 由内向外的明暗
+        col *= 0.70 + 0.55 * smoothstep(0.05, 0.92, r);
+
+        // 瞳孔
+        float pupil = 1.0 - smoothstep(pr - 0.006, pr + 0.004, r);
+        col = mix(col, vec3(0.008, 0.010, 0.016), pupil);
+
+        // 瞳孔内缘反光
+        float rim = smoothstep(pr, pr + 0.017, r) * (1.0 - smoothstep(pr + 0.017, pr + 0.062, r));
+        col += rim * vec3(0.10, 0.19, 0.19);
+
+        col += uHi * vec3(0.10, 0.46, 0.40);
+
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `
+  });
+
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(0.905, 140), irisMat);
+  disc.position.z = 1.60;
+  irisPart.add(addPick(irisPart, disc));
+
+  // 虹膜根部 → 睫状体方向的锥面，收口到巩膜内壁
+  const rootGeo = new THREE.CylinderGeometry(1.172, 0.905, 0.27, 96, 1, true);
+  rootGeo.rotateX(Math.PI / 2);
+  const root = new THREE.Mesh(rootGeo, new THREE.MeshStandardMaterial({
+    color: 0x7b4438, roughness: 0.85, metalness: 0.0, side: THREE.DoubleSide
+  }));
+  root.position.z = 1.735;
+  irisPart.add(root);
+
+  // 角膜缘暗环（limbal ring）
+  const limbal = new THREE.Mesh(
+    new THREE.TorusGeometry(0.918, 0.019, 8, 128),
+    new THREE.MeshStandardMaterial({ color: 0x2c1a18, roughness: 0.6 })
+  );
+  limbal.position.z = 1.603;
+  irisPart.add(limbal);
+}
+eyeGroup.add(irisPart);
+
+/* =========================================================
+   6. 睫状肌 + 悬韧带 + 晶状体
+   ========================================================= */
+const ciliaryPart = makePart({
+  id: 'ciliary', name: '睫状肌',
+  desc: '环绕晶状体的环形平滑肌。看近处时它收缩，悬韧带松弛，晶状体靠自身弹性变凸、屈光力增强；看远时放松，晶状体被拉扁平。',
+  explode: [-2.6, -0.4, 0.3], delay: 0.7, label: [-1.2, -0.26, 1.34]
+});
+const ciliaryRing = new THREE.Mesh(
+  new THREE.TorusGeometry(1.38, 0.112, 18, 110),
+  new THREE.MeshStandardMaterial({ color: 0x8a3a30, roughness: 0.8, metalness: 0.02, emissive: 0x1c0503, emissiveIntensity: 0.35 })
+);
+ciliaryRing.position.z = 1.22;
+ciliaryPart.add(addPick(ciliaryPart, ciliaryRing));
+
+{
+  const zMat = new THREE.MeshStandardMaterial({ color: 0xf7ece2, roughness: 0.85, transparent: true, opacity: 0.5 });
+  for (let i = 0; i < 30; i++) {
+    const a = (i / 30) * Math.PI * 2;
+    const p1 = new THREE.Vector3(Math.cos(a) * 1.235, Math.sin(a) * 1.235, 1.285);
+    const p2 = new THREE.Vector3(Math.cos(a) * 0.605, Math.sin(a) * 0.605, 1.115);
+    const m = cylinderBetween(p1, p2, 0.0065, zMat, 5);
+    ciliaryPart.add(m);
+  }
+}
+eyeGroup.add(ciliaryPart);
+
+const lensPart = makePart({
+  id: 'lens', name: '晶状体',
+  desc: '双凸透明体，由囊膜与晶状体纤维层层构成。它把进入的光二次折射，使物像准确落在视网膜上——这就是“调节”。',
+  explode: [-1.15, -2.15, 0.85], delay: 0.85, label: [-0.12, -0.9, 1.12]
+});
+const lensMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.625, 72, 52),
+  new THREE.MeshPhysicalMaterial({
+    color: 0xdcf3ff,
+    roughness: 0.05,
+    metalness: 0.0,
+    transparent: true,
+    opacity: 0.4,
+    depthWrite: false,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.03,
+    ior: 1.42,
+    side: THREE.DoubleSide,
+    emissive: 0x0a1e28,
+    emissiveIntensity: 0.9
+  })
+);
+lensMesh.position.z = 1.10;
+lensMesh.scale.set(1, 1, 0.5);
+lensMesh.renderOrder = 2;
+lensPart.add(addPick(lensPart, lensMesh));
+eyeGroup.add(lensPart);
+
+/* =========================================================
+   7. 玻璃体
+   ========================================================= */
+const vitreousPart = makePart({
+  id: 'vitreous', name: '玻璃体',
+  desc: '充满眼后 4/5 的透明胶状物，99% 是水。它支撑视网膜、维持眼球形状，并让光在到达视网膜前几乎不衰减。',
+  explode: [1.3, -2.05, -0.3], delay: 0.5, label: [0.42, 1.0, -0.35], ghost: true
+});
+{
+  const geo = new THREE.SphereGeometry(1.87, 56, 40);
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xa8ddff,
+    roughness: 0.08,
+    metalness: 0.0,
+    side: THREE.FrontSide,
+    clearcoat: 1.0,
+    emissive: 0x0a2430,
+    emissiveIntensity: 0.6
+  });
+  applyFresnelAlpha(mat, 0.015, 0.16, 2.0);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 0;
+  vitreousPart.add(addPick(vitreousPart, mesh));
+}
+eyeGroup.add(vitreousPart);
+
+/* =========================================================
+   8. 视网膜 / 黄斑 / 视盘
+   ========================================================= */
+const retinaPart = makePart({
+  id: 'retina', name: '视网膜',
+  desc: '贴在眼球内壁的神经感光层，把光转换成电信号。十层结构里，感光细胞在最深处，信号却要向前传给神经节细胞。',
+  explode: [0.15, 1.0, -2.35], delay: 0.25, label: [0.0, -1.5, -1.35]
+});
+{
+  const geo = new THREE.SphereGeometry(1.97, 104, 72, 0, Math.PI * 2, 1.66, Math.PI - 1.66);
+  geo.rotateX(Math.PI / 2);
+  const mat = new THREE.MeshStandardMaterial({
+    map: retinaTex,
+    color: 0xffffff,
+    roughness: 0.72,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+    emissive: 0x2b0803,
+    emissiveIntensity: 0.45
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 1;
+  retinaPart.add(addPick(retinaPart, mesh));
+}
+eyeGroup.add(retinaPart);
+
+const maculaPart = makePart({
+  id: 'macula', name: '黄斑与中央凹',
+  desc: '视网膜后极的视觉最敏锐区，因富含叶黄素而偏黄。中央凹只有密集的视锥细胞，负责中心视力与辨色，1.5 毫米内决定你的全部阅读能力。',
+  explode: [2.0, -0.5, -2.05], delay: 0.9, label: [0.3, -0.3, -1.85]
+});
+{
+  const macula = new THREE.Mesh(
+    new THREE.CircleGeometry(0.31, 64),
+    new THREE.MeshStandardMaterial({ map: maculaTex, color: 0xffffff, roughness: 0.62, transparent: true, depthWrite: false, emissive: 0x3a2004, emissiveIntensity: 0.7, side: THREE.DoubleSide })
+  );
+  macula.position.set(0, 0, -1.938);
+  maculaPart.add(addPick(maculaPart, macula));
+
+  const fovea = new THREE.Mesh(
+    new THREE.CircleGeometry(0.088, 48),
+    new THREE.MeshStandardMaterial({ color: 0x8f4a1c, roughness: 0.5, emissive: 0x3a1a02, emissiveIntensity: 0.9, side: THREE.DoubleSide })
+  );
+  fovea.position.set(0, 0, -1.928);
+  maculaPart.add(addPick(maculaPart, fovea));
+
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(0.215, 48),
+    new THREE.MeshStandardMaterial({ color: 0xf2dda6, roughness: 0.55, emissive: 0x4a3a10, emissiveIntensity: 0.8, side: THREE.DoubleSide })
+  );
+  disc.position.set(0.44, -0.14, -1.895);
+  disc.rotation.y = 0.16;
+  maculaPart.add(addPick(maculaPart, disc));
+}
+eyeGroup.add(maculaPart);
+
+/* =========================================================
+   9. 感光细胞：视杆 + 视锥
+   ========================================================= */
+const photoPart = makePart({
+  id: 'photo', name: '视杆与视锥细胞',
+  desc: '视网膜最深处的两类感光细胞，朝向光线。视杆约 1.2 亿个，暗光下工作但不辨色；视锥约 600 万个，负责色觉与细节，集中在中央凹。',
+  explode: [-1.75, -1.4, -2.45], delay: 1.05, label: [-0.5, -0.5, -1.8]
+});
+{
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+  const GA = 2.399963; // 黄金角，排成细胞镶嵌
+
+  // 视锥：集中在中央凹，负责色觉与细节
+  const coneGeo = new THREE.ConeGeometry(0.03, 0.19, 6);
+  coneGeo.rotateX(Math.PI / 2);
+  const coneMat = new THREE.MeshStandardMaterial({
+    color: 0xffcf82, roughness: 0.45, metalness: 0.05,
+    emissive: 0x4a2c04, emissiveIntensity: 0.45
+  });
+  const CONES = 170;
+  const cones = new THREE.InstancedMesh(coneGeo, coneMat, CONES);
+  for (let i = 0; i < CONES; i++) {
+    const rr = 0.075 + Math.sqrt((i + 0.5) / CONES) * 0.55;
+    const a = i * GA;
+    const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+    const zs = -Math.sqrt(Math.max(0.02, 1.9 * 1.9 - rr * rr));
+    dummy.position.set(x, y, zs + 0.1);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.setScalar(0.92);
+    dummy.updateMatrix();
+    cones.setMatrixAt(i, dummy.matrix);
+    col.setHSL(0.09, 0.7, 0.62);
+    cones.setColorAt(i, col);
+  }
+  cones.instanceMatrix.needsUpdate = true;
+  photoPart.add(addPick(photoPart, cones));
+
+  // 视杆：向外围铺开，负责暗视觉
+  const rodGeo = new THREE.CylinderGeometry(0.015, 0.0075, 0.25, 6);
+  rodGeo.rotateX(Math.PI / 2);
+  const rodMat = new THREE.MeshStandardMaterial({
+    color: 0xa9dcf5, roughness: 0.42, metalness: 0.05,
+    emissive: 0x0a2c3e, emissiveIntensity: 0.45
+  });
+  const RODS = 320;
+  const rods = new THREE.InstancedMesh(rodGeo, rodMat, RODS);
+  for (let i = 0; i < RODS; i++) {
+    const rr = 0.2 + Math.sqrt((i + 0.5) / RODS) * 0.72;
+    const a = i * GA;
+    const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+    const zs = -Math.sqrt(Math.max(0.02, 1.88 * 1.88 - rr * rr));
+    dummy.position.set(x, y, zs + 0.12);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.setScalar(0.95);
+    dummy.updateMatrix();
+    rods.setMatrixAt(i, dummy.matrix);
+    col.setHSL(0.55, 0.38, 0.68);
+    rods.setColorAt(i, col);
+  }
+  rods.instanceMatrix.needsUpdate = true;
+  photoPart.add(addPick(photoPart, rods));
+}
+eyeGroup.add(photoPart);
+
+/* =========================================================
+   10. 神经细胞层（神经节细胞 + 纤维 → 视盘）
+   ========================================================= */
+const neuroPart = makePart({
+  id: 'neuro', name: '神经节细胞层',
+  desc: '光感受器把信号交给双极细胞，再交给神经节细胞。约一百万条轴突在视网膜表面汇成神经纤维层，全部涌向视盘穿出眼球。',
+  explode: [1.8, 1.95, -2.25], delay: 1.2, label: [0.7, 0.4, -1.7]
+});
+{
+  const dummy = new THREE.Object3D();
+  const geo = new THREE.SphereGeometry(0.024, 7, 5);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xf3e2ab, roughness: 0.5, emissive: 0x4a3a0c, emissiveIntensity: 0.8
+  });
+  const cells = new THREE.InstancedMesh(geo, mat, 130);
+  const fibers = [];
+  const discPos = new THREE.Vector3(0.44, -0.14, -1.9);
+
+  for (let i = 0; i < 130; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const rr = Math.sqrt(Math.random()) * 0.9;
+    const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+    const zs = -Math.sqrt(Math.max(0.02, 1.735 * 1.735 - rr * rr));
+    dummy.position.set(x, y, zs);
+    dummy.scale.setScalar(0.7 + Math.random() * 0.7);
+    dummy.updateMatrix();
+    cells.setMatrixAt(i, dummy.matrix);
+    if (Math.random() < 0.45) {
+      fibers.push(x, y, zs, discPos.x, discPos.y, discPos.z);
+    }
+  }
+  cells.instanceMatrix.needsUpdate = true;
+  neuroPart.add(addPick(neuroPart, cells));
+
+  const fg = new THREE.BufferGeometry();
+  fg.setAttribute('position', new THREE.Float32BufferAttribute(fibers, 3));
+  const lines = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({
+    color: 0xffd98a, transparent: true, opacity: 0.32, depthWrite: false
+  }));
+  neuroPart.add(lines);
+}
+eyeGroup.add(neuroPart);
+
+/* =========================================================
+   11. 视神经 + 脉冲
+   ========================================================= */
+const nervePart = makePart({
+  id: 'nerve', name: '视神经',
+  desc: '约一百万条神经纤维聚成束，从视盘穿出眼窝向后走，经视交叉把信号送到大脑枕叶——那里才真正“看见”。',
+  explode: [0.55, -0.75, -1.75], delay: 1.35, label: [1.95, -1.35, -4.1]
+});
+const nerveCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0.44, -0.14, -1.86),
+  new THREE.Vector3(0.52, -0.2, -2.42),
+  new THREE.Vector3(0.74, -0.36, -3.12),
+  new THREE.Vector3(1.06, -0.6, -3.82),
+  new THREE.Vector3(1.34, -0.86, -4.46),
+  new THREE.Vector3(1.52, -1.06, -4.95)
+]);
+{
+  const tube = new THREE.Mesh(
+    new THREE.TubeGeometry(nerveCurve, 110, 0.3, 18, false),
+    new THREE.MeshStandardMaterial({
+      color: 0xf0dcc4, roughness: 0.72, metalness: 0.04,
+      emissive: 0x2a1d12, emissiveIntensity: 0.5
+    })
+  );
+  nervePart.add(addPick(nervePart, tube));
+
+  const sheath = new THREE.Mesh(
+    new THREE.TubeGeometry(nerveCurve, 110, 0.355, 18, false),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffd9b8, roughness: 0.35, metalness: 0.0,
+      transparent: true, opacity: 0.16, depthWrite: false,
+      clearcoat: 1.0, side: THREE.DoubleSide
+    })
+  );
+  sheath.renderOrder = 1;
+  nervePart.add(sheath);
+}
+eyeGroup.add(nervePart);
+
+// 脉冲光点
+const pulseDots = [];
+for (let i = 0; i < 15; i++) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(0.085, 12, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0x9dfff2, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    })
+  );
+  m.renderOrder = 6;
+  nervePart.add(m);
+  pulseDots.push(m);
+}
+
+/* =========================================================
+   12. 六条眼外肌
+   ========================================================= */
+const muscleDefs = [
+  {
+    name: '上直肌',
+    desc: '起自眶尖总腱环，止于眼球上方前部。收缩时把眼球向上拉，与下斜肌协同完成上转。',
+    pts: [[0, 2.06, 0.72], [0, 2.32, 0.05], [0, 2.06, -1.02], [0.04, 1.36, -2.45], [0.14, 0.5, -3.2]],
+    color: 0x9e4438, ex: [0, 1.5, 0]
+  },
+  {
+    name: '下直肌',
+    desc: '位于眼球下方。收缩使眼球下转，并在内收位参与旋转；与上斜肌互为拮抗。',
+    pts: [[0, -2.06, 0.72], [0, -2.32, 0.05], [0, -2.06, -1.02], [0.04, -1.36, -2.45], [0.14, -0.5, -3.2]],
+    color: 0x984034, ex: [0.32, -1.45, 0]
+  },
+  {
+    name: '内直肌',
+    desc: '眼球内侧最强壮的直肌，收缩使眼球内收（看向鼻侧），是阅读时双眼汇聚的主力。',
+    pts: [[-2.06, 0, 0.72], [-2.32, 0, 0.05], [-2.06, 0, -1.02], [-1.36, 0.04, -2.45], [-0.5, 0.14, -3.2]],
+    color: 0xa64a3c, ex: [-1.6, 0.1, 0]
+  },
+  {
+    name: '外直肌',
+    desc: '眼球外侧的直肌，收缩使眼球外展（看向颞侧）。由展神经支配，麻痹时会出现内斜视。',
+    pts: [[2.06, 0, 0.72], [2.32, 0, 0.05], [2.06, 0, -1.02], [1.36, 0.04, -2.45], [0.5, 0.14, -3.2]],
+    color: 0x9c4539, ex: [1.6, 0.1, 0]
+  },
+  {
+    name: '上斜肌',
+    desc: '唯一从眶尖前行、穿过滑车再折返后方的眼外肌。它使眼球内旋、下转与外展，是旋转稳定的关键。',
+    pts: [[-0.2, 0.42, -3.0], [-0.9, 1.0, -2.0], [-1.45, 1.5, 0.9], [-0.7, 2.16, 0.55], [0.12, 2.3, 0.08], [1.0, 1.95, -0.6]],
+    color: 0xac5142, ex: [-1.05, 1.3, 0.45]
+  },
+  {
+    name: '下斜肌',
+    desc: '唯一起自眶底前部的眼外肌，向后外上方止于眼球后外侧。收缩使眼球外旋、上转与外展。',
+    pts: [[-1.45, -1.25, 1.1], [-1.0, -1.75, 0.5], [-0.2, -2.06, -0.05], [0.7, -1.96, -0.5], [1.15, -1.66, -0.85]],
+    color: 0xa04a3b, ex: [1.05, -1.25, 0.45]
+  }
+];
+
+muscleDefs.forEach((d, idx) => {
+  const curve = new THREE.CatmullRomCurve3(d.pts.map(p => new THREE.Vector3(p[0], p[1], p[2])));
+  const mid = curve.getPoint(0.3);
+  const part = makePart({
+    id: 'muscle' + idx, name: d.name, desc: d.desc,
+    explode: d.ex, delay: 1.45, label: [mid.x * 0.92, mid.y * 0.92, mid.z]
+  });
+  const mat = new THREE.MeshStandardMaterial({
+    map: muscleTex, color: d.color, roughness: 0.82, metalness: 0.0,
+    emissive: 0x180504, emissiveIntensity: 0.3
+  });
+  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 110, 0.088, 14, false), mat);
+  part.add(addPick(part, mesh));
+
+  // 肌腱（止点处渐细的白色纤维）
+  const tendonEnd = curve.getPoint(1.0);
+  const tendonStart = curve.getPoint(0.9);
+  const tendon = cylinderBetween(tendonStart, tendonEnd, 0.044, new THREE.MeshStandardMaterial({
+    color: 0xf2e6d6, roughness: 0.55, transparent: true, opacity: 0.9
+  }), 8);
+  part.add(tendon);
+
+  orbitGroup.add(part);
+});
+
+/* =========================================================
+   13. 光路演示
+   ========================================================= */
+const rayGroup = new THREE.Group();
+rayGroup.renderOrder = 7;
+eyeGroup.add(rayGroup);
+
+const rayPaths = [];
+const photonMeshes = [];
+
+let rayNote = null;
+function buildRays() {
+  const rayMat = new THREE.LineBasicMaterial({
+    color: 0xffcf72, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+
+  const objPts = [new THREE.Vector3(0.46, 0.49, 2.86), new THREE.Vector3(-0.46, -0.49, 2.86)];
+  const imgPts = [new THREE.Vector3(-0.26, -0.26, -1.84), new THREE.Vector3(0.26, 0.26, -1.84)];
+  const offsets = [[0.12, 0.06], [-0.12, 0.06], [0.12, -0.09], [-0.12, -0.09]];
+
+  objPts.forEach((O, k) => {
+    const I = imgPts[k];
+    offsets.forEach(off => {
+      const E = new THREE.Vector3(off[0], off[1], 1.60);
+      const L = new THREE.Vector3(off[0] * 0.72, off[1] * 0.72, 1.10);
+      const pts = [O.clone(), E, L, I.clone()];
+      const path = makePath(pts);
+      rayPaths.push(path);
+
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const line = new THREE.Line(geo, rayMat);
+      line.renderOrder = 7;
+      rayGroup.add(line);
+
+      const ph = new THREE.Mesh(
+        new THREE.SphereGeometry(0.03, 10, 8),
+        new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      ph.userData.path = path;
+      ph.userData.phase = Math.random();
+      rayGroup.add(ph);
+      photonMeshes.push(ph);
+    });
+  });
+
+  // 像点
+  const dotMatI = new THREE.MeshBasicMaterial({ color: 0x8ff6ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+  imgPts.forEach(p => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.036, 10, 8), dotMatI);
+    m.position.copy(p);
+    rayGroup.add(m);
+  });
+
+  // 说明：倒立实像
+  const el = document.createElement('div');
+  el.className = 'note-label';
+  el.textContent = '光线交叉 → 倒立的实像';
+  const note = new CSS2DObject(el);
+  note.position.set(2.15, -1.75, -0.85);
+  rayGroup.add(note);
+  rayNote = note;
+}
+buildRays();
+
+function makePath(pts) {
+  const lens = [];
+  let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const d = pts[i].distanceTo(pts[i + 1]);
+    lens.push(d);
+    total += d;
+  }
+  return { pts, lens, total };
+}
+function samplePath(path, t) {
+  let d = THREE.MathUtils.clamp(t, 0, 1) * path.total;
+  for (let i = 0; i < path.lens.length; i++) {
+    if (d <= path.lens[i]) return path.pts[i].clone().lerp(path.pts[i + 1], path.lens[i] > 0 ? d / path.lens[i] : 0);
+    d -= path.lens[i];
+  }
+  return path.pts[path.pts.length - 1].clone();
+}
+
+/* =========================================================
+   14. 交互状态
+   ========================================================= */
+const state = {
+  explodeT: 0,
+  explodeTarget: 0,
+  bright: false,
+  near: false,
+  rays: true,
+  acc: 0,
+  focus: 0
+};
+
+/* ---------------- 高亮 ---------------- */
+function setHighlight(part, on) {
+  if (!part || part.userData.hi === on) return;
+  part.userData.hi = on;
+  part.userData.meshes.forEach(m => {
+    const mat = m.material;
+    if (!mat) return;
+    if (mat.uniforms && mat.uniforms.uHi) {
+      mat.uniforms.uHi.value = on ? 1 : 0;
+      return;
+    }
+    if (mat.emissive) {
+      if (on) {
+        if (mat.userData._e === undefined) {
+          mat.userData._e = mat.emissive.clone();
+          mat.userData._ei = mat.emissiveIntensity !== undefined ? mat.emissiveIntensity : 1;
+        }
+        mat.emissive.setHex(0x1ff0cc);
+        mat.emissiveIntensity = 0.95;
+      } else if (mat.userData._e !== undefined) {
+        mat.emissive.copy(mat.userData._e);
+        mat.emissiveIntensity = mat.userData._ei;
+      }
+    } else if (mat.color) {
+      if (on) {
+        if (mat.userData._c === undefined) mat.userData._c = mat.color.clone();
+        mat.color.setHex(0x8ffff0);
+      } else if (mat.userData._c !== undefined) {
+        mat.color.copy(mat.userData._c);
+      }
+    }
+  });
+}
+
+let hovered = null;
+const infoBox = document.getElementById('info');
+const infoTitle = document.getElementById('infoTitle');
+const infoDesc = document.getElementById('infoDesc');
+const defaultTitle = infoTitle.textContent;
+const defaultDesc = infoDesc.textContent;
+
+function setHovered(part) {
+  if (hovered === part) return;
+  if (hovered) setHighlight(hovered, false);
+  hovered = part;
+  if (part) {
+    setHighlight(part, true);
+    infoTitle.textContent = part.userData.name;
+    infoDesc.textContent = part.userData.desc;
+    infoBox.classList.add('live');
+    renderer.domElement.style.cursor = 'pointer';
+  } else {
+    infoTitle.textContent = defaultTitle;
+    infoDesc.textContent = defaultDesc;
+    infoBox.classList.remove('live');
+    renderer.domElement.style.cursor = 'grab';
+  }
+}
+
+/* ---------------- 拾取 ---------------- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2(-10, -10);
+let pointerActive = false;
+
+renderer.domElement.addEventListener('pointermove', e => {
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  pointerActive = true;
+});
+renderer.domElement.addEventListener('pointerleave', () => {
+  pointerActive = false;
+  pointer.set(-10, -10);
+});
+
+function pickPart() {
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(pickables, false);
+  if (!hits.length) return null;
+  for (let i = 0; i < hits.length; i++) {
+    const p = hits[i].object.userData.part;
+    if (p && !p.userData.ghost) return p;
+  }
+  return hits[0].object.userData.part || null;
+}
+
+/* =========================================================
+   15. 爆炸视图
+   ========================================================= */
+const btnExplode = document.getElementById('btnExplode');
+const btnExplodeTxt = document.getElementById('btnExplodeTxt');
+
+function updateExplode(dt) {
+  // 匀速推进 + 每层错峰，保证约 1.3 秒内全部到位
+  const remain = state.explodeTarget - state.explodeT;
+  if (Math.abs(remain) > 0.0005) {
+    const step = Math.min(Math.abs(remain), dt / 1.25);
+    state.explodeT += Math.sign(remain) * step;
+  } else {
+    state.explodeT = state.explodeTarget;
+  }
+
+  const T = state.explodeT;
+  parts.forEach(p => {
+    const u = p.userData;
+    const d = Math.min(1, u.delay / 1.5) * 0.5;
+    const local = THREE.MathUtils.clamp((T - d) / (1 - d), 0, 1);
+    const e = local * local * (3 - 2 * local);
+    p.position.copy(u.explode).multiplyScalar(e);
+    const vis = e > 0.04;
+    if (u.label.visible !== vis) u.label.visible = vis;
+    if (vis) u.labelEl.style.opacity = String(Math.min(1, e * 1.5));
+    u.ghost = u.ghostBase && T < 0.35;
+  });
+
+  rayGroup.visible = state.rays && T < 0.06;
+  if (rayNote) rayNote.visible = rayGroup.visible;
+
+  // 爆炸时整体略微拉远取景，并让巩膜变淡以免遮挡
+  world.scale.setScalar(1 - 0.48 * T);
+  world.position.y = -0.12 * T;
+  if (scleraPart.userData.shellMat) {
+    scleraPart.userData.shellMat.opacity = 1 - 0.38 * T;
+  }
+}
+
+btnExplode.addEventListener('click', () => {
+  state.explodeTarget = state.explodeTarget > 0.5 ? 0 : 1;
+  const on = state.explodeTarget > 0.5;
+  btnExplode.classList.toggle('on', on);
+  btnExplodeTxt.textContent = on ? '合拢复位' : '爆炸视图';
+  if (on) setHovered(null);
+});
+
+/* ---------------- 强光 / 弱光 ---------------- */
+const btnLight = document.getElementById('btnLight');
+btnLight.addEventListener('click', () => {
+  state.bright = !state.bright;
+  btnLight.classList.toggle('on', state.bright);
+  btnLight.innerHTML = '<span class="dot"></span>' + (state.bright ? '暗光' : '强光');
+  ambient.intensity = state.bright ? 0.72 : 0.42;
+  keyLight.intensity = state.bright ? 3.1 : 2.3;
+  renderer.toneMappingExposure = state.bright ? 1.2 : 1.04;
+});
+
+/* ---------------- 看近 / 看远 ---------------- */
+const btnFocus = document.getElementById('btnFocus');
+btnFocus.addEventListener('click', () => {
+  state.near = !state.near;
+  btnFocus.classList.toggle('on', state.near);
+  btnFocus.innerHTML = '<span class="dot"></span>' + (state.near ? '看远' : '看近');
+});
+
+/* ---------------- 光路 ---------------- */
+const btnRay = document.getElementById('btnRay');
+btnRay.addEventListener('click', () => {
+  state.rays = !state.rays;
+  btnRay.classList.toggle('on', state.rays);
+});
+
+/* =========================================================
+   16. 扫视 + 神经脉冲
+   ========================================================= */
+const gaze = {
+  t: 1, dur: 0.08,
+  from: new THREE.Quaternion(), to: new THREE.Quaternion(),
+  timer: 0.7, fired: true
+};
+const pulse = { t: 2, on: false };
+const pulseTag = document.getElementById('pulseTag');
+let pulseTagTimer = 0;
+
+function newSaccade() {
+  gaze.from.copy(eyeGroup.quaternion);
+  const e = new THREE.Euler(
+    (Math.random() - 0.5) * 0.2,
+    (Math.random() - 0.5) * 0.3,
+    (Math.random() - 0.5) * 0.05
+  );
+  gaze.to.setFromEuler(e);
+  gaze.t = 0;
+  gaze.fired = false;
+  gaze.timer = 0.85 + Math.random() * 1.1;
+}
+
+function updateGaze(dt) {
+  if (state.explodeT > 0.05) return;
+
+  if (gaze.t < 1) {
+    gaze.t = Math.min(1, gaze.t + dt / gaze.dur);
+    const e = 1 - Math.pow(1 - gaze.t, 3);
+    eyeGroup.quaternion.slerpQuaternions(gaze.from, gaze.to, e);
+    if (!gaze.fired && gaze.t >= 0.98) {
+      gaze.fired = true;
+      pulse.t = 0;
+      pulse.on = true;
+      pulseTag.classList.add('on');
+      clearTimeout(pulseTagTimer);
+      pulseTagTimer = setTimeout(() => pulseTag.classList.remove('on'), 620);
+    }
+  } else {
+    gaze.timer -= dt;
+    if (gaze.timer <= 0) newSaccade();
+  }
+}
+
+function updatePulse(dt) {
+  if (!pulse.on) {
+    pulseDots.forEach(d => { d.material.opacity = 0; });
+    return;
+  }
+  pulse.t += dt / 0.62;
+  for (let i = 0; i < pulseDots.length; i++) {
+    const tt = pulse.t - i * 0.032;
+    const d = pulseDots[i];
+    if (tt >= 0 && tt <= 1) {
+      d.position.copy(nerveCurve.getPointAt(THREE.MathUtils.clamp(tt, 0, 1)));
+      d.material.opacity = (1 - i / pulseDots.length) * 0.95;
+      const s = 0.75 + (1 - i / pulseDots.length) * 0.75;
+      d.scale.setScalar(s);
+    } else {
+      d.material.opacity = 0;
+    }
+  }
+  if (pulse.t > 1.45) pulse.on = false;
+}
+
+/* =========================================================
+   17. 缩放潜入视网膜
+   ========================================================= */
+const _tmpTarget = new THREE.Vector3();
+function updateDive(dt) {
+  if (state.explodeT > 0.2) return;
+  const dist = camera.position.distanceTo(controls.target);
+  const want = THREE.MathUtils.clamp((3.7 - dist) / 2.7, 0, 1);
+  state.focus += (want - state.focus) * Math.min(1, dt * 1.6);
+  if (state.focus < 0.005) state.focus = 0;
+
+  _tmpTarget.set(0, 0, -1.86 * state.focus);
+  const delta = _tmpTarget.clone().sub(controls.target).multiplyScalar(Math.min(1, dt * 2.4));
+  if (delta.lengthSq() > 1e-9) {
+    controls.target.add(delta);
+    camera.position.add(delta);
+  }
+}
+
+/* =========================================================
+   18. 主循环
+   ========================================================= */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // 瞳孔：强光收缩、暗光放大
+  const pupTarget = state.bright ? 0.175 : 0.345;
+  irisUniforms.uPupil.value += (pupTarget - irisUniforms.uPupil.value) * Math.min(1, dt * 3.4);
+
+  // 睫状肌 + 晶状体调节
+  state.acc += ((state.near ? 1 : 0) - state.acc) * Math.min(1, dt * 3.2);
+  const a = state.acc;
+  lensMesh.scale.set(1 + 0.055 * a, 1 + 0.055 * a, 0.5 * (1 + 0.46 * a));
+  ciliaryRing.scale.setScalar(1 - 0.065 * a);
+
+  updateExplode(dt);
+  updateGaze(dt);
+  updatePulse(dt);
+  updateDive(dt);
+
+  // 光点沿光路流动
+  if (rayGroup.visible) {
+    for (let i = 0; i < photonMeshes.length; i++) {
+      const ph = photonMeshes[i];
+      const raw = (t * 0.4 + ph.userData.phase) % 1;
+      ph.position.copy(samplePath(ph.userData.path, 0.4 + raw * 0.6));
+      ph.material.opacity = (0.25 + 0.75 * Math.sin(raw * Math.PI)) * 0.95;
+    }
+  }
+
+  // 悬停检测
+  if (pointerActive) {
+    const p = pickPart();
+    setHovered(p);
+  } else {
+    setHovered(null);
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+}
+animate();
+
+/* =========================================================
+   19. 自适应
+   ========================================================= */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+
+// 开场轻推一下视线
+setTimeout(() => newSaccade(), 900);
+</script>
+</body>
+</html>

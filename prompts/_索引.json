@@ -1,0 +1,94 @@
+{
+  "source": "WorkBuddy 会话记录 projects/f-WorkBuddySessions-人体的秘密/*.jsonl",
+  "note": "每个文件的首条用户消息（<user_query> 原文），仅去除首尾空白",
+  "items": [
+    {
+      "page": "pages/单反相机3D解剖.html",
+      "prompt": "单反相机3D解剖.txt",
+      "sessionId": "b97083c0-9f2c-4294-8460-4572ee16e49a",
+      "createdAt": "2026-10-30 16:20:30",
+      "language": "zh",
+      "chars": 436
+    },
+    {
+      "page": "pages/弹子锁3D解剖.html",
+      "prompt": "弹子锁3D解剖.txt",
+      "sessionId": "5b439b97-33aa-4d9a-bbb8-f73ff38019c6",
+      "createdAt": "2026-11-05 17:18:56",
+      "language": "zh",
+      "chars": 427
+    },
+    {
+      "page": "pages/机械硬盘3D解剖.html",
+      "prompt": "机械硬盘3D解剖.txt",
+      "sessionId": "eabf4c86-9d23-4eda-9515-dc8b52f90604",
+      "createdAt": "2026-11-06 09:31:45",
+      "language": "en",
+      "chars": 1485
+    },
+    {
+      "page": "pages/人耳3D解剖.html",
+      "prompt": "人耳3D解剖.txt",
+      "sessionId": "59383496-2e58-4f41-972f-8b33bc8db67d",
+      "createdAt": "2026-11-06 09:31:27",
+      "language": "zh",
+      "chars": 1639
+    },
+    {
+      "page": "pages/人眼3D解剖.html",
+      "prompt": "人眼3D解剖.txt",
+      "sessionId": "ec55a229-0527-40b3-a3dd-b3af2bf81f9a",
+      "createdAt": "2026-10-30 16:20:43",
+      "language": "zh",
+      "chars": 435
+    },
+    {
+      "page": "pages/四冲程发动机3D.html",
+      "prompt": "四冲程发动机3D.txt",
+      "sessionId": "853e1a9d-6edb-4c9b-8e64-78a7e0c77d93",
+      "createdAt": "2026-10-30 16:20:59",
+      "language": "zh",
+      "chars": 432
+    },
+    {
+      "page": "pages/锁式线迹缝纫机3D.html",
+      "prompt": "锁式线迹缝纫机3D.txt",
+      "sessionId": "7123b404-a560-42f7-a0b4-c71133adf92f",
+      "createdAt": "2026-11-06 09:32:03",
+      "language": "en",
+      "chars": 1499
+    },
+    {
+      "page": "pages/膝关节3D解剖.html",
+      "prompt": "膝关节3D解剖.txt",
+      "sessionId": "14a121b5-c41f-42d6-a1c5-b1636731ca2d",
+      "createdAt": "2026-11-05 17:19:33",
+      "language": "zh",
+      "chars": 443
+    },
+    {
+      "page": "pages/心脏3D解剖.html",
+      "prompt": "心脏3D解剖.txt",
+      "sessionId": "0c64d3c1-ecdc-493c-8057-87e18400599f",
+      "createdAt": "2026-10-27 16:03:19",
+      "language": "en",
+      "chars": 812
+    },
+    {
+      "page": "pages/叶片光合作用3D.html",
+      "prompt": "叶片光合作用3D.txt",
+      "sessionId": "bf6be785-db40-4056-84f5-7a16eba062a9",
+      "createdAt": "2026-10-27 16:21:31",
+      "language": "zh",
+      "chars": 464
+    },
+    {
+      "page": "pages/意式咖啡机3D.html",
+      "prompt": "意式咖啡机3D.txt",
+      "sessionId": "91644150-048a-469e-8589-09fa352a9c95",
+      "createdAt": "2026-11-05 17:19:17",
+      "language": "zh",
+      "chars": 431
+    }
+  ]
+}

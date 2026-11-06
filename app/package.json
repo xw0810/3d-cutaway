@@ -1,0 +1,21 @@
+{
+  "name": "body-secrets",
+  "productName": "3D交互模型库",
+  "version": "1.0.0",
+  "private": true,
+  "description": "本地浏览 3D 交互解剖与机械模型",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "start": "npm run sync && electron .",
+    "smoke": "npm run sync && electron . --smoke",
+    "dist": "npm run sync && node scripts/package.mjs",
+    "dist:all": "npm run sync && node scripts/package.mjs --all"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.4.0",
+    "electron": "^45.2.3",
+    "three": "0.160.0"
+  }
+}

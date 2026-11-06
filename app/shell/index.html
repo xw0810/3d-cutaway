@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>3D交互模型库</title>
+<link rel="stylesheet" href="/shell/styles.css" />
+</head>
+<body>
+<div id="app">
+  <aside id="drawer" aria-label="模型目录">
+    <header class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <div class="brand-txt">
+        <b>3D 交互模型库</b>
+        <small>本地动画与剖切模型</small>
+      </div>
+      <button id="collapse" class="icon-btn" title="收起目录 (Ctrl+B)" aria-label="收起目录">‹</button>
+    </header>
+
+    <div class="search">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6"></circle><line x1="13.5" y1="13.5" x2="18" y2="18"></line></svg>
+      <input id="q" type="search" placeholder="搜索模型、部位或关键词" autocomplete="off" spellcheck="false" aria-label="搜索模型" />
+      <kbd id="kbd-hint">Ctrl K</kbd>
+    </div>
+
+    <nav id="list" class="list" aria-label="模型列表"></nav>
+
+    <footer class="foot">
+      <span id="count">—</span>
+      <span class="keys"><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>↵</kbd> 打开</span>
+    </footer>
+  </aside>
+
+  <button id="expand" class="icon-btn rail-btn" title="展开目录 (Ctrl+B)" aria-label="展开目录">›</button>
+
+  <main id="stage">
+    <header class="topbar">
+      <div class="crumb">
+        <span id="cat">未选择</span>
+        <h1 id="title">从左侧目录选择一个模型</h1>
+      </div>
+      <div class="actions">
+        <button id="reload" class="ghost" title="重新载入当前模型">重新载入</button>
+        <button id="full" class="ghost" title="全屏查看">全屏</button>
+      </div>
+    </header>
+
+    <div id="frame-wrap">
+      <iframe id="view" title="3D 模型" allow="fullscreen"></iframe>
+
+      <div id="empty" class="overlay">
+        <div class="empty-card">
+          <span class="orb" aria-hidden="true"></span>
+          <h2 id="hero-title">可交互的 3D 剖切模型</h2>
+          <p>左侧按「人体解剖 / 机械与工程 / 自然与生活」分类。搜索支持部位与关键词，例如「瓣膜」「光圈」「耳蜗」。</p>
+          <div class="empty-keys">
+            <span><kbd>Ctrl</kbd><kbd>K</kbd> 搜索</span>
+            <span><kbd>Ctrl</kbd><kbd>B</kbd> 收起目录</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="loading" class="overlay hidden"><span class="spinner"></span><b>正在装配模型…</b></div>
+    </div>
+  </main>
+</div>
+<script type="module" src="/shell/app.js"></script>
+</body>
+</html>

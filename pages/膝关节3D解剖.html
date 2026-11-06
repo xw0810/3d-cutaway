@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>人体膝关节 · 交互式三维解剖</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#05090f}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:#e9f2f8;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(ellipse 72% 58% at 62% 8%, #18303e 0%, rgba(12,22,31,0) 64%),
+      radial-gradient(ellipse 90% 78% at 24% 96%, #1a1a22 0%, rgba(9,12,18,0) 58%),
+      linear-gradient(158deg,#0a121a 0%,#070c13 48%,#04070c 100%);
+  }
+  #c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab;outline:none}
+  #c:active{cursor:grabbing}
+  #c.hovering{cursor:help}
+
+  .panel{
+    position:fixed;z-index:20;
+    background:linear-gradient(180deg,rgba(18,29,39,.80),rgba(10,16,23,.72));
+    -webkit-backdrop-filter:blur(18px) saturate(140%);
+    backdrop-filter:blur(18px) saturate(140%);
+    border:1px solid rgba(150,210,235,.10);
+    border-radius:15px;
+    box-shadow:0 20px 55px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.055);
+  }
+
+  .hud-tl{left:26px;top:24px;padding:17px 24px 18px;pointer-events:none}
+  .eyebrow{font-size:9.5px;letter-spacing:.32em;color:#6fc9dc;font-weight:600}
+  .hud-tl h1{font-size:24px;font-weight:650;letter-spacing:.02em;margin:8px 0 7px;line-height:1.2}
+  .hud-tl h1 span{color:#7d9bad;font-weight:400;font-size:15px;margin-left:8px;letter-spacing:.04em}
+  .hud-tl .sub{font-size:11px;color:rgba(196,220,234,.50);letter-spacing:.04em}
+
+  .hud-tr{right:26px;top:24px;width:206px;padding:14px 15px 13px;display:flex;flex-direction:column;gap:8px}
+  .hud-tr .cap{font-size:9px;letter-spacing:.26em;color:rgba(180,214,230,.38);margin-bottom:2px}
+  button{
+    font:inherit;font-size:12.5px;color:#dcebf3;background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:9px 14px;cursor:pointer;
+    transition:all .16s;letter-spacing:.03em;white-space:nowrap;width:100%;text-align:left;
+    display:flex;align-items:center;gap:9px;
+  }
+  button:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.22);color:#fff}
+  button:active{transform:translateY(1px)}
+  button .ico{font-size:13px;width:15px;text-align:center;opacity:.8;flex:none}
+  button.primary{
+    background:linear-gradient(180deg,#5fd6e8,#2c9fbc);border-color:rgba(140,225,240,.5);
+    color:#052029;font-weight:650;box-shadow:0 5px 20px rgba(50,170,200,.28);
+  }
+  button.primary:hover{background:linear-gradient(180deg,#7fe3f0,#38aecb);color:#052029}
+  button.primary.on{background:linear-gradient(180deg,#ffb27a,#e2823f);border-color:rgba(255,190,140,.55);color:#2a1405;box-shadow:0 5px 20px rgba(230,130,60,.3)}
+  button.tog{font-size:11.5px;padding:7px 12px;color:rgba(200,222,234,.62)}
+  button.tog.on{color:#8ee6f2;background:rgba(80,200,220,.10);border-color:rgba(100,215,235,.32)}
+  button.tog .sw{width:22px;height:12px;border-radius:8px;background:rgba(255,255,255,.13);margin-left:auto;position:relative;flex:none;transition:background .18s}
+  button.tog .sw::after{content:'';position:absolute;left:2px;top:2px;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.55);transition:transform .18s,background .18s}
+  button.tog.on .sw{background:rgba(80,210,230,.42)}
+  button.tog.on .sw::after{transform:translateX(10px);background:#e6fdff}
+  .tgroup{display:flex;flex-direction:column;gap:5px;margin-top:2px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08)}
+
+  .hud-bl{left:26px;bottom:26px;width:250px;padding:15px 17px 14px}
+  .hud-bl .cap{font-size:9px;letter-spacing:.26em;color:rgba(180,214,230,.38);margin-bottom:11px}
+  .angle{display:flex;align-items:baseline;gap:7px;margin-bottom:12px}
+  .angle b{font-size:27px;font-weight:600;font-variant-numeric:tabular-nums;color:#8fe4f2;line-height:1}
+  .angle i{font-style:normal;font-size:11px;color:rgba(190,218,232,.42);letter-spacing:.06em}
+  .angle .ph{margin-left:auto;font-size:10.5px;color:rgba(255,190,140,.85);letter-spacing:.08em}
+  .rows{display:flex;flex-direction:column;gap:1px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;padding:4px 0;color:rgba(190,216,230,.54)}
+  .row span{white-space:nowrap}
+  .row b{font-weight:550;color:#cfe4ef;font-variant-numeric:tabular-nums;text-align:right}
+  .row b.taut{color:#ff9f86}
+  .row b.mid{color:#e9cf9c}
+  .row b.slack{color:#8fb6c6}
+  .foot{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08);font-size:10.5px;line-height:1.7;color:rgba(170,200,215,.42)}
+
+  .toolbar{left:50%;transform:translateX(-50%);bottom:26px;display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:13px}
+  .rng{display:flex;align-items:center;gap:9px;font-size:11.5px;color:rgba(196,220,234,.55);white-space:nowrap}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:104px;height:3px;border-radius:2px;background:rgba(255,255,255,.16);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#6fd8e8;box-shadow:0 0 0 3px rgba(90,210,230,.18);cursor:pointer}
+  output{font-variant-numeric:tabular-nums;color:#cfeaf2;font-size:11.5px;min-width:34px;text-align:right}
+  .sep{width:1px;height:20px;background:rgba(255,255,255,.10)}
+  .hint{font-size:11px;color:rgba(180,208,222,.44);white-space:nowrap;letter-spacing:.03em}
+  .hint b{color:rgba(140,225,240,.75);font-weight:500}
+
+  #labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .lbl{
+    position:absolute;left:0;top:0;white-space:nowrap;
+    font-size:11.5px;letter-spacing:.05em;padding:4px 10px 4px 9px;border-radius:20px;
+    color:#d5f2f8;background:rgba(8,18,25,.88);
+    border:1px solid rgba(100,210,230,.42);
+    box-shadow:0 5px 18px rgba(0,0,0,.65);
+    opacity:0;pointer-events:none;will-change:transform,opacity;
+    transition:opacity .22s,color .18s,border-color .18s,background .18s;
+  }
+  .lbl::before{content:'';position:absolute;left:-3.5px;top:50%;width:5px;height:5px;border-radius:50%;
+    background:#5fd6e8;transform:translateY(-50%);box-shadow:0 0 8px #5fd6e8}
+  .lbl.hot{color:#fff;border-color:rgba(255,190,120,.8);background:rgba(52,32,14,.9)}
+  .lbl.hot::before{background:#ffbe7a;box-shadow:0 0 9px #ffbe7a}
+
+  #tip{
+    position:fixed;z-index:40;left:0;top:0;pointer-events:none;opacity:0;
+    max-width:286px;padding:11px 14px;border-radius:11px;
+    background:rgba(8,16,22,.94);border:1px solid rgba(100,210,230,.40);
+    box-shadow:0 14px 38px rgba(0,0,0,.62);
+    transform:translateY(5px);transition:opacity .15s,transform .15s;
+  }
+  #tip.show{opacity:1;transform:translateY(0)}
+  #tip .t{font-size:12.5px;font-weight:650;color:#8fe4f2;letter-spacing:.04em;margin-bottom:5px;
+    display:flex;align-items:center;gap:7px}
+  #tip .t::before{content:'';width:5px;height:5px;border-radius:50%;background:#ffbe7a;box-shadow:0 0 8px #ffbe7a}
+  #tip .d{font-size:11.5px;line-height:1.7;color:rgba(206,226,236,.75)}
+
+  #loader{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+    background:#05090f;transition:opacity .7s}
+  #loader.hide{opacity:0;pointer-events:none}
+  .spin{width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.10);border-top-color:#5fd6e8;animation:sp .9s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .lt{font-size:11.5px;letter-spacing:.26em;color:rgba(170,205,220,.45)}
+  #err{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;
+    background:#05090f;color:#8fa8b8;font-size:13px;text-align:center;padding:30px;line-height:1.9}
+
+  @media (max-width:980px){
+    .hud-bl,.hint{display:none}
+    .hud-tl{padding:12px 16px}
+    .hud-tl h1{font-size:18px}
+    .hud-tl h1 span{font-size:12px}
+    .hud-tr{right:14px;top:14px;width:168px;padding:10px}
+    .toolbar{bottom:14px;gap:7px;padding:7px 9px}
+    .hud-tl{left:14px;top:14px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+
+<div class="panel hud-tl">
+  <div class="eyebrow">解剖学 · 三维交互模型</div>
+  <h1>人体膝关节<span>屈伸解剖</span></h1>
+  <div class="sub">骨与软骨 · 半月板 · 四条韧带 · 关节囊与滑液 · 髌骨装置</div>
+</div>
+
+<div class="panel hud-tr">
+  <div class="cap">视图控制</div>
+  <button id="btnExplode" class="primary"><span class="ico">⤢</span><span id="btnExplodeTxt">爆炸展开</span></button>
+  <button id="btnPlay"><span class="ico">⏸</span><span id="btnPlayTxt">暂停屈伸</span></button>
+  <button id="btnReset"><span class="ico">⟲</span><span>重置视角</span></button>
+  <div class="tgroup">
+    <button id="tgSkin" class="tog on"><span>皮肤轮廓</span><i class="sw"></i></button>
+    <button id="tgCap" class="tog on"><span>关节囊</span><i class="sw"></i></button>
+    <button id="tgFluid" class="tog on"><span>滑液</span><i class="sw"></i></button>
+  </div>
+</div>
+
+<div class="panel hud-bl">
+  <div class="cap">实时状态</div>
+  <div class="angle"><b id="degOut">0</b><i>度屈曲</i><span class="ph" id="phaseOut">伸展相</span></div>
+  <div class="rows">
+    <div class="row"><span>股骨运动</span><b>后滚 + 后滑</b></div>
+    <div class="row"><span>髌骨轨迹</span><b>沿滑车沟下移</b></div>
+    <div class="row"><span>半月板</span><b>受压形变 · 持续垫衬</b></div>
+    <div class="row"><span>前交叉韧带</span><b id="aclOut" class="slack">松弛</b></div>
+    <div class="row"><span>后交叉韧带</span><b id="pclOut" class="taut">绷紧</b></div>
+  </div>
+  <div class="foot">屈伸周期约 1 秒 · 关节线为缩放中心</div>
+</div>
+
+<div class="panel toolbar">
+  <span class="hint"><b>拖拽</b> 环绕　<b>滚轮</b> 缩放至关节线　<b>悬停</b> 查看作用</span>
+  <div class="sep"></div>
+  <label class="rng">手动屈曲
+    <input id="rng" type="range" min="0" max="52" step="1" value="0" />
+    <output id="rngOut">0°</output>
+  </label>
+</div>
+
+<div id="tip"><div class="t"></div><div class="d"></div></div>
+
+<div id="loader"><div class="spin"></div><div class="lt">正在装配膝关节模型</div></div>
+<div id="err">无法加载三维渲染库<br/><span style="font-size:11px;opacity:.6">请检查网络后刷新页面（需要访问 unpkg.com）</span></div>
+
+<script>
+  window.__kneeReady = false;
+  setTimeout(function(){
+    if(!window.__kneeReady){
+      var e=document.getElementById('err'); if(e) e.style.display='flex';
+      var l=document.getElementById('loader'); if(l) l.classList.add('hide');
+    }
+  },14000);
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+(async function(){
+  const THREE = await import('three');
+  const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+  let RoomEnvironment = null;
+  try { RoomEnvironment = (await import('three/addons/environments/RoomEnvironment.js')).RoomEnvironment; } catch(e){}
+  start(THREE, OrbitControls, RoomEnvironment);
+})().catch(function(err){
+  console.error(err);
+  document.getElementById('err').style.display='flex';
+  document.getElementById('loader').classList.add('hide');
+});
+
+function start(THREE, OrbitControls, RoomEnvironment){
+  const V = (x,y,z)=>new THREE.Vector3(x,y,z);
+  const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+  const D2R = Math.PI/180;
+  const MAX_DEG = 52;
+  const PERIOD = 1.0;
+  const PIVOT = V(0, 0.78, 0);
+
+  /* ---------- 渲染器 / 场景 / 相机 ---------- */
+  const canvas = document.getElementById('c');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, powerPreference:'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.06, 300);
+  const CAM_HOME = V(7.2, 3.4, 10.8);
+  camera.position.copy(CAM_HOME);
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.target.set(0, 0.30, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.065;
+  controls.enablePan = false;
+  controls.minDistance = 1.35;
+  controls.maxDistance = 34;
+  controls.rotateSpeed = 0.72;
+  controls.zoomSpeed = 0.9;
+  controls.update();
+
+  if(RoomEnvironment){
+    try{
+      const pm = new THREE.PMREMGenerator(renderer);
+      const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+      scene.environment = env;
+      pm.dispose();
+    }catch(e){ console.warn('环境光生成跳过', e); }
+  }
+
+  scene.add(new THREE.HemisphereLight(0xbcdcff, 0x2a1d18, 0.62));
+  const key = new THREE.DirectionalLight(0xfff0dc, 2.45); key.position.set(6,9,8); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x8ab8ee, 1.30); fill.position.set(-8,3,6); scene.add(fill);
+  const rim  = new THREE.DirectionalLight(0xffb98e, 1.15); rim.position.set(2,4,-9); scene.add(rim);
+  const top  = new THREE.DirectionalLight(0xeaf6ff, 0.65); top.position.set(0,11,1); scene.add(top);
+  const inner= new THREE.PointLight(0x66d8f0, 9, 11, 2.0); inner.position.set(0,0.9,2.2); scene.add(inner);
+  const lower= new THREE.PointLight(0xffc79a, 5, 9, 2.0); lower.position.set(0,-1.4,1.4); scene.add(lower);
+
+  // 淡淡的参考环，纯几何体，不使用任何图片
+  for(let i=0;i<3;i++){
+    const r = 2.3 + i*1.35, pts=[];
+    for(let j=0;j<=96;j++){ const a=j/96*Math.PI*2; pts.push(V(Math.cos(a)*r,-4.28,Math.sin(a)*r)); }
+    const g = new THREE.BufferGeometry().setFromPoints(pts);
+    scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color:0x6fb6d0, transparent:true, opacity:0.075 })));
+  }
+
+  /* ---------- 材质 ---------- */
+  const MAT = {
+    bone: new THREE.MeshPhysicalMaterial({ color:0xeee2c8, roughness:0.68, metalness:0, clearcoat:0.18, clearcoatRoughness:0.55, sheen:0.35, sheenColor:0xfff2dd, envMapIntensity:0.75 }),
+    bone2: new THREE.MeshPhysicalMaterial({ color:0xe6d7b9, roughness:0.72, metalness:0, clearcoat:0.14, sheen:0.28, sheenColor:0xffeed4, envMapIntensity:0.7 }),
+    cond: new THREE.MeshPhysicalMaterial({ color:0xf1e6cf, roughness:0.60, metalness:0, clearcoat:0.22, clearcoatRoughness:0.48, sheen:0.4, sheenColor:0xfff4e2, envMapIntensity:0.8 }),
+    cart: new THREE.MeshPhysicalMaterial({ color:0xbfe0f0, roughness:0.13, metalness:0, clearcoat:1.0, clearcoatRoughness:0.07, transparent:true, opacity:0.91, side:THREE.DoubleSide, envMapIntensity:1.15 }),
+    groove: new THREE.MeshPhysicalMaterial({ color:0xc9e6f2, roughness:0.18, metalness:0, clearcoat:0.95, clearcoatRoughness:0.10, side:THREE.DoubleSide, envMapIntensity:1.05 }),
+    men: new THREE.MeshPhysicalMaterial({ color:0xe3c88a, roughness:0.48, metalness:0, clearcoat:0.34, side:THREE.DoubleSide, envMapIntensity:0.85 }),
+    lig: new THREE.MeshPhysicalMaterial({ color:0xeeb2a2, roughness:0.62, metalness:0, sheen:0.55, sheenColor:0xffd8c6, side:THREE.DoubleSide, envMapIntensity:0.8 }),
+    ten: new THREE.MeshPhysicalMaterial({ color:0xf2dec4, roughness:0.54, metalness:0, sheen:0.65, sheenColor:0xfff1de, side:THREE.DoubleSide, envMapIntensity:0.8 }),
+    patCart: new THREE.MeshPhysicalMaterial({ color:0xa9d8ee, roughness:0.11, clearcoat:1.0, clearcoatRoughness:0.06, transparent:true, opacity:0.94, side:THREE.DoubleSide, envMapIntensity:1.2 })
+  };
+
+  // 纯程序化骨面斑驳：在着色器里用三维噪声轻微扰动底色，不用任何贴图
+  function boneMottle(mat){
+    mat.onBeforeCompile = (shader)=>{
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vKPos;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKPos = position;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+varying vec3 vKPos;
+float kh(vec3 p){ return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453); }
+float kn(vec3 p){
+  vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(mix(kh(i),kh(i+vec3(1,0,0)),f.x),mix(kh(i+vec3(0,1,0)),kh(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(kh(i+vec3(0,0,1)),kh(i+vec3(1,0,1)),f.x),mix(kh(i+vec3(0,1,1)),kh(i+vec3(1,1,1)),f.x),f.y),f.z);
+}
+`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+float kn1 = kn(vKPos*7.0)*0.68 + kn(vKPos*23.0)*0.32;
+diffuseColor.rgb *= 0.90 + kn1*0.17;
+`);
+    };
+    mat.customProgramCacheKey = ()=>'kneeBoneMottleV1';
+    return mat;
+  }
+
+  // 菲涅尔「透视」材质：皮肤、关节囊、滑液，全程序化，无贴图
+  function xray(color, rim, baseA, rimA, power, additive){
+    return new THREE.ShaderMaterial({
+      uniforms:{
+        uColor:{value:new THREE.Color(color)}, uRim:{value:new THREE.Color(rim)},
+        uBase:{value:baseA}, uRimA:{value:rimA}, uPower:{value:power},
+        uHi:{value:0}, uTime:{value:0},
+        uBend:{value:0}, uFlex:{value:0}, uGlide:{value:0}
+      },
+      vertexShader:`
+        uniform float uBend; uniform float uFlex; uniform float uGlide;
+        varying vec3 vN; varying vec3 vV; varying vec3 vW;
+        void main(){
+          vec3 pos = position;
+          if(uBend > 0.5){
+            float t = smoothstep(-0.35, 1.05, pos.y);
+            vec3 q = pos - vec3(0.0, 0.78, 0.0);
+            float a = uFlex*t, c = cos(a), s = sin(a);
+            vec3 rq = vec3(q.x, q.y*c - q.z*s, q.y*s + q.z*c);
+            rq += vec3(0.0, 0.78, -uGlide*t);
+            pos = mix(pos, rq, t);
+          }
+          vec4 wp = modelMatrix * vec4(pos,1.0);
+          vN = normalize(mat3(modelMatrix) * normal);
+          vV = normalize(cameraPosition - wp.xyz);
+          vW = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }`,
+      fragmentShader:`
+        uniform vec3 uColor; uniform vec3 uRim;
+        uniform float uBase; uniform float uRimA; uniform float uPower; uniform float uHi; uniform float uTime;
+        varying vec3 vN; varying vec3 vV; varying vec3 vW;
+        void main(){
+          float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), uPower);
+          float sh = 0.93 + 0.07*sin(vW.y*6.0 + uTime*1.5);
+          vec3 col = mix(uColor, uRim, clamp(f*1.45,0.0,1.0));
+          col += uHi * vec3(0.30,0.50,0.55);
+          float a = clamp(uBase + f*uRimA, 0.0, 0.92)*sh + uHi*0.14;
+          gl_FragColor = vec4(col, a);
+        }`,
+      transparent:true, depthWrite:false, side:THREE.DoubleSide,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending
+    });
+  }
+  const SKIN = ()=>xray(0x9fc6d8, 0xe8fbff, 0.012, 0.44, 3.1, true);
+  const CAPS = ()=>xray(0x5f9fbe, 0xa9e6ff, 0.055, 0.40, 2.0);
+  const FLUID= ()=>xray(0x33c6cf, 0x9bf6ff, 0.115, 0.44, 2.3);
+
+  /* ---------- 部件系统 ---------- */
+  const labelLayer = document.getElementById('labels');
+  const pickMeshes = [];
+  const parts = [];
+
+  const femurGroup = new THREE.Group(); scene.add(femurGroup);
+  const femurContent = new THREE.Group(); femurContent.position.set(0,-PIVOT.y,0); femurGroup.add(femurContent);
+
+  function makePart(cfg){
+    const g = new THREE.Group();
+    (cfg.parent || scene).add(g);
+    const anchor = new THREE.Object3D();
+    anchor.position.copy(cfg.anchor || V(0,0,0));
+    g.add(anchor);
+    const el = document.createElement('div');
+    el.className = 'lbl'; el.textContent = cfg.name;
+    labelLayer.appendChild(el);
+    const p = {
+      id:cfg.id, name:cfg.name, desc:cfg.desc, group:g, anchor, el,
+      base:(cfg.base || V(0,0,0)).clone(),
+      dir:(cfg.dir || V(0,1,0)).clone().normalize(),
+      dist:cfg.dist===undefined?1.6:cfg.dist,
+      container:!!cfg.container,
+      meshes:[], _off:new THREE.Vector3()
+    };
+    g.position.copy(p.base);
+    parts.push(p);
+    return p;
+  }
+  function addMesh(part, geo, mat, o){
+    o = o || {};
+    const m = new THREE.Mesh(geo, mat.clone());
+    if(mat===MAT.bone || mat===MAT.bone2 || mat===MAT.cond) boneMottle(m.material);
+    if(o.bend && m.material.uniforms) m.material.uniforms.uBend.value=1;
+    if(o.pos) m.position.copy(o.pos);
+    if(o.rot) m.rotation.set(o.rot.x||0,o.rot.y||0,o.rot.z||0);
+    if(o.scale) m.scale.copy(o.scale);
+    if(o.order!==undefined) m.renderOrder = o.order;
+    m.userData.partId = part.id;
+    m.userData.container = part.container;
+    m.userData.origEmi = m.material.emissive ? m.material.emissive.getHex() : null;
+    m.userData.origEmiI = m.material.emissiveIntensity!==undefined ? m.material.emissiveIntensity : 0;
+    part.group.add(m);
+    part.meshes.push(m);
+    pickMeshes.push(m);
+    return m;
+  }
+
+  /* ---------- 几何体工具 ---------- */
+  function lathe(profile, seg){ return new THREE.LatheGeometry(profile.map(p=>new THREE.Vector2(p[0],p[1])), seg||64); }
+
+  // 楔形半月板：外缘厚、内缘薄的 C 形纤维软骨环
+  function meniscusGeo(R, a0, a1){
+    const N=48, pos=[], idx=[], uv=[];
+    const rIn=R-0.045, rOut=R+0.285;
+    for(let i=0;i<=N;i++){
+      const t=i/N, a=a0+(a1-a0)*t, ca=Math.cos(a), sa=Math.sin(a);
+      const taper=0.52+0.48*Math.sin(Math.PI*t);
+      const ring=[[rOut,-0.045],[rOut,0.215*taper],[rIn,0.018]];
+      for(let k=0;k<3;k++){ pos.push(ca*ring[k][0], ring[k][1], sa*ring[k][0]); uv.push(t,k/2); }
+    }
+    for(let i=0;i<N;i++){
+      const a=i*3, b=(i+1)*3;
+      idx.push(a,b,a+1, b,b+1,a+1);
+      idx.push(a+1,b+1,a+2, b+1,b+2,a+2);
+      idx.push(a+2,b+2,a, b+2,b,a);
+    }
+    idx.push(0,1,2);
+    const e=N*3; idx.push(e,e+2,e+1);
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+
+  // 股骨前方带凹槽的滑车面
+  function trochleaGeo(){
+    const N=30,M=30,pos=[],idx=[],uv=[];
+    for(let i=0;i<=N;i++){
+      const v=i/N, y=1.64-v*1.46, bulge=0.60+0.17*Math.sin(Math.PI*v);
+      for(let j=0;j<=M;j++){
+        const u=j/M*2-1, x=u*0.72;
+        const z=bulge+0.31*Math.pow(Math.abs(u),1.7)-0.10*v*v;
+        pos.push(x,y,z); uv.push(j/M,v);
+      }
+    }
+    for(let i=0;i<N;i++) for(let j=0;j<M;j++){
+      const a=i*(M+1)+j, b=a+M+1;
+      idx.push(a,b,a+1, b,b+1,a+1);
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+    g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
+
+  // 盾形髌骨：下极收窄、前后压扁
+  function patellaGeo(){
+    const g=new THREE.SphereGeometry(1,44,30), a=g.attributes.position;
+    for(let i=0;i<a.count;i++){
+      const x=a.getX(i), y=a.getY(i), z=a.getZ(i);
+      const taper=1-0.40*Math.max(0,-y);
+      a.setXYZ(i, x*0.52*taper, y*0.70, z*0.30*(1+0.10*y));
+    }
+    g.computeVertexNormals(); return g;
+  }
+
+  function tubePart(part, mat, radius){
+    const m = addMesh(part, new THREE.SphereGeometry(0.01,6,4), mat);
+    return {
+      mesh:m, radius,
+      set(pts, rs){
+        const curve=new THREE.CatmullRomCurve3(pts);
+        const g=new THREE.TubeGeometry(curve,22,radius*(rs||1),9,false);
+        m.geometry.dispose(); m.geometry=g;
+      }
+    };
+  }
+
+  /* ---------- 1. 皮肤轮廓 ---------- */
+  const pSkin = makePart({ id:'skin', name:'皮肤轮廓',
+    desc:'体表轮廓，勾勒膝关节在皮下的外形与位置。',
+    dir:V(0,0,1), dist:4.0, anchor:V(0,2.4,1.1), container:true });
+  const skinProfile=[[0.60,-4.20],[0.70,-3.30],[0.76,-2.35],[0.90,-1.45],[1.24,-0.62],
+    [1.50,0.00],[1.55,0.62],[1.44,1.32],[1.29,2.05],[1.23,3.05],[1.17,4.20]];
+  addMesh(pSkin, lathe(skinProfile,72), SKIN(), { scale:V(1,1,0.92), order:12, bend:true });
+
+  /* ---------- 2. 关节囊 ---------- */
+  const pCap = makePart({ id:'capsule', name:'关节囊',
+    desc:'包裹整个关节的纤维囊，把滑液封闭在腔内并限制过度活动。',
+    dir:V(0,0,-1), dist:3.3, anchor:V(0,1.2,-1.35), container:true });
+  const capProfile=[[0.58,-1.16],[1.16,-0.96],[1.42,-0.48],[1.53,0.10],[1.51,0.72],
+    [1.35,1.32],[1.10,1.84],[0.82,2.24],[0.64,2.50]];
+  addMesh(pCap, lathe(capProfile,72), CAPS(), { scale:V(1,1,0.90), order:11, bend:true });
+
+  /* ---------- 3. 滑液 ---------- */
+  const pFluid = makePart({ id:'fluid', name:'滑液',
+    desc:'囊内的黏稠液体，润滑软骨、减少摩擦并营养关节软骨。',
+    dir:V(-0.9,0.32,0.25), dist:2.6, anchor:V(0,0.20,0.75), container:true });
+  addMesh(pFluid, new THREE.SphereGeometry(1,48,32), FLUID(), { pos:V(0,0.18,0), scale:V(1.34,0.44,1.16), order:10 });
+  addMesh(pFluid, new THREE.SphereGeometry(1,32,24), FLUID(), { pos:V(0,0.05,0), scale:V(1.02,0.30,0.90), order:10 });
+
+  /* ---------- 4. 股骨 ---------- */
+  const pFemur = makePart({ id:'femur', name:'股骨',
+    desc:'大腿骨，自上而下把体重传导到胫骨平台。',
+    parent:femurContent, dir:V(0,1,0), dist:3.0, anchor:V(0,2.75,0.2) });
+  addMesh(pFemur, new THREE.CylinderGeometry(0.50,0.56,2.35,36), MAT.bone, { pos:V(0,3.22,0) });
+  addMesh(pFemur, new THREE.CylinderGeometry(0.55,1.03,1.18,40), MAT.bone, { pos:V(0,1.52,0), scale:V(1,1,0.92) });
+  addMesh(pFemur, new THREE.SphereGeometry(1,28,20), MAT.bone2, { pos:V(-1.02,1.06,-0.08), scale:V(0.24,0.30,0.32) });
+  addMesh(pFemur, new THREE.SphereGeometry(1,28,20), MAT.bone2, { pos:V( 1.02,1.06,-0.08), scale:V(0.24,0.30,0.32) });
+
+  /* ---------- 5/6. 两个股骨髁 ---------- */
+  const condGeo = new THREE.SphereGeometry(1,48,34);
+  const pCondM = makePart({ id:'condM', name:'内侧股骨髁',
+    desc:'股骨内侧的圆形凸起，在内侧胫骨平台上滚动与滑动。',
+    parent:femurContent, dir:V(-1,0.30,-0.15), dist:1.9, anchor:V(-0.60,0.78,0.35) });
+  addMesh(pCondM, condGeo, MAT.cond, { pos:V(-0.60,0.78,-0.06), scale:V(0.60,0.70,0.80) });
+  const pCondL = makePart({ id:'condL', name:'外侧股骨髁',
+    desc:'股骨外侧的圆形凸起，屈膝时向后滚动更多，带动膝关节旋转。',
+    parent:femurContent, dir:V(1,0.30,-0.15), dist:1.9, anchor:V(0.60,0.78,0.35) });
+  addMesh(pCondL, condGeo, MAT.cond, { pos:V(0.60,0.78,-0.06), scale:V(0.60,0.70,0.80) });
+
+  /* ---------- 7. 股骨髁软骨 ---------- */
+  const pFemCart = makePart({ id:'femCart', name:'股骨髁软骨',
+    desc:'覆盖股骨髁的光滑软骨，让关节面几乎无摩擦地相互滑动。',
+    parent:femurContent, dir:V(0,0.48,-1), dist:1.8, anchor:V(0,0.40,-0.72) });
+  const capGeo = new THREE.SphereGeometry(1,44,26,0,Math.PI*2,Math.PI*0.44,Math.PI*0.56);
+  addMesh(pFemCart, capGeo, MAT.cart, { pos:V(-0.60,0.78,-0.06), scale:V(0.617,0.717,0.815), order:2 });
+  addMesh(pFemCart, capGeo, MAT.cart, { pos:V( 0.60,0.78,-0.06), scale:V(0.617,0.717,0.815), order:2 });
+
+  /* ---------- 8. 滑车沟 ---------- */
+  const pGroove = makePart({ id:'groove', name:'滑车沟',
+    desc:'股骨前方的凹槽，像导轨一样约束髌骨上下滑动。',
+    parent:femurContent, dir:V(0,0.34,1), dist:2.1, anchor:V(0,1.05,0.98) });
+  addMesh(pGroove, trochleaGeo(), MAT.groove, { order:2 });
+
+  /* ---------- 9. 胫骨 ---------- */
+  const pTibia = makePart({ id:'tibia', name:'胫骨',
+    desc:'小腿主骨，以平坦的胫骨平台承托两个股骨髁。',
+    dir:V(0,-1,0), dist:2.7, anchor:V(0,-2.1,0.35) });
+  addMesh(pTibia, new THREE.CylinderGeometry(1.22,1.15,0.46,56), MAT.bone, { pos:V(0,-0.23,0), scale:V(1.15,1,0.95) });
+  addMesh(pTibia, new THREE.CylinderGeometry(0.66,0.54,1.05,40), MAT.bone, { pos:V(0,-0.96,0), scale:V(1,1,0.92) });
+  addMesh(pTibia, new THREE.CylinderGeometry(0.44,0.40,2.55,36), MAT.bone, { pos:V(0,-2.68,0) });
+  addMesh(pTibia, new THREE.SphereGeometry(1,28,20), MAT.bone2, { pos:V(0,-0.82,0.86), scale:V(0.28,0.34,0.20) });
+  addMesh(pTibia, new THREE.SphereGeometry(1,24,18), MAT.bone2, { pos:V(-0.22,0.09,-0.06), scale:V(0.15,0.20,0.22) });
+  addMesh(pTibia, new THREE.SphereGeometry(1,24,18), MAT.bone2, { pos:V( 0.22,0.09,-0.06), scale:V(0.15,0.20,0.22) });
+
+  /* ---------- 10. 胫骨平台软骨 ---------- */
+  const pTibCart = makePart({ id:'tibCart', name:'胫骨平台软骨',
+    desc:'覆盖胫骨平台的软骨层，与半月板一起把压力摊开。',
+    dir:V(0,-0.28,1), dist:1.7, anchor:V(0,0.08,0.62) });
+  const discGeo = new THREE.CylinderGeometry(0.60,0.60,0.075,44);
+  addMesh(pTibCart, discGeo, MAT.cart, { pos:V(-0.55,0.038,0), scale:V(1,1,0.88), order:2 });
+  addMesh(pTibCart, discGeo, MAT.cart, { pos:V( 0.55,0.038,0), scale:V(1,1,0.88), order:2 });
+
+  /* ---------- 11/12. 半月板 ---------- */
+  const pMenM = makePart({ id:'menM', name:'内侧半月板',
+    desc:'内侧的 C 形纤维软骨楔，垫在两个关节面之间缓冲并增加贴合。',
+    dir:V(-1,0.12,0.35), dist:1.6, anchor:V(-0.55,0.16,0.58) });
+  addMesh(pMenM, meniscusGeo(0.50, Math.PI*0.28, Math.PI*1.72), MAT.men,
+    { pos:V(-0.55,0.070,0), scale:V(1,1,0.92) });
+  const pMenL = makePart({ id:'menL', name:'外侧半月板',
+    desc:'外侧近似环形的纤维软骨楔，受压形变把负荷均匀分散。',
+    dir:V(1,0.12,0.35), dist:1.6, anchor:V(0.55,0.16,0.58) });
+  addMesh(pMenL, meniscusGeo(0.50, -Math.PI*0.72, Math.PI*0.72), MAT.men,
+    { pos:V(0.55,0.070,0), scale:V(1,1,0.92) });
+
+  /* ---------- 20. 腓骨 ---------- */
+  const pFib = makePart({ id:'fib', name:'腓骨',
+    desc:'小腿外侧的细骨，为外侧副韧带提供附着点。',
+    dir:V(1,-0.55,-0.35), dist:2.0, anchor:V(1.14,-1.5,-0.2) });
+  addMesh(pFib, new THREE.SphereGeometry(1,28,20), MAT.bone2, { pos:V(1.12,-0.62,-0.20), scale:V(0.25,0.31,0.25) });
+  addMesh(pFib, new THREE.CylinderGeometry(0.19,0.16,2.35,28), MAT.bone2, { pos:V(1.16,-1.82,-0.20) });
+
+  /* ---------- 13~16. 四条韧带（动态管） ---------- */
+  const pACL = makePart({ id:'acl', name:'前交叉韧带',
+    desc:'限制胫骨向前滑脱；股骨后滚、胫骨相对前移时被拉紧。',
+    dir:V(0.35,0.18,1), dist:1.7, anchor:V(0,0.7,0) });
+  const pPCL = makePart({ id:'pcl', name:'后交叉韧带',
+    desc:'限制胫骨向后滑脱；伸膝回位、胫骨趋于后移时承担主要张力。',
+    dir:V(-0.35,0.18,-1), dist:1.7, anchor:V(0,0.7,0) });
+  const pMCL = makePart({ id:'mcl', name:'内侧副韧带',
+    desc:'贴在关节内侧，抵抗膝外翻，防止关节向内塌陷。',
+    dir:V(-1,0,0.18), dist:2.3, anchor:V(-1.2,0.4,0) });
+  const pLCL = makePart({ id:'lcl', name:'外侧副韧带',
+    desc:'连在股骨与腓骨头之间，抵抗膝内翻、稳定外侧。',
+    dir:V(1,0,0.18), dist:2.3, anchor:V(1.2,0.4,0) });
+  const aclT = tubePart(pACL, MAT.lig, 0.105);
+  const pclT = tubePart(pPCL, MAT.lig, 0.115);
+  const mclT = tubePart(pMCL, MAT.lig, 0.135);
+  const lclT = tubePart(pLCL, MAT.lig, 0.095);
+
+  /* ---------- 17. 髌骨 ---------- */
+  const pPat = makePart({ id:'pat', name:'髌骨',
+    desc:'浮在滑车沟前方的籽骨，加大股四头肌力臂并保护膝前。',
+    dir:V(0,0.22,1), dist:2.9, anchor:V(0,0,0.25) });
+  addMesh(pPat, patellaGeo(), MAT.cond);
+  addMesh(pPat, new THREE.SphereGeometry(1,32,24), MAT.patCart,
+    { pos:V(0,0,-0.175), scale:V(0.43,0.55,0.085), order:2 });
+
+  /* ---------- 18/19. 肌腱 ---------- */
+  const pQuad = makePart({ id:'quad', name:'股四头肌腱',
+    desc:'从大腿肌群拉住髌骨上缘，把伸膝力量向下传递。',
+    dir:V(0,1,0.55), dist:2.2, anchor:V(0,2.2,0.7) });
+  const quadT = tubePart(pQuad, MAT.ten, 0.155);
+  const pTendon = makePart({ id:'tendon', name:'髌腱',
+    desc:'把髌骨下缘锚在胫骨粗隆，完成伸膝力量的最后一程。',
+    dir:V(0,-0.75,0.9), dist:2.1, anchor:V(0,0.1,0.9) });
+  const tendonT = tubePart(pTendon, MAT.ten, 0.125);
+
+  /* ---------- 股骨变换矩阵 ---------- */
+  const M = new THREE.Matrix4();
+  const RX = new THREE.Matrix4(), T1 = new THREE.Matrix4(), T2 = new THREE.Matrix4();
+  function femMatrix(rad, glide){
+    T1.makeTranslation(0, PIVOT.y, -glide);
+    RX.makeRotationX(rad);
+    T2.makeTranslation(0, -PIVOT.y, 0);
+    M.copy(T1).multiply(RX).multiply(T2);
+  }
+  const femPoint = p=>p.clone().applyMatrix4(M);
+
+  /* ---------- 附着点（静息世界坐标） ---------- */
+  const A_T=V(-0.17,0.12,0.36),  A_F=V(0.50,1.30,-0.44);
+  const P_T=V(0.14,0.10,-0.46),  P_F=V(-0.48,1.32,0.20);
+  const M_F=V(-1.09,1.28,-0.06), M_T=V(-1.14,-1.02,0.04);
+  const L_F=V(1.09,1.28,-0.06),  L_T=V(1.16,-0.62,-0.20);
+  const Q_TOP=V(0,3.05,0.52), TUB=V(0,-0.82,0.86);
+  const PAT_EXT=V(0,1.18,1.04), PAT_FLX=V(0,0.62,0.60);
+
+  /* ---------- 交互状态 ---------- */
+  const state = {
+    time:0, playing:true, exploded:false, explodeT:0, manual:0,
+    showSkin:true, showCap:true, showFluid:true,
+    hover:null, lastInteract:0, camPull:0, camTarget:0, hudT:1
+  };
+  const tip = document.getElementById('tip');
+  const tipT = tip.querySelector('.t'), tipD = tip.querySelector('.d');
+  const pointer = new THREE.Vector2(-2,-2), pointerPx = {x:0,y:0};
+  const raycaster = new THREE.Raycaster();
+
+  const btnExplode=document.getElementById('btnExplode'), btnExplodeTxt=document.getElementById('btnExplodeTxt');
+  const btnPlay=document.getElementById('btnPlay'), btnPlayTxt=document.getElementById('btnPlayTxt');
+  const rng=document.getElementById('rng'), rngOut=document.getElementById('rngOut');
+  const degOut=document.getElementById('degOut'), phaseOut=document.getElementById('phaseOut');
+  const aclOut=document.getElementById('aclOut'), pclOut=document.getElementById('pclOut');
+
+  function pullCamera(to){ state.camTarget = to; state.camPull = 1; }
+  btnExplode.addEventListener('click', ()=>{
+    state.exploded=!state.exploded;
+    btnExplodeTxt.textContent = state.exploded?'复位合拢':'爆炸展开';
+    btnExplode.classList.toggle('on', state.exploded);
+    state.lastInteract=state.time;
+    pullCamera(state.exploded?17.2:CAM_HOME.length());
+  });
+  btnPlay.addEventListener('click', ()=>{
+    state.playing=!state.playing;
+    const c=clamp(1-2*(state.manual/MAX_DEG),-1,1);
+    state.time=Math.acos(c)/(Math.PI*2)*PERIOD;
+    btnPlayTxt.textContent=state.playing?'暂停屈伸':'继续屈伸';
+    btnPlay.querySelector('.ico').textContent=state.playing?'⏸':'▶';
+    if(!state.playing){ state.manual=Math.round(state.lastDeg||0); rng.value=state.manual; rngOut.textContent=state.manual+'°'; }
+    state.lastInteract=state.time;
+  });
+  document.getElementById('btnReset').addEventListener('click', ()=>{
+    camera.position.copy(CAM_HOME); controls.target.set(0,0.30,0); controls.update();
+    state.camPull=0; state.lastInteract=state.time;
+  });
+  function toggle(id, key, part){
+    const b=document.getElementById(id);
+    b.addEventListener('click', ()=>{
+      state[key]=!state[key]; b.classList.toggle('on',state[key]); part.group.visible=state[key];
+      state.lastInteract=state.time;
+    });
+  }
+  toggle('tgSkin','showSkin',pSkin);
+  toggle('tgCap','showCap',pCap);
+  toggle('tgFluid','showFluid',pFluid);
+
+  let draggingSlider=false;
+  rng.addEventListener('pointerdown', ()=>draggingSlider=true);
+  window.addEventListener('pointerup', ()=>draggingSlider=false);
+  rng.addEventListener('input', ()=>{
+    state.playing=false; state.manual=+rng.value;
+    rngOut.textContent=state.manual+'°';
+    btnPlayTxt.textContent='继续屈伸'; btnPlay.querySelector('.ico').textContent='▶';
+    state.lastInteract=state.time;
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    pointer.x=(e.clientX/innerWidth)*2-1;
+    pointer.y=-(e.clientY/innerHeight)*2+1;
+    pointerPx.x=e.clientX; pointerPx.y=e.clientY;
+    state.lastInteract=state.time;
+    placeTip();
+  });
+  canvas.addEventListener('pointerleave', ()=>{ pointer.set(-2,-2); setHover(null); });
+  canvas.addEventListener('pointerdown', ()=>{ state.camPull=0; state.lastInteract=state.time; });
+  canvas.addEventListener('wheel', ()=>{ state.camPull=0; state.lastInteract=state.time; }, {passive:true});
+
+  function placeTip(){
+    if(!state.hover) return;
+    const w=286, h=92;
+    const x=clamp(pointerPx.x+18, 10, innerWidth-w-10);
+    const y=clamp(pointerPx.y+18, 10, innerHeight-h-10);
+    tip.style.left=x+'px'; tip.style.top=y+'px';
+  }
+  function applyHi(part,on){
+    for(const m of part.meshes){
+      if(m.material.isShaderMaterial){ m.material.uniforms.uHi.value = on?1:0; }
+      else if(m.material.emissive){
+        if(on){ m.material.emissive.setHex(0x54c9e0); m.material.emissiveIntensity=0.55; }
+        else  { m.material.emissive.setHex(m.userData.origEmi); m.material.emissiveIntensity=m.userData.origEmiI; }
+      }
+    }
+    part.el.classList.toggle('hot',on);
+  }
+  function setHover(part){
+    if(state.hover===part) return;
+    if(state.hover) applyHi(state.hover,false);
+    state.hover=part;
+    if(part){
+      applyHi(part,true);
+      tipT.textContent=part.name; tipD.textContent=part.desc;
+      tip.classList.add('show'); placeTip();
+      canvas.classList.add('hovering');
+    }else{
+      tip.classList.remove('show'); canvas.classList.remove('hovering');
+    }
+  }
+  function pick(){
+    if(pointer.x<-1.5) { setHover(null); return; }
+    const list=pickMeshes.filter(m=>m.visible && m.parent.visible && m.parent.parent.visible);
+    raycaster.setFromCamera(pointer,camera);
+    const hits=raycaster.intersectObjects(list,false);
+    if(!hits.length){ setHover(null); return; }
+    const h=hits.find(x=>!x.object.userData.container) || hits[0];
+    const p=parts.find(x=>x.id===h.object.userData.partId);
+    setHover(p||null);
+  }
+
+  /* ---------- 每帧更新 ---------- */
+  const paleLig=new THREE.Color(0xe6cfc0), tautLig=new THREE.Color(0xff9a80);
+  const tmpV=new THREE.Vector3(), tmpV2=new THREE.Vector3();
+  const clock=new THREE.Clock();
+
+  function tensionText(t){ return t>0.66?'绷紧':t>0.42?'适中':'松弛'; }
+  function tensionCls(t){ return t>0.66?'taut':t>0.42?'mid':'slack'; }
+
+  function updateScene(fn, vel, et){
+    const rad = MAX_DEG*fn*0.78*D2R;
+    const glide = 0.46*fn;
+
+    femurGroup.position.set(0,PIVOT.y,-glide);
+    femurGroup.rotation.x = rad;
+    femMatrix(rad, glide);
+
+    for(const p of parts) p._off.copy(p.dir).multiplyScalar(p.dist*et);
+
+    // 髌骨：沿滑车沟下移并向后压入
+    const patPos = PAT_EXT.clone().lerp(PAT_FLX, fn);
+    pPat.base.copy(patPos);
+    pPat.group.rotation.x = -0.30*fn;
+
+    // 半月板：被挤压变形，但始终垫在两个关节面之间
+    for(const p of [pMenM,pMenL]){
+      const m=p.meshes[0];
+      m.scale.y = 1-0.27*fn;
+      m.scale.z = 0.92*(1+0.055*fn);
+      m.position.z = -0.13*fn;
+      m.rotation.y = (p===pMenM?1:-1)*0.055*fn;
+    }
+
+    // 交叉韧带张力：胫骨趋于前移 → 前交叉绷紧；趋于后移 → 后交叉绷紧
+    let acl = 0.20 + 0.44*fn + 0.30*Math.max(0,vel);
+    let pcl = 0.20 + 0.44*(1-fn) + 0.30*Math.max(0,-vel);
+    acl=clamp(acl,0,1); pcl=clamp(pcl,0,1);
+    const aclBow=(1-acl)/0.36, pclBow=(1-pcl)/0.36;
+    aclT.mesh.material.color.copy(paleLig).lerp(tautLig,acl);
+    pclT.mesh.material.color.copy(paleLig).lerp(tautLig,pcl);
+    aclT.mesh.material.emissive.setHex(0x3a1008); aclT.mesh.material.emissiveIntensity=acl*0.20;
+    pclT.mesh.material.emissive.setHex(0x3a1008); pclT.mesh.material.emissiveIntensity=pcl*0.20;
+
+    // 前交叉韧带
+    const aA=A_T.clone().add(pTibia._off);
+    const bA=femPoint(A_F).add(pCondL._off);
+    const mA=aA.clone().add(bA).multiplyScalar(0.5).add(V(0.10,0.12,0.20).multiplyScalar(aclBow));
+    aclT.set([aA,mA,bA], 1-0.10*(1-acl));
+    pACL.anchor.position.copy(aA).add(bA).multiplyScalar(0.5);
+
+    // 后交叉韧带
+    const aP=P_T.clone().add(pTibia._off);
+    const bP=femPoint(P_F).add(pCondM._off);
+    const mP=aP.clone().add(bP).multiplyScalar(0.5).add(V(-0.10,0.12,-0.18).multiplyScalar(pclBow));
+    pclT.set([aP,mP,bP], 1-0.10*(1-pcl));
+    pPCL.anchor.position.copy(aP).add(bP).multiplyScalar(0.5);
+
+    // 内侧副韧带
+    const aM=M_T.clone().add(pTibia._off);
+    const bM=femPoint(M_F).add(pCondM._off);
+    const mM=aM.clone().add(bM).multiplyScalar(0.5).add(V(-0.17,0,0.02));
+    mclT.set([aM,mM,bM]);
+    pMCL.anchor.position.copy(mM);
+
+    // 外侧副韧带
+    const aL=L_T.clone().add(pFib._off);
+    const bL=femPoint(L_F).add(pCondL._off);
+    const mL=aL.clone().add(bL).multiplyScalar(0.5).add(V(0.17,0,0.02));
+    lclT.set([aL,mL,bL]);
+    pLCL.anchor.position.copy(mL);
+
+    // 股四头肌腱
+    const qTop=femPoint(Q_TOP).add(pFemur._off);
+    const pTop=patPos.clone().add(pPat._off).add(V(0,0.58,0.02));
+    const mQ=qTop.clone().add(pTop).multiplyScalar(0.5).add(V(0,0.02,0.13));
+    quadT.set([qTop,mQ,pTop]);
+    pQuad.anchor.position.copy(mQ);
+
+    // 髌腱
+    const pBot=patPos.clone().add(pPat._off).add(V(0,-0.56,0.04));
+    const tub=TUB.clone().add(pTibia._off);
+    const mD=pBot.clone().add(tub).multiplyScalar(0.5).add(V(0,0,0.10));
+    tendonT.set([pBot,mD,tub]);
+    pTendon.anchor.position.copy(mD);
+
+    // 爆炸位移
+    for(const p of parts) p.group.position.copy(p.base).add(p._off);
+
+    // 透视材质：微光，以及皮肤 / 关节囊随屈膝平滑弯折
+    const tm=state.time;
+    for(const p of [pSkin,pCap,pFluid]) for(const m of p.meshes){
+      const u=m.material.uniforms; if(!u) continue;
+      u.uTime.value=tm;
+      if(u.uBend.value>0.5){ u.uFlex.value=rad; u.uGlide.value=glide; }
+    }
+
+    return {acl,pcl,deg:MAX_DEG*fn};
+  }
+
+  const LBL_CAND=[[0,0],[0,-20],[0,20],[-32,-11],[32,-11],[-32,11],[32,11],
+                  [0,-40],[0,40],[-64,-22],[64,-22],[-64,22],[64,22],
+                  [0,-60],[0,60],[-96,-32],[96,-32],[-96,32],[96,32]];
+  const placed=[];
+  function overlaps(a,b){
+    return Math.abs(a.x-b.x)<(a.w+b.w)/2+4 && Math.abs(a.y-b.y)<(a.h+b.h)/2+4;
+  }
+  function updateLabels(et){
+    const vis=clamp((et-0.10)/0.45,0,1);
+    const w=innerWidth,h=innerHeight;
+    placed.length=0;
+    const items=[];
+    for(let i=0;i<parts.length;i++){
+      const p=parts[i], el=p.el;
+      if(vis<=0.001){ if(el.style.opacity!=='0') el.style.opacity='0'; continue; }
+      p.anchor.getWorldPosition(tmpV);
+      tmpV.project(camera);
+      if(tmpV.z>1){ el.style.opacity='0'; continue; }
+      if(!p.lw && el.offsetWidth){ p.lw=el.offsetWidth; p.lh=el.offsetHeight; }
+      items.push({
+        p, el,
+        x:(tmpV.x*0.5+0.5)*w,
+        y:(-tmpV.y*0.5+0.5)*h,
+        w:p.lw||92, h:p.lh||24
+      });
+    }
+    items.sort((a,b)=>a.y-b.y);
+    for(const it of items){
+      let best=null;
+      for(const c of LBL_CAND){
+        const cand={ x:clamp(it.x+c[0],it.w/2+8,w-it.w/2-8), y:clamp(it.y+c[1],it.h/2+8,h-it.h/2-8), w:it.w, h:it.h };
+        if(!placed.some(q=>overlaps(cand,q))){ best=cand; break; }
+      }
+      if(!best){ const c=LBL_CAND[LBL_CAND.length-1];
+        best={ x:clamp(it.x+c[0],it.w/2+8,w-it.w/2-8), y:clamp(it.y+c[1],it.h/2+8,h-it.h/2-8), w:it.w, h:it.h };
+      }
+      placed.push(best);
+      it.el.style.transform='translate(-50%,-50%) translate('+best.x.toFixed(1)+'px,'+best.y.toFixed(1)+'px)';
+      it.el.style.opacity=(vis*(state.hover===it.p?1:0.94)).toFixed(2);
+    }
+  }
+
+  function frame(){
+    requestAnimationFrame(frame);
+    const dt=Math.min(clock.getDelta(),0.05);
+    state.time+=dt;
+
+    let fn, vel;
+    const phase=state.time*Math.PI*2/PERIOD;
+    if(state.playing){ fn=0.5-0.5*Math.cos(phase); vel=Math.sin(phase); }
+    else { fn=state.manual/MAX_DEG; vel=0; }
+
+    const target=state.exploded?1:0;
+    state.explodeT+=(target-state.explodeT)*Math.min(1,dt*4.6);
+    if(Math.abs(target-state.explodeT)<0.0008) state.explodeT=target;
+    const et=state.explodeT;
+    const effFn=fn*(1-et)+0.12*et;
+    const effVel=vel*(1-et);
+
+    const info=updateScene(effFn,effVel,et);
+
+    // 拉远 / 拉近镜头（用户一操作即让位）
+    if(state.camPull>0){
+      const cur=camera.position.distanceTo(controls.target);
+      const d=cur+(state.camTarget-cur)*Math.min(1,dt*3.0);
+      camera.position.sub(controls.target).setLength(d).add(controls.target);
+      if(Math.abs(d-state.camTarget)<0.06) state.camPull=0;
+    }
+    controls.autoRotate = (state.time-state.lastInteract>12) && !state.hover && !state.exploded && state.playing;
+    controls.autoRotateSpeed = 0.35;
+    controls.update();
+    camera.updateMatrixWorld(true);
+
+    if(!draggingSlider && state.playing){
+      const v=Math.round(info.deg); rng.value=v; rngOut.textContent=v+'°';
+    }
+    state.lastDeg=info.deg;
+
+    state.hudT+=dt;
+    if(state.hudT>0.07){
+      state.hudT=0;
+      degOut.textContent=Math.round(info.deg);
+      phaseOut.textContent = state.playing ? (vel>=0?'屈曲相':'伸展相') : '手动定位';
+      phaseOut.style.color = vel>=0 ? 'rgba(255,190,140,.9)' : 'rgba(140,225,240,.9)';
+      aclOut.textContent=tensionText(info.acl); aclOut.className=tensionCls(info.acl);
+      pclOut.textContent=tensionText(info.pcl); pclOut.className=tensionCls(info.pcl);
+    }
+
+    scene.updateMatrixWorld(true);
+    pick();
+    updateLabels(et);
+    renderer.render(scene,camera);
+  }
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+
+  // 首帧前先把动态管建好，避免空白几何体参与拾取
+  femMatrix(0,0);
+  updateScene(0,0,0);
+  scene.updateMatrixWorld(true);
+  renderer.render(scene,camera);
+
+  window.__kneeReady=true;
+  document.getElementById('loader').classList.add('hide');
+  setTimeout(()=>{ const l=document.getElementById('loader'); if(l) l.remove(); },900);
+  frame();
+}
+</script>
+</body>
+</html>

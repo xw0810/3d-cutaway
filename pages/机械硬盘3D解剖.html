@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>机械硬盘 · 交互式 3D 剖切解剖</title>
+<link rel="icon" href="data:," />
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#05080d}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    color:#e9f2f8;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(ellipse 80% 62% at 52% 0%, #16283a 0%, rgba(14,24,36,0) 64%),
+      radial-gradient(ellipse 92% 76% at 12% 100%, #10202c 0%, rgba(8,14,20,0) 60%),
+      linear-gradient(160deg,#0b1119 0%,#080c12 48%,#04060a 100%);
+  }
+  #c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab;outline:none}
+  #c:active{cursor:grabbing}
+
+  .panel{
+    position:fixed;z-index:20;
+    background:linear-gradient(180deg,rgba(19,32,44,.82),rgba(9,15,22,.76));
+    -webkit-backdrop-filter:blur(20px) saturate(135%);
+    backdrop-filter:blur(20px) saturate(135%);
+    border:1px solid rgba(106,207,232,.16);
+    border-radius:15px;
+    box-shadow:0 22px 58px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+
+  .hud-tl{left:26px;top:24px;padding:17px 22px 18px;max-width:330px}
+  .eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;letter-spacing:.28em;color:rgba(112,214,238,.8);font-weight:600}
+  .hud-tl h1{font-size:22px;font-weight:650;letter-spacing:.01em;margin:8px 0 7px;line-height:1.2}
+  .hud-tl h1 span{color:#8fa4b4;font-weight:400;font-size:14px;letter-spacing:.05em;margin-left:7px}
+  .hud-tl .sub{font-size:11px;line-height:1.8;color:rgba(197,216,229,.6)}
+  .hud-tl .sub em{font-style:normal;color:rgba(126,222,246,.95)}
+
+  .hud-tr{right:26px;top:24px;width:236px;padding:15px 17px 14px}
+  .cap{font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.24em;color:rgba(180,210,226,.44);margin-bottom:9px}
+  .bigline{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  .bigline b{font-family:ui-monospace,monospace;font-size:29px;font-weight:500;color:#7fe0f5;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .bigline i{font-style:normal;font-size:10.5px;color:rgba(180,210,226,.5);letter-spacing:.06em}
+  .rows{border-top:1px solid rgba(106,207,232,.14);padding-top:7px}
+  .rows div{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:10.5px;color:rgba(180,210,226,.5)}
+  .rows b{font-family:ui-monospace,monospace;font-size:11.5px;font-weight:500;color:#dcecf5;font-variant-numeric:tabular-nums}
+  .rows b.hot{color:#ffc27a}
+  .pbar{height:3px;border-radius:3px;background:rgba(255,255,255,.08);margin:11px 0 10px;overflow:hidden}
+  .pbar i{display:block;height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#2b6f96,#69d6f0,#c1f3ff);transition:width .1s linear}
+  .phase{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.03em;color:#83d8ef}
+  .phase i{width:5px;height:5px;border-radius:50%;background:#69d6f0;box-shadow:0 0 9px #69d6f0;animation:bl 1.7s infinite;flex:none}
+  @keyframes bl{0%,100%{opacity:1}50%{opacity:.28}}
+  .scale{display:flex;gap:3px;margin-top:11px;padding-top:10px;border-top:1px solid rgba(106,207,232,.12)}
+  .scale span{flex:1;text-align:center;font-size:8.5px;letter-spacing:.02em;color:rgba(170,198,214,.34);padding:4px 0;border-radius:5px;background:rgba(255,255,255,.035);transition:all .25s}
+  .scale span.on{color:#061821;background:linear-gradient(180deg,#8ce6f8,#43b9d9);box-shadow:0 2px 12px rgba(80,200,230,.28)}
+
+  .toolbar{left:50%;transform:translateX(-50%);bottom:26px;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 9px;border-radius:15px;flex-wrap:nowrap;max-width:calc(100vw - 32px)}
+  button{
+    font:inherit;font-size:11.5px;color:#dcebf3;background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:7px 10px;cursor:pointer;
+    transition:all .16s;letter-spacing:.01em;white-space:nowrap;
+  }
+  button:hover{background:rgba(106,207,232,.15);border-color:rgba(106,207,232,.45);color:#eafcff}
+  button:active{transform:translateY(1px)}
+  button.on{background:rgba(106,207,232,.18);border-color:rgba(106,207,232,.55);color:#bdf1ff;box-shadow:inset 0 0 16px rgba(106,207,232,.1)}
+  button.primary{background:linear-gradient(180deg,#6ed4ec,#2f92b8);border-color:rgba(150,230,248,.55);color:#051922;font-weight:650;box-shadow:0 5px 18px rgba(47,146,184,.28)}
+  button.primary:hover{background:linear-gradient(180deg,#8ee4f6,#3aa1c7)}
+  .sep{width:1px;height:21px;background:rgba(255,255,255,.1);margin:0 2px}
+
+  .hud-br{right:26px;bottom:26px;width:300px;padding:14px 17px 15px}
+  .hk{font-family:ui-monospace,monospace;font-size:8.5px;letter-spacing:.24em;color:rgba(106,207,232,.6)}
+  .hn{font-size:14.5px;font-weight:600;margin:8px 0 7px;color:#bff0ff;letter-spacing:.02em}
+  .hd{font-size:11px;line-height:1.75;color:rgba(196,217,230,.68);min-height:38px}
+  .legend{display:flex;gap:13px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(106,207,232,.12);font-size:9.5px;color:rgba(180,210,226,.5)}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+  .hint{position:fixed;left:26px;bottom:28px;z-index:20;font-size:10.5px;line-height:1.9;color:rgba(184,208,222,.38);letter-spacing:.03em;pointer-events:none}
+  .hint b{color:rgba(120,220,242,.8);font-weight:500}
+
+  #labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .lbl{
+    position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;
+    font-size:9.5px;letter-spacing:.04em;padding:3px 9px 3px 8px;border-radius:20px;
+    color:#c8f2ff;background:rgba(9,22,32,.92);
+    border:1px solid rgba(106,207,232,.48);
+    box-shadow:0 5px 18px rgba(0,0,0,.62);
+    opacity:0;transition:opacity .26s,color .18s,border-color .18s,background .18s;pointer-events:none;
+  }
+  .lbl::before{content:'';position:absolute;left:-3.5px;top:50%;width:5px;height:5px;border-radius:50%;background:#69d6f0;transform:translateY(-50%);box-shadow:0 0 8px #69d6f0}
+  .lbl.hot{color:#fff;border-color:rgba(160,238,255,.95);background:rgba(18,68,84,.95);box-shadow:0 0 0 1px rgba(160,238,255,.25),0 6px 22px rgba(0,0,0,.65)}
+
+  #loading{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:#05080d;color:#7fa6ba;font-size:12px;letter-spacing:.24em;transition:opacity .7s}
+  #loading.hide{opacity:0;pointer-events:none}
+  #err{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#05080d;color:#9fb9c8;font-size:13px;text-align:center;padding:30px}
+
+  @media (max-width:1180px){.hint{display:none}.hud-br{width:258px}.hud-tr{width:214px}}
+  @media (max-width:860px){
+    .hud-tr{display:none}.hud-br{display:none}
+    .hud-tl{left:12px;top:12px;padding:11px 14px;max-width:214px}
+    .hud-tl h1{font-size:16px}.hud-tl h1 span{font-size:11px}.hud-tl .sub{font-size:9.5px}
+    .toolbar{bottom:12px;gap:5px;padding:7px 8px}
+    button{padding:7px 9px;font-size:11px}.sep{display:none}
+    .lbl{font-size:9px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+
+<div class="panel hud-tl">
+  <div class="eyebrow">交 互 式 三 维 · 机 械 硬 盘</div>
+  <h1>机械硬盘<span>剖切解剖</span></h1>
+  <div class="sub">密封铝壳里，四张盘片以演示转速匀速旋转；<em>音圈电机</em>每秒一次把执行臂甩到新磁道，滑块靠一层气垫浮在盘面上方几纳米。上层盘片被切去一块楔形，露出<em>磁道、扇区与磁晶粒</em>。</div>
+</div>
+
+<div class="panel hud-tr">
+  <div class="cap">实 时 读 数</div>
+  <div class="bigline"><b id="roRpm">60</b><i>转 / 分（演示放慢）</i></div>
+  <div class="rows">
+    <div><span>当前磁道</span><b id="roTrack">—</b></div>
+    <div><span>目标磁道</span><b id="roTarget">—</b></div>
+    <div><span>经过的扇区</span><b id="roSector">07</b></div>
+    <div><span>磁头飞行高度</span><b id="roFly">3.0 纳米</b></div>
+    <div><span>读写动作</span><b id="roIO" class="hot">待机</b></div>
+  </div>
+  <div class="pbar"><i id="roBar"></i></div>
+  <div class="phase"><i></i><span id="roPhase">盘片旋转 · 等待寻道</span></div>
+  <div class="scale" id="scale">
+    <span class="on">整机</span><span>盘片</span><span>磁道</span><span>扇区</span><span>磁晶粒</span>
+  </div>
+</div>
+
+<div class="panel toolbar">
+  <button id="btnEx" class="primary">爆炸视图</button>
+  <button id="btnMicro">磁晶显微</button>
+  <div class="sep"></div>
+  <button id="btnBack">背面视角</button>
+  <button id="btnXray" class="on">透视顶盖</button>
+  <button id="btnPause">暂停</button>
+  <button id="btnReset">复位视角</button>
+</div>
+
+<div class="panel hud-br">
+  <div class="hk">悬 停 · 部 件 说 明</div>
+  <div class="hn" id="hName">整台机械硬盘</div>
+  <div class="hd" id="hDesc">把指针移到任意部件上，它会亮起，并用一句话说明自己在这条「磁→电」链路里的作用。</div>
+  <div class="legend"><span><i style="background:#ff7a18"></i>磁化方向 →</span><span><i style="background:#1e8ce6"></i>磁化方向 ←</span></div>
+</div>
+
+<div class="hint">
+  <b>拖拽</b> 环绕观察　·　<b>滚轮</b> 一路缩放：整机 → 盘片 → 磁道 → 扇区 → 磁晶粒<br/>
+  <b>空格</b> 暂停　<b>E</b> 爆炸　<b>M</b> 显微　<b>B</b> 背面　<b>R</b> 复位
+</div>
+
+<div id="loading">正在装配盘片与磁头…</div>
+<div id="err">无法加载三维渲染库<br/><span style="font-size:11px;opacity:.6">请检查网络后刷新页面（需要访问 unpkg.com）</span></div>
+
+<script>
+  window.addEventListener('error', function(){ if(!window.__ready){ document.getElementById('err').style.display='flex'; } });
+  setTimeout(function(){ if(!window.__ready){ document.getElementById('err').style.display='flex'; } }, 11000);
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ═══════════════════════════════════════════════════
+   1 · 渲染环境
+   ═══════════════════════════════════════════════════ */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.14;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.02, 260);
+const HOME = new THREE.Vector3(13.2, 12.4, 18.6);
+const TGT_HOME = new THREE.Vector3(0, 0.9, -0.2);
+camera.position.copy(HOME);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(TGT_HOME);
+controls.enableDamping = true;
+controls.dampingFactor = 0.068;
+controls.rotateSpeed = 0.82;
+controls.zoomSpeed = 0.94;
+controls.zoomToCursor = true;
+controls.minDistance = 0.11;
+controls.maxDistance = 62;
+controls.maxPolarAngle = Math.PI * 0.94;
+controls.update();
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.035).texture;
+
+scene.add(new THREE.HemisphereLight(0xbcdcf2, 0x0d141c, 0.68));
+const key = new THREE.DirectionalLight(0xf2f8ff, 2.65);
+key.position.set(11, 18, 13);
+key.castShadow = true;
+key.shadow.mapSize.set(2048,2048);
+key.shadow.camera.near = 4; key.shadow.camera.far = 70;
+key.shadow.camera.left = -15; key.shadow.camera.right = 15;
+key.shadow.camera.top = 16; key.shadow.camera.bottom = -16;
+key.shadow.bias = -0.0012; key.shadow.normalBias = 0.03;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0x6fa8dc, 1.25); fill.position.set(-14, 9, -9); scene.add(fill);
+const rim  = new THREE.DirectionalLight(0x8fe3ff, 1.05); rim.position.set(-9, 6, -15); scene.add(rim);
+const topL = new THREE.DirectionalLight(0xeaf7ff, 1.0); topL.position.set(0, 24, 2); scene.add(topL);
+const frontL= new THREE.DirectionalLight(0xd6ecff, 0.92); frontL.position.set(3, 7, 18); scene.add(frontL);
+const innerFill = new THREE.DirectionalLight(0xbfe6ff, 1.15); innerFill.position.set(-7, 5, 12); scene.add(innerFill);
+const underL = new THREE.PointLight(0x66b6d8, 0.8, 16, 2); underL.position.set(0, -3.5, 2); scene.add(underL);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(150,150), new THREE.ShadowMaterial({opacity:0.34, transparent:true}));
+ground.rotation.x = -Math.PI/2; ground.position.y = -0.85; ground.receiveShadow = true; scene.add(ground);
+
+/* ═══════════════════════════════════════════════════
+   2 · 程序化纹理（无任何图片素材）
+   ═══════════════════════════════════════════════════ */
+function brushedTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=512;
+  const x=c.getContext('2d');
+  x.fillStyle='#9aa4ab'; x.fillRect(0,0,512,512);
+  for(let i=0;i<3400;i++){
+    const y=Math.random()*512, v=95+Math.random()*135;
+    x.strokeStyle='rgba('+v+','+v+','+v+','+(0.035+Math.random()*0.2).toFixed(3)+')';
+    x.lineWidth=0.25+Math.random()*1.05;
+    x.beginPath(); x.moveTo(0,y); x.lineTo(512,y+(Math.random()-0.5)*1.5); x.stroke();
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2); t.anisotropy=8;
+  return t;
+}
+const BRUSH=brushedTexture();
+
+function labelTexture(){
+  const c=document.createElement('canvas'); c.width=768; c.height=1024;
+  const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,768,1024);
+  g.addColorStop(0,'#f4f7f9'); g.addColorStop(.55,'#dfe7ec'); g.addColorStop(1,'#c6d2da');
+  x.fillStyle=g; x.fillRect(0,0,768,1024);
+  x.fillStyle='#153c5c'; x.fillRect(0,0,768,116);
+  x.fillStyle='#63c9e8'; x.fillRect(0,110,768,7);
+  x.fillStyle='#eef6fa'; x.font='600 62px "PingFang SC","Microsoft YaHei",sans-serif';
+  x.textAlign='left'; x.fillText('玄 枢',44,84);
+  x.font='500 25px "PingFang SC","Microsoft YaHei",sans-serif';
+  x.fillStyle='rgba(220,240,250,.78)'; x.fillText('三 · 五 英 寸 机 械 硬 盘',250,80);
+  x.fillStyle='#12232f'; x.font='700 96px "PingFang SC","Microsoft YaHei",sans-serif';
+  x.fillText('4 TB',44,244);
+  x.font='500 27px "PingFang SC","Microsoft YaHei",sans-serif'; x.fillStyle='#40596b';
+  x.fillText('7200 转 / 分　·　SATA 6 Gb/s　·　256 MB 缓存',46,290);
+  x.strokeStyle='rgba(30,70,95,.22)'; x.lineWidth=2; x.strokeRect(40,326,688,164);
+  x.fillStyle='#1b3648'; x.font='500 24px "PingFang SC","Microsoft YaHei",sans-serif';
+  x.fillText('型号　XZ-4000 / 序列号　2026-1106-0731',60,368);
+  x.fillText('额定　5V 0.85A　·　12V 0.55A',60,406);
+  x.fillText('密封腔体　请勿拆解　·　开盖即失效',60,444);
+  x.fillStyle='#8ea6b6'; x.font='500 19px ui-monospace,monospace'; x.fillText('HDD / 3.5 / 26.1mm',60,476);
+  // 条码
+  let bx=44; x.fillStyle='#132734';
+  for(let i=0;i<96;i++){ const w=1+Math.random()*5; x.fillRect(bx,545,w,126); bx+=w+1.6+Math.random()*2.2; if(bx>720)break; }
+  x.fillStyle='#3d5668'; x.font='500 21px ui-monospace,monospace'; x.fillText('4 9 0 1 2 3 4 5 6 7 8 9 0',44,700);
+  // 防伪方块阵列
+  for(let r=0;r<9;r++) for(let q=0;q<9;q++){
+    x.fillStyle=((r*7+q*3)%5<2)?'#1b3648':'rgba(27,54,72,.10)';
+    x.fillRect(560+q*20,540+r*20,17,17);
+  }
+  x.fillStyle='#b9c8d2'; x.fillRect(40,748,688,2);
+  x.fillStyle='#38536a'; x.font='500 22px "PingFang SC","Microsoft YaHei",sans-serif';
+  x.fillText('中国制造　·　五年有限保修',44,796);
+  x.fillText('磁记录层：垂直磁化颗粒 / 单碟 1 TB',44,834);
+  x.fillText('执行机构：音圈电机 + 空气轴承滑块',44,872);
+  x.fillStyle='rgba(21,60,92,.62)'; x.font='600 27px "PingFang SC","Microsoft YaHei",sans-serif';
+  x.fillText('内 部 结 构 剖 切 示 意',44,950);
+  x.strokeStyle='rgba(30,70,95,.25)'; x.lineWidth=3; x.strokeRect(18,18,732,988);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+
+function recordTexture(){
+  const S=1024, c=document.createElement('canvas'); c.width=c.height=S;
+  const x=c.getContext('2d'), cx=S/2, cy=S/2, R=S/2-16;
+  x.fillStyle='#0d1a24'; x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.fill();
+  const g=x.createRadialGradient(cx-120,cy-150,20,cx,cy,R);
+  g.addColorStop(0,'#527d99'); g.addColorStop(.5,'#234156'); g.addColorStop(1,'#0c1c28');
+  x.fillStyle=g; x.beginPath(); x.arc(cx,cy,R,0,Math.PI*2); x.fill();
+  // 24 个扇区
+  const NS=24;
+  for(let k=0;k<NS;k++){
+    const a0=k*Math.PI*2/NS, a1=(k+1)*Math.PI*2/NS;
+    if(k===7){
+      x.fillStyle='rgba(104,214,240,.34)'; x.beginPath(); x.moveTo(cx,cy);
+      x.arc(cx,cy,R,a0,a1); x.closePath(); x.fill();
+      x.strokeStyle='rgba(160,244,255,.98)'; x.lineWidth=4.5;
+      x.beginPath(); x.moveTo(cx+R*0.26*Math.cos(a0),cy+R*0.26*Math.sin(a0));
+      x.lineTo(cx+R*Math.cos(a0),cy+R*Math.sin(a0)); x.stroke();
+      x.beginPath(); x.moveTo(cx+R*0.26*Math.cos(a1),cy+R*0.26*Math.sin(a1));
+      x.lineTo(cx+R*Math.cos(a1),cy+R*Math.sin(a1)); x.stroke();
+    }
+    x.strokeStyle=k===7?'rgba(170,244,255,.92)':'rgba(168,222,244,.40)';
+    x.lineWidth=k===7?3.0:1.6;
+    x.beginPath(); x.moveTo(cx+R*0.25*Math.cos(a0),cy+R*0.25*Math.sin(a0));
+    x.lineTo(cx+R*Math.cos(a0),cy+R*Math.sin(a0)); x.stroke();
+  }
+  // 磁道
+  for(let i=0;i<34;i++){
+    const r=R*(0.26+i*0.0215);
+    x.strokeStyle=i%4===0?'rgba(150,230,255,.66)':'rgba(158,214,238,.30)';
+    x.lineWidth=i%4===0?2.6:1.4;
+    x.beginPath(); x.arc(cx,cy,r,0,Math.PI*2); x.stroke();
+  }
+  // 伺服脉冲短刻线
+  for(let k=0;k<NS;k++){
+    const a=(k+0.5)*Math.PI*2/NS;
+    for(let j=0;j<5;j++){
+      const r=R*(0.30+j*0.13);
+      x.strokeStyle='rgba(255,186,92,.68)'; x.lineWidth=3.6;
+      x.beginPath(); x.moveTo(cx+r*Math.cos(a),cy+r*Math.sin(a));
+      x.lineTo(cx+(r+11)*Math.cos(a),cy+(r+11)*Math.sin(a)); x.stroke();
+    }
+  }
+  // 中心轴孔
+  x.fillStyle='#0a121a'; x.beginPath(); x.arc(cx,cy,R*0.245,0,Math.PI*2); x.fill();
+  x.strokeStyle='rgba(160,210,230,.4)'; x.lineWidth=3;
+  x.beginPath(); x.arc(cx,cy,R*0.245,0,Math.PI*2); x.stroke();
+  // 高亮扇区文字
+  x.save(); x.translate(cx+R*0.68*Math.cos(7.5*Math.PI*2/NS),cy+R*0.68*Math.sin(7.5*Math.PI*2/NS));
+  x.rotate(7.5*Math.PI*2/NS); x.fillStyle='#b9f0ff'; x.font='600 17px "PingFang SC",sans-serif';
+  x.textAlign='center'; x.fillText('扇 区 07',0,0); x.restore();
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+
+function pcbTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=512;
+  const x=c.getContext('2d');
+  x.fillStyle='#12362f'; x.fillRect(0,0,512,512);
+  for(let i=0;i<220;i++){
+    x.strokeStyle='rgba(196,220,160,'+(0.05+Math.random()*0.16).toFixed(2)+')';
+    x.lineWidth=1+Math.random()*2.2;
+    const px=Math.random()*512, py=Math.random()*512;
+    x.beginPath(); x.moveTo(px,py);
+    x.lineTo(px+(Math.random()-0.5)*160,py+(Math.random()-0.5)*160); x.stroke();
+  }
+  for(let i=0;i<150;i++){
+    x.fillStyle='rgba(214,182,96,.42)';
+    x.beginPath(); x.arc(Math.random()*512,Math.random()*512,1.5+Math.random()*2.4,0,Math.PI*2); x.fill();
+  }
+  x.fillStyle='rgba(220,238,225,.55)'; x.font='500 17px "PingFang SC",sans-serif';
+  x.fillText('主 控',40,60); x.fillText('缓 存',40,220); x.fillText('电 机 驱 动',40,390);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(1,2); t.anisotropy=8; return t;
+}
+
+function filterTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const x=c.getContext('2d');
+  x.fillStyle='#d8c9a0'; x.fillRect(0,0,256,256);
+  for(let i=0;i<256;i+=6){
+    x.strokeStyle='rgba(90,80,58,.42)'; x.lineWidth=1.4;
+    x.beginPath(); x.moveTo(0,i); x.lineTo(256,i); x.stroke();
+    x.beginPath(); x.moveTo(i,0); x.lineTo(i,256); x.stroke();
+  }
+  for(let i=0;i<900;i++){
+    x.fillStyle='rgba(70,64,48,'+(Math.random()*0.3).toFixed(2)+')';
+    x.fillRect(Math.random()*256,Math.random()*256,2,2);
+  }
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+/* ═══════════════════════════════════════════════════
+   3 · 材质
+   ═══════════════════════════════════════════════════ */
+const M = {
+  alu: new THREE.MeshStandardMaterial({color:0xc9d4dc, metalness:0.92, roughness:0.30, roughnessMap:BRUSH, bumpMap:BRUSH, bumpScale:0.009, envMapIntensity:2.2, side:THREE.DoubleSide}),
+  aluDark: new THREE.MeshStandardMaterial({color:0x697c88, metalness:0.9, roughness:0.4, envMapIntensity:1.6, side:THREE.DoubleSide}),
+  edge: new THREE.MeshStandardMaterial({color:0xe8f2f8, metalness:0.97, roughness:0.14, envMapIntensity:2.5}),
+  lidShell: new THREE.MeshStandardMaterial({color:0xbcd0dd, metalness:0.85, roughness:0.28, roughnessMap:BRUSH, transparent:true, opacity:0.14, depthWrite:false, side:THREE.DoubleSide, envMapIntensity:2.0}),
+  wallShell: new THREE.MeshStandardMaterial({color:0x9fb6c5, metalness:0.8, roughness:0.35, transparent:true, opacity:0.17, depthWrite:false, side:THREE.DoubleSide, envMapIntensity:1.8}),
+  labelShell: new THREE.MeshStandardMaterial({map:labelTexture(), metalness:0.02, roughness:0.78, transparent:true, opacity:0.16, depthWrite:false, side:THREE.DoubleSide, envMapIntensity:0.45}),
+  platter: new THREE.MeshStandardMaterial({color:0x9fb9ca, metalness:0.94, roughness:0.17, envMapIntensity:2.2, side:THREE.DoubleSide}),
+  platterEdge: new THREE.MeshStandardMaterial({color:0xdff2ff, metalness:1.0, roughness:0.1, envMapIntensity:2.8}),
+  cut: new THREE.MeshStandardMaterial({color:0x7fd8ee, metalness:0.75, roughness:0.24, emissive:0x0d4a5e, emissiveIntensity:0.6, side:THREE.DoubleSide}),
+  record: new THREE.MeshStandardMaterial({map:recordTexture(), metalness:0.45, roughness:0.38, transparent:true, alphaTest:0.02, side:THREE.DoubleSide, envMapIntensity:1.1}),
+  grain: new THREE.MeshStandardMaterial({color:0xffffff, metalness:0.04, roughness:0.56, emissive:0x0a1a22, emissiveIntensity:0.42, side:THREE.DoubleSide}),
+  trackGlow: new THREE.MeshStandardMaterial({color:0x6fe3ff, metalness:0.1, roughness:0.3, emissive:0x37c4ea, emissiveIntensity:1.5, transparent:true, opacity:0.7, depthWrite:false, side:THREE.DoubleSide}),
+  sectorGlow: new THREE.MeshStandardMaterial({color:0x8aeaff, metalness:0.1, roughness:0.3, emissive:0x2aa5cf, emissiveIntensity:1.2, transparent:true, opacity:0.55, depthWrite:false, side:THREE.DoubleSide}),
+  steel: new THREE.MeshStandardMaterial({color:0xd2dce3, metalness:0.94, roughness:0.22, envMapIntensity:2.4, side:THREE.DoubleSide}),
+  arm: new THREE.MeshStandardMaterial({color:0xb6c6d0, metalness:0.92, roughness:0.28, envMapIntensity:2.2, side:THREE.DoubleSide}),
+  dark: new THREE.MeshStandardMaterial({color:0x2a333b, metalness:0.7, roughness:0.45, envMapIntensity:1.2}),
+  black: new THREE.MeshStandardMaterial({color:0x141a20, metalness:0.25, roughness:0.68}),
+  rubber: new THREE.MeshStandardMaterial({color:0x1b2228, metalness:0.06, roughness:0.85}),
+  copper: new THREE.MeshStandardMaterial({color:0xd98a45, metalness:0.95, roughness:0.28, emissive:0x3a1605, emissiveIntensity:0.45, envMapIntensity:1.6, side:THREE.DoubleSide}),
+  gold: new THREE.MeshStandardMaterial({color:0xf2c46a, metalness:0.96, roughness:0.19, envMapIntensity:2.1}),
+  magnet: new THREE.MeshStandardMaterial({color:0x3b4954, metalness:0.86, roughness:0.36, envMapIntensity:1.4, side:THREE.DoubleSide}),
+  flex: new THREE.MeshStandardMaterial({color:0xd39a4e, metalness:0.55, roughness:0.42, emissive:0x4a2605, emissiveIntensity:0.45, side:THREE.DoubleSide, envMapIntensity:1.3}),
+  ceramic: new THREE.MeshStandardMaterial({color:0x9aa8b2, metalness:0.35, roughness:0.36, envMapIntensity:1.5}),
+  writeHead: new THREE.MeshStandardMaterial({color:0xffa860, metalness:0.55, roughness:0.3, emissive:0xff7418, emissiveIntensity:0.7, side:THREE.DoubleSide}),
+  readHead: new THREE.MeshStandardMaterial({color:0x7fc6ff, metalness:0.55, roughness:0.3, emissive:0x2277d8, emissiveIntensity:0.7, side:THREE.DoubleSide}),
+  air: new THREE.MeshStandardMaterial({color:0x8fe6ff, metalness:0, roughness:0.2, transparent:true, opacity:0.24, depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending}),
+  airBar: new THREE.MeshStandardMaterial({color:0xbdf2ff, metalness:0, roughness:0.2, transparent:true, opacity:0.5, depthWrite:false, blending:THREE.AdditiveBlending}),
+  pcb: new THREE.MeshStandardMaterial({map:pcbTexture(), metalness:0.25, roughness:0.58, side:THREE.DoubleSide, envMapIntensity:1.0}),
+  chip: new THREE.MeshStandardMaterial({color:0x11171d, metalness:0.22, roughness:0.58}),
+  filter: new THREE.MeshStandardMaterial({map:filterTexture(), metalness:0.1, roughness:0.85, side:THREE.DoubleSide}),
+  glowW: new THREE.MeshStandardMaterial({color:0xffb470, emissive:0xff7a1e, emissiveIntensity:1.6, transparent:true, opacity:0.7, depthWrite:false, blending:THREE.AdditiveBlending}),
+  glowR: new THREE.MeshStandardMaterial({color:0x9bd6ff, emissive:0x2a86e8, emissiveIntensity:1.4, transparent:true, opacity:0.6, depthWrite:false, blending:THREE.AdditiveBlending})
+};
+M.lidShell.userData.shell=true;   M.lidShell.userData.baseOpacity=0.14;
+M.wallShell.userData.shell=true;  M.wallShell.userData.baseOpacity=0.17;
+M.labelShell.userData.shell=true; M.labelShell.userData.baseOpacity=0.16;
+
+/* ═══════════════════════════════════════════════════
+   4 · 几何工具
+   ═══════════════════════════════════════════════════ */
+const D2R=Math.PI/180;
+function box(w,h,d,mat,x=0,y=0,z=0){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); return m; }
+function cyl(rt,rb,h,mat,seg=32,open=false,ts=0,tl=Math.PI*2){ return new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg,1,open,ts,tl),mat); }
+function ball(r,mat,x=0,y=0,z=0,seg=16){ const m=new THREE.Mesh(new THREE.SphereGeometry(r,seg,Math.max(8,Math.floor(seg/2))),mat); m.position.set(x,y,z); return m; }
+function torus(R,r,mat,x=0,y=0,z=0,arc=Math.PI*2){ const m=new THREE.Mesh(new THREE.TorusGeometry(R,r,8,96,arc),mat); m.position.set(x,y,z); return m; }
+function tube(pts,r,mat,seg=64){
+  const curve=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(p[0],p[1],p[2])));
+  return {mesh:new THREE.Mesh(new THREE.TubeGeometry(curve,seg,r,8,false),mat), curve};
+}
+function beam(p0,p1,w0,w1,h,mat){
+  const P0=new THREE.Vector3(...p0), P1=new THREE.Vector3(...p1);
+  const d=P1.clone().sub(P0); d.y=0; d.normalize();
+  const n=new THREE.Vector3(-d.z,0,d.x);
+  const quad=(p,w)=>{
+    const a=p.clone().addScaledVector(n,w/2), b=p.clone().addScaledVector(n,-w/2);
+    return [[a.x,a.y+h/2,a.z],[b.x,b.y+h/2,b.z],[b.x,b.y-h/2,b.z],[a.x,a.y-h/2,a.z]];
+  };
+  const all=[...quad(P0,w0),...quad(P1,w1)];
+  const faces=[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[1,5,6],[1,6,2],[2,6,7],[2,7,3],[3,7,4],[3,4,0]];
+  const pos=[]; faces.forEach(f=>f.forEach(i=>pos.push(...all[i])));
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.computeVertexNormals();
+  return new THREE.Mesh(g,mat);
+}
+function ribbon(points,width,mat){
+  const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
+  const N=90,pos=[],idx=[];
+  for(let i=0;i<=N;i++){
+    const p=curve.getPoint(i/N);
+    pos.push(p.x,p.y+width/2,p.z, p.x,p.y-width/2,p.z);
+  }
+  for(let i=0;i<N;i++){ const a=i*2; idx.push(a,a+2,a+1,a+1,a+2,a+3); }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g,mat);
+}
+function platterGeo(R,ri,th,gapA,gapB){
+  let s=new THREE.Shape();
+  if(gapA===undefined){
+    s.absarc(0,0,R,0,Math.PI*2,false);
+    const h=new THREE.Path(); h.absarc(0,0,ri,0,Math.PI*2,true); s.holes.push(h);
+  }else{
+    const a0=gapB, a1=gapA+Math.PI*2;
+    s.moveTo(R*Math.cos(a0),R*Math.sin(a0));
+    s.absarc(0,0,R,a0,a1,false);
+    s.lineTo(ri*Math.cos(a1),ri*Math.sin(a1));
+    s.absarc(0,0,ri,a1,a0,true);
+    s.lineTo(R*Math.cos(a0),R*Math.sin(a0));
+  }
+  const g=new THREE.ExtrudeGeometry(s,{depth:th,bevelEnabled:false,curveSegments:96,steps:1});
+  g.rotateX(Math.PI/2);
+  return g;
+}
+
+/* ═══════════════════════════════════════════════════
+   5 · 部件注册（爆炸 / 悬停 / 标签）
+   ═══════════════════════════════════════════════════ */
+const root=new THREE.Group(); scene.add(root);
+const spin=new THREE.Group(); spin.position.set(0,0,-1.6); root.add(spin);
+const parts=[],pickables=[],shellMats=[],armRigs=[];
+const labelsEl=document.getElementById('labels');
+
+function P(name,desc,obj,ex,opt={}){
+  const parent=opt.parent||root;
+  obj.position.set(...(opt.pos||[0,0,0]));
+  const p={
+    name,desc,obj,
+    base:obj.position.clone(),
+    ex:new THREE.Vector3(ex[0],ex[1],ex[2]).multiplyScalar(1.36),
+    delay:opt.delay??0,
+    labelOff:new THREE.Vector3(...(opt.labelOff||[0,0.5,0])),
+    idx:parts.length,_ei:0
+  };
+  if(opt.rig) armRigs.push(obj);
+  const map=new Map();
+  obj.userData.part=p;
+  obj.traverse(o=>{
+    if(!o.isMesh) return;
+    o.userData.part=p;
+    const src=o.material, meta=src.userData||{};
+    if(!Array.isArray(src)){
+      if(!map.has(src)){
+        const c=src.clone();
+        if(meta.shell){ c.userData.baseOpacity=meta.baseOpacity??0.16; shellMats.push(c); }
+        map.set(src,c);
+      }
+      o.material=map.get(src);
+    }
+    o.userData.shell=!!meta.shell;
+    o.castShadow=!(o.userData.shell||o.userData.noShadow);
+    o.receiveShadow=true;
+    pickables.push(o);
+  });
+  const el=document.createElement('div'); el.className='lbl'; el.textContent=name; labelsEl.appendChild(el); p.el=el;
+  parts.push(p); parent.add(obj);
+  return obj;
+}
+/* 执行臂绕转轴旋转：外层组放在转轴，内层组把全局坐标平移回去 */
+const AX=3.7, AZ=4.7, ARM_L=5.6, TH0=210*D2R;
+const SX=0, SZ=-1.6;
+function rigPart(name,desc,g,ex,opt={}){
+  const outer=new THREE.Group();
+  const inner=new THREE.Group(); inner.position.set(-AX,0,-AZ); inner.add(g); outer.add(inner);
+  return P(name,desc,outer,ex,Object.assign({pos:[AX,0,AZ],rig:true},opt));
+}
+function headPos(theta){ return {x:AX+ARM_L*Math.cos(theta), z:AZ+ARM_L*Math.sin(theta)}; }
+
+/* 需在注册后取回的引用 */
+let grainInst=null, grainMat=null, trackRing=null, sectorBar=null,
+    writeMat=null, readMat=null, airMat=null, flowBars=[],
+    ioGroup=null, wGlow=null, rGlow=null, wRing=null, wBeam=null,
+    grainA=[], grainR=[], grainD=[], GN=0;
+
+/* ═══════════════════════════════════════════════════
+   6 · 密封铝壳：底座、侧壁、顶盖、螺丝、标签、密封、呼吸孔
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(10.4,0.30,14.8,M.aluDark,0,0.15,0));
+  g.add(box(10.5,0.055,14.9,M.edge,0,0.31,0));
+  // 四壁（透视）
+  g.add(box(10.4,1.9,0.14,M.wallShell,0,1.25,7.33));
+  g.add(box(10.4,1.9,0.14,M.wallShell,0,1.25,-7.33));
+  g.add(box(0.14,1.9,14.8,M.wallShell,5.13,1.25,0));
+  g.add(box(0.14,1.9,14.8,M.wallShell,-5.13,1.25,0));
+  // 四角立柱与螺纹孔座
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    const b=cyl(0.36,0.36,1.82,M.aluDark,16); b.position.set(sx*4.72,1.22,sz*6.92); g.add(b);
+    const h=cyl(0.13,0.13,0.05,M.black,12); h.position.set(sx*4.72,2.17,sz*6.92); g.add(h);
+  }
+  // 铸造筋与凹槽
+  for(let i=0;i<5;i++) g.add(box(8.9,0.06,0.10,M.aluDark,0,0.35,-5.4+i*2.7));
+  const boss=cyl(1.42,1.42,0.22,M.aluDark,48); boss.position.set(0,0.41,-1.6); g.add(boss);
+  const pb=cyl(0.82,0.82,0.30,M.aluDark,32); pb.position.set(AX,0.44,AZ); g.add(pb);
+  // 内侧加工纹理
+  for(let i=0;i<3;i++){
+    const t=torus(1.5+i*0.55,0.018,M.edge,0,0.34,-1.6); t.rotation.x=Math.PI/2; g.add(t);
+  }
+  P('铝合金底座铸件','一体压铸的密封腔体底座，承载主轴与执行臂转轴；四角螺丝座把顶盖压紧在密封胶圈上，腔内外只靠呼吸孔连通。',g,[0,-2.3,0],{delay:0.46,labelOff:[0,-0.5,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(10.4,0.15,14.8,M.lidShell,0,2.30,0));
+  // 不透明折边，保留外壳轮廓
+  for(const sx of [-1,1]) g.add(box(0.16,0.22,14.9,M.edge,sx*5.12,2.31,0));
+  for(const sz of [-1,1]) g.add(box(10.4,0.22,0.16,M.edge,0,2.31,sz*7.4));
+  // 冲压加强筋
+  for(let i=0;i<4;i++){
+    const s=box(7.2,0.02,0.06,M.aluDark,0,2.385,-4.4+i*2.5); g.add(s);
+  }
+  // 圆角凹槽
+  const c=cyl(1.35,1.35,0.02,M.aluDark,48,false); c.position.set(0,2.39,-1.6);
+  c.material=M.lidShell; g.add(c);
+  P('密封顶盖（透视）','铝合金冲压顶盖，靠周边十颗螺丝与胶圈压成气密腔体；这里做透视处理，好让你看见平时永远见不到的内部。',g,[0,6.4,0],{delay:0.0,labelOff:[0,0.7,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const pts=[[-4.72,6.92],[4.72,6.92],[-4.72,-6.92],[4.72,-6.92],[-4.72,0],[4.72,0],[0,6.92],[0,-6.92],[-2.6,6.92],[2.6,-6.92]];
+  for(const [x,z] of pts){
+    const s=cyl(0.135,0.135,0.075,M.steel,12); s.position.set(x,2.43,z); g.add(s);
+    const slot=box(0.16,0.012,0.026,M.black,x,2.472,z); g.add(slot);
+    const slot2=box(0.026,0.012,0.16,M.black,x,2.472,z); g.add(slot2);
+  }
+  P('顶盖螺丝 ×10','十颗十字螺丝沿周边均匀分布，把顶盖均匀压在密封胶圈上，保证腔内洁净度与外部气压平缓平衡。',g,[0,7.5,0],{delay:0.04,labelOff:[0,0.4,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const p=new THREE.Mesh(new THREE.PlaneGeometry(5.4,7.2),M.labelShell);
+  p.rotation.x=-Math.PI/2; p.position.set(0,2.405,-1.4); g.add(p);
+  const b=box(5.45,0.008,7.25,M.edge,0,2.398,-1.4); b.material=M.lidShell; g.add(b);
+  P('产品标签','顶盖上的铭牌：容量、转速、接口、序列号与条码；在透视模式下它一并半透明，才不会挡住下方的盘片。',g,[0,8.0,-0.8],{delay:0.02,labelOff:[0,0.4,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  for(const sx of [-1,1]) g.add(box(0.09,0.055,14.4,M.rubber,sx*4.92,2.215,0));
+  for(const sz of [-1,1]) g.add(box(9.9,0.055,0.09,M.rubber,0,2.215,sz*7.18));
+  P('密封胶圈','沿腔体一圈的弹性胶条，被顶盖压紧后隔绝灰尘与水汽；硬盘不是在真空里工作，而是靠它维持一尘不染的空气。',g,[0,4.8,0],{delay:0.10,labelOff:[0,0.4,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const ring=torus(0.20,0.032,M.edge,3.85,2.40,-5.25); ring.rotation.x=Math.PI/2; g.add(ring);
+  const hole=cyl(0.115,0.115,0.05,M.black,20); hole.position.set(3.85,2.385,-5.25); g.add(hole);
+  const fil=new THREE.Mesh(new THREE.PlaneGeometry(0.85,0.85),M.filter);
+  fil.rotation.x=-Math.PI/2; fil.position.set(3.85,2.20,-5.25); g.add(fil);
+  const frame=box(0.95,0.05,0.95,M.aluDark,3.85,2.18,-5.25); g.add(frame);
+  const halo=torus(0.30,0.012,M.trackGlow,3.85,2.19,-5.25); halo.rotation.x=Math.PI/2; g.add(halo);
+  P('呼吸孔与过滤膜','只让空气慢慢进出、平衡内外气压的小孔；下面的滤膜挡住微粒，否则一粒灰尘落在盘面上就足以撞坏磁头。',g,[2.8,6.9,-2.4],{delay:0.08,labelOff:[0.4,0.5,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   7 · 盘片组、主轴电机、磁记录层、磁晶粒
+   ═══════════════════════════════════════════════════ */
+const R=4.55, RI=1.06, TH=0.075;
+const GAP_A=95*D2R, GAP_B=150*D2R;
+const YTOP=[1.92,1.52,1.12,0.72];
+
+(()=>{
+  const g=new THREE.Group();
+  const hub=cyl(1.02,1.06,1.76,M.steel,48); hub.position.set(0,1.28,0); g.add(hub);
+  const cap=cyl(0.78,0.94,0.13,M.edge,48); cap.position.set(0,2.19,0); g.add(cap);
+  for(let i=0;i<6;i++){
+    const a=i*Math.PI/3;
+    const s=cyl(0.055,0.055,0.02,M.dark,10); s.position.set(0.56*Math.cos(a),2.265,0.56*Math.sin(a)); g.add(s);
+  }
+  const brg=torus(1.10,0.055,M.dark,0,0.52,0); brg.rotation.x=Math.PI/2; g.add(brg);
+  const motor=cyl(1.30,1.30,0.34,M.aluDark,48); motor.position.set(0,0.40,0); g.add(motor);
+  P('主轴电机与轴承','无刷直流电机带动整叠盘片以恒定角速度旋转；流体动压轴承把径向抖动压到纳米级，磁道才不会从磁头底下跑掉。',g,[0,-0.8,0],{parent:spin,delay:0.30,labelOff:[0,0.7,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  for(let i=0;i<3;i++){
+    const r=cyl(1.30,1.30,0.20,M.steel,40); r.position.set(0,YTOP[i]-0.16,0); g.add(r);
+    const e=torus(1.30,0.02,M.edge,0,YTOP[i]-0.06,0); e.rotation.x=Math.PI/2; g.add(e);
+  }
+  P('盘片间隔环','夹在四张盘片之间的精密金属环，保证盘距绝对一致；任何一点点倾斜都会让磁头在不同盘面上飞行高度不齐。',g,[0,0.7,0],{parent:spin,delay:0.26,labelOff:[0,0.35,0]});
+})();
+
+for(let i=0;i<4;i++){
+  const top=i===0;
+  const g=new THREE.Group();
+  const geo=top?platterGeo(R,RI,TH,GAP_A,GAP_B):platterGeo(R,RI,TH);
+  const m=new THREE.Mesh(geo,M.platter); m.position.y=YTOP[i]+TH/2; g.add(m);
+  if(!top){
+    const e=torus(R,0.014,M.platterEdge,0,YTOP[i]-TH/2,0); e.rotation.x=Math.PI/2; g.add(e);
+    const inner=torus(RI,0.012,M.platterEdge,0,YTOP[i]-TH/2,0); inner.rotation.x=Math.PI/2; g.add(inner);
+  }else{
+    // 楔形剖切的两个径向断面
+    for(const a of [GAP_A,GAP_B]){
+      const mid=(R+RI)/2, len=R-RI;
+      const b=box(len,TH*1.05,0.014,M.cut,mid*Math.cos(a),YTOP[i],mid*Math.sin(a));
+      b.rotation.y=-a; g.add(b);
+      const lip=box(len,0.012,0.03,M.trackGlow,mid*Math.cos(a),YTOP[i]+TH/2+0.006,mid*Math.sin(a));
+      lip.rotation.y=-a; g.add(lip);
+    }
+    const arc=torus(R,0.016,M.platterEdge,0,YTOP[i]-TH/2,0,Math.PI*2-(GAP_B-GAP_A));
+    arc.rotation.x=Math.PI/2; arc.rotation.z=GAP_B; g.add(arc);
+  }
+  const name=top?'上层盘片（楔形剖切）':'第'+(i+1)+'张盘片';
+  const desc=top
+    ? '玻璃基片上溅射的磁性薄膜，数据就写在里面；这里切去一块 55° 楔形，把表面之下的磁道、扇区与磁晶粒露出来。'
+    : '双面可记录的盘片，表面比镜面还平；一叠四张共用一根主轴，磁头在盘面间只留几纳米的气隙。';
+  P(name,desc,g,[0,top?4.5:(3.0-i*0.68),0],{parent:spin,delay:0.16+i*0.035,labelOff:[0,0.3+i*0.1,0]});
+}
+
+(()=>{
+  const g=new THREE.Group();
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(R,96),M.record);
+  disc.rotation.x=-Math.PI/2; disc.position.y=1.795; g.add(disc);
+  // 当前磁道高亮环
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1,0.014,6,128),M.trackGlow);
+  ring.rotation.x=Math.PI/2; ring.position.y=1.803; g.add(ring); trackRing=ring;
+  // 高亮扇区径向标记
+  const bar=box(R-RI-0.1,0.008,0.035,M.sectorGlow,(R+RI)/2,1.806,0);
+  bar.rotation.y=-(112.5*D2R); g.add(bar); sectorBar=bar;
+  // 楔口边缘的磁道断面
+  for(const a of [GAP_A,GAP_B]){
+    const b=box(R-RI,0.02,0.02,M.cut,(R+RI)/2*Math.cos(a),1.788,(R+RI)/2*Math.sin(a));
+    b.rotation.y=-a; g.add(b);
+  }
+  P('磁记录层 · 磁道与扇区','盘面被划成上万个同心磁道，每道再切成扇区；琥珀色短刻线是伺服脉冲，磁头靠它判断自己有没有偏离磁道中心。',g,[0,3.9,0],{parent:spin,delay:0.20,labelOff:[0,0.5,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const COLS=208, ROWS=13;
+  GN=COLS*ROWS;
+  const geo=new THREE.CylinderGeometry(0.006,0.019,0.062,4,1);
+  geo.rotateZ(-Math.PI/2);
+  const inst=new THREE.InstancedMesh(geo,M.grain,GN);
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const dummy=new THREE.Object3D();
+  const cWarm=new THREE.Color(0xff7a18), cCool=new THREE.Color(0x1e8ce6);
+  let k=0;
+  for(let r=0;r<ROWS;r++){
+    const rr=3.02+r*0.098;
+    for(let q=0;q<COLS;q++){
+      const a=q*Math.PI*2/COLS + (r%2)*0.012;
+      grainA[k]=a; grainR[k]=rr; grainD[k]=((q+r*3)%11)<6?1:-1;
+      dummy.position.set(rr*Math.cos(a),1.812,rr*Math.sin(a));
+      dummy.rotation.set(0,-a-Math.PI/2+(grainD[k]>0?0:Math.PI),0);
+      dummy.updateMatrix(); inst.setMatrixAt(k,dummy.matrix);
+      inst.setColorAt(k,grainD[k]>0?cWarm:cCool);
+      k++;
+    }
+  }
+  inst.instanceMatrix.needsUpdate=true; inst.instanceColor.needsUpdate=true;
+  inst.userData.noShadow=true;
+  g.add(inst); grainInst=inst;
+  P('磁性晶粒（示意放大）','每颗晶粒只有一个磁化方向：橙为 →、蓝为 ←。写入磁头用局部磁场把它翻转，读取磁头再感应方向，这就是一个比特。',g,[0,3.9,0],{parent:spin,delay:0.20,labelOff:[0,0.22,0]});
+  grainMat=inst.material;
+})();
+
+/* ═══════════════════════════════════════════════════
+   8 · 执行臂：转轴、音圈电机、臂、悬臂、滑块、磁头、气垫
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  const shaft=cyl(0.24,0.24,1.62,M.steel,24); shaft.position.set(AX,1.34,AZ); g.add(shaft);
+  for(const y of [0.72,1.34,2.06]){
+    const b=torus(0.36,0.065,M.edge,AX,y,AZ); b.rotation.x=Math.PI/2; g.add(b);
+  }
+  const cap=cyl(0.40,0.40,0.10,M.dark,24); cap.position.set(AX,2.20,AZ); g.add(cap);
+  P('执行臂转轴（滚珠轴承）','整条磁头臂绕这根精密轴承摆动；轴承预紧消除回差，音圈一推，臂就能在十几毫秒内跨过上千条磁道。',g,[2.2,3.4,2.2],{delay:0.22,labelOff:[0,0.65,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const H=headPos(TH0);
+  g.add(beam([AX,2.06,AZ],[AX+4.62*Math.cos(TH0),2.06,AZ+4.62*Math.sin(TH0)],0.86,0.22,0.105,M.arm));
+  const block=cyl(0.62,0.62,0.22,M.aluDark,24); block.position.set(AX,2.06,AZ); g.add(block);
+  // 减重孔
+  for(let i=0;i<3;i++){
+    const t=0.25+i*0.2;
+    const px=AX+(H.x-AX)*t, pz=AZ+(H.z-AZ)*t;
+    const hole=cyl(0.10,0.10,0.12,M.black,12); hole.position.set(px,2.06,pz); g.add(hole);
+  }
+  // 臂背侧的线圈支架
+  const cx=AX-1.10*Math.cos(TH0), cz=AZ-1.10*Math.sin(TH0);
+  g.add(beam([AX,2.02,AZ],[cx,2.02,cz],0.55,0.42,0.075,M.arm));
+  rigPart('执行臂（铝制摇臂）','把音圈产生的推力变成磁头的圆弧运动；臂身开减重孔降低转动惯量，才能在一次寻道里快起快停。',g,[1.8,4.2,1.8],{delay:0.18,labelOff:[0,0.5,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const cx=AX-1.12*Math.cos(TH0), cz=AZ-1.12*Math.sin(TH0);
+  const u=Math.cos(TH0), v=Math.sin(TH0);
+  const n=[-v,u];
+  const pts=[];
+  const corners=[[-0.62,-0.48],[0.62,-0.48],[0.40,0.48],[-0.40,0.48]];
+  for(let e=0;e<4;e++){
+    const a=corners[e], b=corners[(e+1)%4];
+    for(let s=0;s<=6;s++){
+      const t=s/6, px=a[0]+(b[0]-a[0])*t, py=a[1]+(b[1]-a[1])*t;
+      pts.push([cx+px*u+py*n[0], 2.00, cz+px*v+py*n[1]]);
+    }
+  }
+  for(let layer=0;layer<3;layer++){
+    const q=pts.map(p=>[p[0],p[1]+layer*0.026,p[2]]);
+    const t=tube(q,0.032,M.copper,90); g.add(t.mesh);
+  }
+  const lead=tube([[cx,2.00,cz],[cx+0.5,2.02,cz+0.4],[AX,2.08,AZ]],0.026,M.copper,32); g.add(lead.mesh);
+  rigPart('音圈（铜线圈）','绕在臂尾的扁平铜线圈，悬在两块永磁体之间；电流方向决定推力方向，电流大小决定摆多快——这就是「音圈电机」。',g,[2.8,3.3,2.8],{delay:0.20,labelOff:[0.3,0.5,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const cx=AX-1.12*Math.cos(TH0), cz=AZ-1.12*Math.sin(TH0);
+  const top=cyl(1.02,1.02,0.10,M.magnet,40,false,0.30,2.45); top.position.set(cx,2.16,cz); g.add(top);
+  const ring=torus(1.02,0.03,M.edge,cx,2.11,cz,2.45); ring.rotation.x=Math.PI/2; ring.rotation.z=0.30; g.add(ring);
+  P('音圈电机上磁板','固定在顶盖内侧的永磁体，与下磁板夹出一条均匀气隙；线圈在气隙里通电受力，执行臂随之摆动。',g,[2.6,5.4,1.6],{delay:0.12,labelOff:[0,0.5,0]});
+})();
+(()=>{
+  const g=new THREE.Group();
+  const cx=AX-1.12*Math.cos(TH0), cz=AZ-1.12*Math.sin(TH0);
+  const bot=cyl(1.02,1.02,0.10,M.magnet,40,false,0.30,2.45); bot.position.set(cx,1.84,cz); g.add(bot);
+  const yoke=box(2.1,0.10,1.9,M.aluDark,cx,1.76,cz); g.add(yoke);
+  P('音圈电机下磁板与磁轭','下磁板和导磁磁轭把磁力线收拢在气隙里；断电时磁头靠坡道停靠，不会停在记录着数据的盘面上。',g,[2.6,-1.2,1.6],{delay:0.34,labelOff:[0,-0.4,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const H=headPos(TH0);
+  const p0=[AX+4.58*Math.cos(TH0),2.045,AZ+4.58*Math.sin(TH0)];
+  g.add(beam(p0,[H.x,2.00,H.z],0.20,0.075,0.026,M.steel));
+  const dimple=ball(0.055,M.edge,H.x-0.10*Math.cos(TH0),2.028,H.z-0.10*Math.sin(TH0)); g.add(dimple);
+  for(const s of [-1,1]){
+    const t=tube([[AX+4.6*Math.cos(TH0),2.03,AZ+4.6*Math.sin(TH0)],
+      [AX+5.1*Math.cos(TH0)+s*0.06,2.01,AZ+5.1*Math.sin(TH0)],
+      [H.x,2.00,H.z]],0.012,M.steel,24); g.add(t.mesh);
+  }
+  rigPart('悬臂与挠性件','一片极薄的不锈钢弹簧，把滑块轻轻压向盘面；气流把滑块托起时，它只提供约几克的载荷并保持磁头贴着气垫浮动。',g,[1.2,3.1,1.2],{delay:0.24,labelOff:[0,0.3,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const H=headPos(TH0);
+  const s=box(0.30,0.052,0.22,M.ceramic,H.x,2.002,H.z); g.add(s);
+  const trail=box(0.045,0.035,0.19,M.dark,H.x-0.16,2.002,H.z); g.add(trail);
+  rigPart('滑块（空气轴承）','陶瓷滑块底面刻有微米级气槽；盘片带起的气流把它托起，磁头始终浮在盘面上方约 3 纳米，从不接触。',g,[0.9,2.7,0.9],{delay:0.26,labelOff:[0,0.28,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const H=headPos(TH0);
+  const w=box(0.052,0.030,0.075,M.writeHead,H.x-0.175,1.988,H.z+0.045); g.add(w);
+  const pole=box(0.02,0.045,0.09,M.edge,H.x-0.19,1.99,H.z+0.045); g.add(pole);
+  rigPart('写入磁头','一个微型电磁铁：线圈里通以正负电流，在极小的气隙处产生局部磁场，把正下方晶粒的磁化方向翻转成 0 或 1。',g,[0.7,2.4,0.7],{delay:0.28,labelOff:[0,0.24,0]});
+  writeMat=w.material;
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const H=headPos(TH0);
+  const r=box(0.045,0.026,0.062,M.readHead,H.x-0.175,1.986,H.z-0.052); g.add(r);
+  const shield=box(0.018,0.040,0.10,M.edge,H.x-0.205,1.988,H.z-0.052); g.add(shield);
+  rigPart('读取磁头','磁阻传感器：晶粒的磁化方向改变它的电阻，微弱电压被前置放大后还原成比特；它只读不写，也不碰盘面。',g,[0.7,2.4,0.7],{delay:0.28,labelOff:[0,0.24,0]});
+  readMat=r.material;
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const H=headPos(TH0);
+  const cushion=ball(0.24,M.air,H.x,1.963,H.z); cushion.scale.set(1.35,0.10,0.95); g.add(cushion);
+  airMat=cushion.material;
+  for(let i=0;i<8;i++){
+    const b=box(0.028,0.008,0.16,M.airBar,H.x-0.14+i*0.04,1.958,H.z); g.add(b);
+    flowBars.push({mesh:b,baseX:b.position.x,phase:i/8});
+  }
+  rigPart('气垫（3 纳米飞行高度）','盘片高速旋转拖出的空气膜：前缘进气、后缘泄压，形成稳定升力。这里把纳米级间隙放大了，实际磁头与盘面永不接触。',g,[0.6,2.0,0.6],{delay:0.30,labelOff:[0,-0.25,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   9 · 柔性排线、停靠坡道
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  const pts=[
+    [AX+0.55,1.72,AZ+0.25],[AX+1.05,1.68,AZ+0.85],[AX+1.15,1.60,AZ+1.75],
+    [AX+0.65,1.52,AZ+2.55],[AX-0.35,1.48,AZ+2.85],[AX-1.55,1.46,AZ+2.45],
+    [AX-2.35,1.44,AZ+1.65],[AX-2.05,1.42,AZ+0.75]
+  ];
+  g.add(ribbon(pts,0.28,M.flex));
+  for(let i=0;i<4;i++){
+    const t=tube(pts.map(p=>[p[0],p[1]+0.06+i*0.055,p[2]]),0.008,M.copper,80); g.add(t.mesh);
+  }
+  const conn=box(0.62,0.30,0.34,M.black,AX-2.05,1.42,AZ+0.75); g.add(conn);
+  for(let i=0;i<6;i++) g.add(box(0.07,0.05,0.02,M.gold,AX-2.28+i*0.09,1.46,AZ+0.93));
+  P('柔性排线（弯曲的铜箔）','从摆动的臂一路卷到腔体侧壁的扁平排线，既给音圈送驱动电流，又把磁头读出的微弱信号送出去；它必须软到不妨碍摆臂。',g,[-2.6,2.6,2.2],{delay:0.32,labelOff:[-0.4,0.5,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const a=112*D2R, r=4.82;
+  const px=SX+r*Math.cos(a), pz=SZ+r*Math.sin(a);
+  const base=box(1.05,0.16,0.62,M.black,px,1.99,pz); base.rotation.y=-a; g.add(base);
+  const slope=box(0.78,0.055,0.52,M.aluDark,px+0.10,2.08,pz); slope.rotation.y=-a; slope.rotation.z=0.22; g.add(slope);
+  const lip=box(0.10,0.13,0.56,M.edge,px-0.32,2.09,pz); lip.rotation.y=-a; g.add(lip);
+  for(let i=0;i<3;i++){
+    const s=cyl(0.045,0.045,0.02,M.gold,10); s.position.set(px+i*0.2,2.075,pz+0.28); g.add(s);
+  }
+  P('磁头停靠坡道','断电时臂被甩到盘片外缘，滑块顺着这道小塑料斜坡抬起并锁住；有了坡道，磁头就不会在停机时「降落」在存着数据的盘面上。',g,[-2.8,1.8,-1.4],{delay:0.34,labelOff:[0,0.45,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   10 · 底面：控制电路板与 SATA 触点
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  g.add(box(9.5,0.10,13.4,M.pcb,0,-0.30,0));
+  const chips=[[1.6,1.6,1.5,-0.20,-2.6],[1.1,1.1,-2.2,-0.19,-3.1],[1.2,1.0,-2.9,-0.19,1.9],[0.8,0.8,3.0,-0.19,3.5]];
+  for(const [w,d,x,y,z] of chips){
+    g.add(box(w,0.14,d,M.chip,x,y,z));
+    const dot=cyl(0.045,0.045,0.01,M.gold,10); dot.position.set(x-w/2+0.1,-0.115,z-d/2+0.1); g.add(dot);
+  }
+  for(let i=0;i<26;i++){
+    const x=(Math.random()-0.5)*8.4, z=(Math.random()-0.5)*12.2;
+    g.add(box(0.10+Math.random()*0.16,0.05,0.09,M.dark,x,-0.22,z));
+  }
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    const s=cyl(0.17,0.17,0.05,M.steel,14); s.position.set(sx*4.3,-0.16,sz*6.0); g.add(s);
+  }
+  const conn=box(1.1,0.20,0.30,M.dark,-3.2,-0.18,5.9); g.add(conn);
+  P('底部控制电路板','藏在硬盘背面的整套电子系统：主控解释 SATA 指令、算出磁道位置、驱动音圈与主轴，并把读回的模拟信号解码成数据。',g,[0,-3.6,0],{delay:0.42,labelOff:[0,-0.5,0]});
+})();
+
+(()=>{
+  const g=new THREE.Group();
+  const housing=box(3.5,0.20,0.62,M.black,0,-0.32,7.02); g.add(housing);
+  const data=box(1.05,0.06,0.55,M.dark,-1.0,-0.24,7.05); g.add(data);
+  const power=box(2.0,0.06,0.55,M.dark,0.95,-0.24,7.05); g.add(power);
+  for(let i=0;i<7;i++) g.add(box(0.10,0.02,0.42,M.gold,-1.45+i*0.15,-0.205,7.02));
+  for(let i=0;i<15;i++) g.add(box(0.10,0.02,0.42,M.gold,0.08+i*0.125,-0.205,7.02));
+  const key=box(0.14,0.10,0.62,M.black,-0.42,-0.24,7.02); g.add(key);
+  for(let i=0;i<4;i++) g.add(box(0.18,0.04,0.30,M.gold,-3.0+i*0.32,-0.20,6.35));
+  P('SATA 数据／电源触点','背面边缘的两组金手指：窄的一组传数据，宽的一组供电；防呆缺口保证插头不会反插，接口速率可达 6 Gb/s。',g,[0,-4.4,3.2],{delay:0.48,labelOff:[0,-0.4,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   11 · 读写瞬间：磁头下方的光效
+   ═══════════════════════════════════════════════════ */
+(()=>{
+  const g=new THREE.Group();
+  const mW=M.glowW.clone(), mR=M.glowR.clone(), mRing=M.glowW.clone(), mBeam=M.glowW.clone();
+  wGlow=ball(0.09,mW,-0.19,0.01,0.045); g.add(wGlow);
+  rGlow=ball(0.075,mR,-0.19,0.01,-0.052); g.add(rGlow);
+  wRing=torus(0.20,0.014,mRing,0,-0.035,0); wRing.rotation.x=Math.PI/2; g.add(wRing);
+  wBeam=cyl(0.035,0.012,0.09,mBeam,16); wBeam.position.set(-0.18,-0.04,0.045); g.add(wBeam);
+  g.position.set(headPos(TH0).x,1.99,headPos(TH0).z);
+  root.add(g); ioGroup=g;
+})();
+const writeLight=new THREE.PointLight(0xff8a30,0,2.4,2); scene.add(writeLight);
+const readLight=new THREE.PointLight(0x4aa8ff,0,2.4,2); scene.add(readLight);
+
+/* ═══════════════════════════════════════════════════
+   12 · 状态机
+   ═══════════════════════════════════════════════════ */
+const state={
+  t:0, phi:Math.PI, sector:0.5, seekT:0.0,
+  theta:TH0, thetaFrom:TH0, thetaTo:TH0,
+  track:512, target:512, bit:0,
+  writePulse:0, readPulse:0, readDelay:0,
+  explode:0, explodeTarget:0, xray:true, paused:false, micro:false,
+  tween:null, appliedDolly:1, fly:3.0, microPhi:0, ioText:'待机', phaseText:'盘片旋转 · 等待寻道'
+};
+const clamp01=v=>v<0?0:v>1?1:v;
+const smooth=t=>t*t*(3-2*t);
+const damp=(c,t,k,dt)=>c+(t-c)*Math.min(1,dt*k);
+const wrapPI=a=>Math.atan2(Math.sin(a),Math.cos(a));
+const TRACK_LO=202*D2R, TRACK_HI=222*D2R;
+function newSeek(){
+  state.thetaFrom=state.thetaTo;
+  state.thetaTo=TRACK_LO+Math.random()*(TRACK_HI-TRACK_LO);
+  state.target=Math.round((TRACK_HI-state.thetaTo)/(TRACK_HI-TRACK_LO)*1023);
+}
+newSeek(); state.thetaFrom=state.thetaTo; state.theta=state.thetaTo; newSeek();
+
+const dummyG=new THREE.Object3D();
+const cWarm=new THREE.Color(0xff7a18), cCool=new THREE.Color(0x1e8ce6);
+function setGrain(i,dir){
+  grainD[i]=dir;
+  const a=grainA[i], r=grainR[i];
+  dummyG.position.set(r*Math.cos(a),1.812,r*Math.sin(a));
+  dummyG.rotation.set(0,-a-Math.PI/2+(dir>0?0:Math.PI),0);
+  dummyG.updateMatrix();
+  grainInst.setMatrixAt(i,dummyG.matrix);
+  grainInst.setColorAt(i,dir>0?cWarm:cCool);
+}
+function writeUnderHead(){
+  const H=headPos(state.theta);
+  const beta=Math.atan2(H.z-SZ,H.x-SX);
+  const rH=Math.hypot(H.x-SX,H.z-SZ);
+  const bit=Math.random()<0.5?0:1; state.bit=bit;
+  let n=0;
+  for(let i=0;i<GN;i++){
+    const diff=Math.abs(wrapPI(grainA[i]-state.phi-beta));
+    if(diff<0.155 && Math.abs(grainR[i]-rH)<0.36){
+      setGrain(i,(((i%13)<7)?1:-1)*(bit?1:-1)); n++;
+    }
+  }
+  grainInst.instanceMatrix.needsUpdate=true; grainInst.instanceColor.needsUpdate=true;
+  state.writePulse=1; state.readDelay=0.13;
+  state.ioText='写入「'+bit+'」 · 翻转 '+n+' 颗晶粒';
+  state.phaseText='扇区 07 经过 · 写入磁场翻转晶粒';
+}
+function readSenses(){
+  state.readPulse=1;
+  state.ioText='读取「'+state.bit+'」 · 感应磁化方向';
+  state.phaseText='读取磁头感应方向 · 比特还原';
+}
+
+/* ═══════════════════════════════════════════════════
+   13 · 交互：悬停 / 按钮 / 键盘 / 相机
+   ═══════════════════════════════════════════════════ */
+const ray=new THREE.Raycaster(), pointer=new THREE.Vector2(-10,-10);
+let hovered=null,pickList=[];
+const emiCache=new Map();
+function rebuildPick(){ pickList=pickables.filter(m=>!(m.userData.shell&&state.xray)); }
+rebuildPick();
+function highlight(p,on){
+  p.obj.traverse(o=>{
+    if(!o.isMesh||!o.material||!o.material.emissive||o.userData.noHi) return;
+    const m=o.material;
+    if(on){
+      if(!emiCache.has(m)) emiCache.set(m,{c:m.emissive.getHex(),i:m.emissiveIntensity});
+      m.emissive.setHex(0x1c7ea0); m.emissiveIntensity=1.05;
+    }else{
+      const s=emiCache.get(m); if(s){ m.emissive.setHex(s.c); m.emissiveIntensity=s.i; }
+    }
+  });
+}
+const hName=document.getElementById('hName'),hDesc=document.getElementById('hDesc');
+const DEF_DESC='把指针移到任意部件上，它会亮起，并用一句话说明自己在这条「磁→电」链路里的作用。';
+function applyHover(p){
+  if(hovered===p) return;
+  if(hovered){ highlight(hovered,false); hovered.el.classList.remove('hot'); }
+  hovered=p;
+  if(p){ highlight(p,true); p.el.classList.add('hot'); hName.textContent=p.name; hDesc.textContent=p.desc;
+    if(state.explode<0.02){ p.el.style.opacity='1'; }
+  }else{ hName.textContent='整台机械硬盘'; hDesc.textContent=DEF_DESC; }
+}
+function onPointer(e){
+  const r=canvas.getBoundingClientRect();
+  pointer.x=((e.clientX-r.left)/r.width)*2-1;
+  pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+}
+canvas.addEventListener('pointermove',onPointer);
+canvas.addEventListener('pointerdown',e=>{canvas.style.cursor='grabbing';onPointer(e);});
+canvas.addEventListener('pointerup',()=>{canvas.style.cursor='grab';});
+canvas.addEventListener('pointerleave',()=>{pointer.set(-10,-10);applyHover(null);});
+
+const btnEx=document.getElementById('btnEx'),btnMicro=document.getElementById('btnMicro'),
+      btnBack=document.getElementById('btnBack'),btnXray=document.getElementById('btnXray'),
+      btnPause=document.getElementById('btnPause'),btnReset=document.getElementById('btnReset');
+function syncButtons(){
+  btnEx.textContent=state.explodeTarget>0.5?'收拢部件':'爆炸视图';
+  btnEx.classList.toggle('on',state.explodeTarget>0.5);
+  btnXray.classList.toggle('on',state.xray);
+  btnPause.textContent=state.paused?'继续':'暂停';
+  btnPause.classList.toggle('on',state.paused);
+  btnMicro.classList.toggle('on',state.micro);
+}
+function tweenTo(pos,tgt){ state.tween={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos.clone(),t1:tgt.clone(),k:0}; }
+const MICRO_TGT=new THREE.Vector3(-1.90,1.90,1.42);
+const MICRO_POS=new THREE.Vector3(-1.20,2.62,2.92);
+const BACK_POS=new THREE.Vector3(8.5,-8.6,13.5);
+const BACK_TGT=new THREE.Vector3(0,-0.3,1.2);
+btnEx.onclick=()=>{state.explodeTarget=state.explodeTarget>0.5?0:1;syncButtons();};
+btnMicro.onclick=()=>{
+  state.micro=!state.micro;
+  if(state.micro){ if(state.explodeTarget>0.5){state.explodeTarget=0;syncButtons();}
+    state.microPhi=Math.round(state.phi/(Math.PI*2))*Math.PI*2;
+    tweenTo(MICRO_POS,MICRO_TGT);
+  }else{ tweenTo(HOME,TGT_HOME); }
+  syncButtons();
+};
+btnBack.onclick=()=>{ state.explodeTarget=0; state.micro=false; syncButtons(); tweenTo(BACK_POS,BACK_TGT); };
+btnXray.onclick=()=>{ state.xray=!state.xray; rebuildPick(); syncButtons(); };
+btnPause.onclick=()=>{ state.paused=!state.paused; syncButtons(); };
+btnReset.onclick=()=>{ state.explodeTarget=0; state.micro=false; state.paused=false; syncButtons(); tweenTo(HOME,TGT_HOME); };
+window.addEventListener('keydown',e=>{
+  if(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  const k=e.key.toLowerCase();
+  if(e.code==='Space'){e.preventDefault();btnPause.click();}
+  else if(k==='e')btnEx.click();
+  else if(k==='m')btnMicro.click();
+  else if(k==='b')btnBack.click();
+  else if(k==='x')btnXray.click();
+  else if(k==='r')btnReset.click();
+});
+
+/* ═══════════════════════════════════════════════════
+   14 · 读数 / 主循环
+   ═══════════════════════════════════════════════════ */
+const roRpm=document.getElementById('roRpm'),roTrack=document.getElementById('roTrack'),
+      roTarget=document.getElementById('roTarget'),roSector=document.getElementById('roSector'),
+      roFly=document.getElementById('roFly'),roIO=document.getElementById('roIO'),
+      roBar=document.getElementById('roBar'),roPhase=document.getElementById('roPhase'),
+      scaleEl=document.getElementById('scale');
+const scaleSpans=[...scaleEl.children];
+const tmpV=new THREE.Vector3();
+const clock=new THREE.Clock();
+
+function tick(){
+  const raw=Math.min(clock.getDelta(),0.05);
+  const dt=state.paused?0:raw;
+  state.t+=dt;
+
+  /* 缩放层级：从整机一路到磁晶粒 */
+  const dGrain=camera.position.distanceTo(MICRO_TGT);
+  const nearK=1-smooth(clamp01((dGrain-1.2)/5.0));
+  const dCam=camera.position.distanceTo(controls.target);
+  let stage=0;
+  if(dCam<0.55)stage=4; else if(dCam<2.0)stage=3; else if(dCam<6.6)stage=2;
+  else if(dCam<15.5)stage=1; else stage=0;
+  scaleSpans.forEach((s,i)=>s.classList.toggle('on',i===stage));
+
+  /* 靠近磁晶粒时自动放慢，方便观察；显微模式定格并对齐楔口 */
+  const spinRate=state.micro?0:(1-0.995*nearK);
+  if(!state.micro) state.phi+=dt*Math.PI*2*spinRate;
+  else state.phi=damp(state.phi,state.microPhi,3.0,raw);
+  spin.rotation.y=state.phi;
+
+  /* 扇区经过磁头：每秒一次（与盘片演示转速同步） */
+  if(dt>0){
+    state.sector+=dt;
+    if(state.sector>=1){ state.sector-=1; writeUnderHead(); }
+    if(state.readDelay>0){
+      state.readDelay-=dt;
+      if(state.readDelay<=0) readSenses();
+    }
+  }
+
+  /* 寻道：快速摆弧 → 过冲收敛 → 稳定跟随 */
+  if(dt>0){
+    state.seekT+=dt;
+    if(state.seekT>=1){ state.seekT-=1; newSeek(); }
+    const u=clamp01(state.seekT/0.22);
+    const s=1-Math.pow(1-u,4);
+    const settle=state.seekT>0.22
+      ? Math.sin((state.seekT-0.22)*38)*Math.exp(-(state.seekT-0.22)*10)*0.019
+      : 0;
+    const amp=1-0.62*nearK;
+    state.theta=state.thetaFrom+(state.thetaTo-state.thetaFrom)*s*amp+settle;
+    state.track=Math.round((TRACK_HI-state.theta)/(TRACK_HI-TRACK_LO)*1023);
+  }
+  const rigRot=-(state.theta-TH0);
+  armRigs.forEach(o=>{o.rotation.y=rigRot;});
+  const H=headPos(state.theta);
+  const rHead=Math.hypot(H.x-SX,H.z-SZ);
+  if(trackRing) trackRing.scale.set(rHead,rHead,1);
+  if(ioGroup) ioGroup.position.set(H.x,1.99,H.z);
+
+  /* 读写脉冲与光效 */
+  state.writePulse=Math.max(0,state.writePulse-raw*5.0);
+  state.readPulse=Math.max(0,state.readPulse-raw*4.2);
+  const pw=state.writePulse, pr=state.readPulse;
+  if(writeMat) writeMat.emissiveIntensity=0.7+pw*3.4;
+  if(readMat) readMat.emissiveIntensity=0.7+pr*3.0;
+  if(wGlow){ wGlow.scale.setScalar(0.5+pw*1.5); wGlow.material.opacity=pw*0.85; }
+  if(rGlow){ rGlow.scale.setScalar(0.5+pr*1.4); rGlow.material.opacity=pr*0.8; }
+  if(wRing){ wRing.scale.setScalar(0.5+pw*2.6); wRing.material.opacity=pw*0.65; }
+  if(wBeam){ wBeam.material.opacity=pw*0.7; }
+  writeLight.position.set(H.x-0.19,2.03,H.z+0.045); writeLight.intensity=pw*3.4;
+  readLight.position.set(H.x-0.19,2.03,H.z-0.052); readLight.intensity=pr*2.6;
+  if(dt>0&&pw<0.02&&pr<0.02){
+    state.ioText='待机 · 磁头稳定跟随';
+    state.phaseText=state.seekT<0.24?'音圈加速 · 执行臂快速摆弧':(state.seekT<0.44?'过冲收敛 · 锁定磁道':'稳定跟随 · 等待扇区 07 经过');
+  }
+
+  /* 气垫：始终悬浮，绝不接触 */
+  state.fly=3.0+Math.sin(state.t*4.3)*0.14+Math.sin(state.t*11.7)*0.05;
+  if(airMat) airMat.opacity=0.19+Math.sin(state.t*7)*0.055+nearK*0.10;
+  flowBars.forEach((f,i)=>{
+    const u=((state.t*1.8+f.phase)%1);
+    f.mesh.position.x=f.baseX+(u-0.5)*0.24;
+    f.mesh.scale.z=0.6+Math.sin(u*Math.PI)*0.9;
+  });
+
+  /* 爆炸分层：展开柔和，收回利落 */
+  state.explode=damp(state.explode,state.explodeTarget,state.explodeTarget>0.5?3.2:6.4,raw);
+  const eGlobal=smooth(clamp01(state.explode));
+  parts.forEach(p=>{
+    p._ei=smooth(clamp01((eGlobal-p.delay)/Math.max(0.001,1-p.delay)));
+    p.obj.position.copy(p.base).addScaledVector(p.ex,p._ei);
+  });
+
+  /* 透视外壳 */
+  shellMats.forEach(m=>{
+    let op;
+    if(!state.xray) op=1-eGlobal*0.55;
+    else op=(m.userData.baseOpacity??0.16)*(1-eGlobal*0.45);
+    m.opacity=Math.max(0.02,Math.min(1,op));
+    m.transparent=m.opacity<0.999;
+    m.depthWrite=m.opacity>0.80;
+  });
+
+  /* 悬停 */
+  ray.setFromCamera(pointer,camera);
+  const hits=ray.intersectObjects(pickList,false);
+  const hitP=hits.length?hits[0].object.userData.part:null;
+  applyHover(hitP);
+  if(hitP&&state.explode<0.02){
+    hitP.obj.getWorldPosition(tmpV).add(hitP.labelOff).project(camera);
+    hitP.el.style.opacity='1';
+    hitP.el.style.transform='translate(-50%,-50%) translate('+((tmpV.x*0.5+0.5)*innerWidth).toFixed(1)+'px,'+((-tmpV.y*0.5+0.5)*innerHeight).toFixed(1)+'px)';
+  }else if(!hitP&&hovered===null&&state.explode<0.02){
+    parts.forEach(p=>{p.el.style.opacity='0';});
+  }
+
+  /* 爆炸时给每个部件挂名字标签 */
+  if(eGlobal>0.015){
+    const w=innerWidth,h=innerHeight,items=[],placed=[];
+    parts.forEach(p=>{
+      p.obj.getWorldPosition(tmpV).add(p.labelOff).project(camera);
+      const x=(tmpV.x*0.5+0.5)*w,y=(-tmpV.y*0.5+0.5)*h;
+      const outside=tmpV.z>1||x<-90||x>w+90||y<-40||y>h+40;
+      items.push({el:p.el,x,y,outside,hot:p===hovered});
+    });
+    items.sort((a,b)=>a.y-b.y);
+    items.forEach(it=>{
+      if(it.outside){it.el.style.opacity='0';return;}
+      let y=it.y;
+      for(let pass=0;pass<5;pass++){
+        for(const q of placed){ if(Math.abs(q.x-it.x)<152&&Math.abs(q.y-y)<25) y=q.y+25; }
+      }
+      placed.push({x:it.x,y});
+      it.el.style.opacity=String(Math.min(1,(eGlobal-0.015)*5));
+      it.el.style.transform='translate(-50%,-50%) translate('+it.x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+    });
+  }else if(!hovered){
+    for(const p of parts) if(p.el.style.opacity!=='0') p.el.style.opacity='0';
+  }
+
+  /* 爆炸时镜头自动后退一点 */
+  const dollyTarget=1+eGlobal*0.62;
+  if(!state.tween&&Math.abs(dollyTarget-state.appliedDolly)>1e-5){
+    const off=camera.position.clone().sub(controls.target);
+    off.setLength(THREE.MathUtils.clamp(off.length()*(dollyTarget/state.appliedDolly),controls.minDistance,controls.maxDistance));
+    camera.position.copy(controls.target).add(off);
+    state.appliedDolly=dollyTarget;
+  }
+  if(state.tween){
+    const w=state.tween; w.k=Math.min(1,w.k+raw*1.55);
+    const s=smooth(w.k);
+    camera.position.lerpVectors(w.p0,w.p1,s);
+    controls.target.lerpVectors(w.t0,w.t1,s);
+    if(w.k>=1){ state.tween=null; state.appliedDolly=dollyTarget; }
+  }
+
+  /* 读数 */
+  roRpm.textContent=(60*spinRate).toFixed(spinRate<0.1?1:0);
+  roTrack.textContent=String(Math.max(0,Math.min(1023,state.track))).padStart(4,'0');
+  roTarget.textContent=String(state.target).padStart(4,'0');
+  roSector.textContent='07 · '+(1-state.sector).toFixed(2)+' 秒';
+  roFly.textContent=state.fly.toFixed(1)+' 纳米 · 未接触';
+  roIO.textContent=state.ioText;
+  roIO.classList.toggle('hot',pw>0.02||pr>0.02);
+  roBar.style.width=(state.seekT*100).toFixed(1)+'%';
+  roPhase.textContent=state.phaseText;
+
+  controls.update();
+  renderer.render(scene,camera);
+}
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+syncButtons();
+rebuildPick();
+document.getElementById('loading').classList.add('hide');
+window.__ready=true;
+renderer.setAnimationLoop(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+# ---- 构建产物 ----
+dist/
+app/dist/
+
+# 由 npm run sync 生成
+app/pages/
+app/vendor/
+app/catalog.json
+
+# ---- 依赖 ----
+node_modules/
+
+# ---- 录屏工具与素材（体积大、可重新生成）----
+video-export/
+
+# ---- 调试用临时副本 ----
+_verify_*.html
+
+# ---- 本地智能体会话记录 ----
+.workbuddy/
+AGENTS.md
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.log

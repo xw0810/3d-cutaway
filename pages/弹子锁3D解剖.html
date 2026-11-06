@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>弹子锁 · 交互式 3D 剖面</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#07070a}
+  body{
+    font-family:"PingFang SC","HarmonyOS Sans SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:#fff;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(ellipse 80% 62% at 56% 40%, #241f18 0%, #12100e 42%, #08080a 100%);
+  }
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      linear-gradient(rgba(255,236,200,.032) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,236,200,.032) 1px, transparent 1px);
+    background-size:54px 54px;
+    -webkit-mask-image:radial-gradient(ellipse 72% 62% at 53% 44%, #000 12%, transparent 76%);
+    mask-image:radial-gradient(ellipse 72% 62% at 53% 44%, #000 12%, transparent 76%);
+  }
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;z-index:1}
+  #c:active{cursor:grabbing}
+
+  .hud{
+    position:fixed;z-index:20;
+    background:linear-gradient(180deg, rgba(32,27,22,.72), rgba(16,14,12,.62));
+    -webkit-backdrop-filter:blur(18px) saturate(140%);
+    backdrop-filter:blur(18px) saturate(140%);
+    border:1px solid rgba(226,190,130,.16);
+    border-radius:16px;
+    box-shadow:0 20px 54px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,228,180,.08);
+  }
+
+  .hud.tl{left:24px;top:24px;padding:16px 22px 18px}
+  .eyebrow{font-size:9.5px;letter-spacing:.36em;color:rgba(226,190,130,.55);margin-bottom:9px}
+  .hud h1{font-size:24px;font-weight:600;letter-spacing:.05em;line-height:1.1;
+    background:linear-gradient(180deg,#fff 0%,#f3cf94 130%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hud .sub{font-size:11.5px;color:rgba(255,255,255,.42);margin-top:8px;letter-spacing:.05em}
+
+  .hud.tr{right:24px;top:24px;padding:11px;display:flex;flex-direction:column;gap:8px}
+  button{
+    font-family:inherit;font-size:12.5px;letter-spacing:.05em;color:rgba(255,255,255,.9);cursor:pointer;
+    border:1px solid rgba(226,190,130,.2);border-radius:11px;
+    background:linear-gradient(180deg,rgba(255,235,200,.09),rgba(255,235,200,.02));
+    padding:10px 16px;min-width:172px;
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    transition:transform .18s cubic-bezier(.2,.8,.3,1),background .2s,border-color .2s,box-shadow .25s,color .2s;
+  }
+  button:hover{transform:translateY(-1px);border-color:rgba(226,190,130,.45);background:linear-gradient(180deg,rgba(255,235,200,.16),rgba(255,235,200,.04))}
+  button:active{transform:translateY(0) scale(.985)}
+  button.on{
+    background:linear-gradient(180deg,#d9a758,#a06f27);
+    border-color:rgba(255,215,150,.6);
+    color:#231708;
+    box-shadow:0 8px 26px rgba(217,167,88,.34), inset 0 1px 0 rgba(255,255,255,.35);
+    font-weight:600;
+  }
+  button.danger.on{
+    background:linear-gradient(180deg,#e0654f,#9c2f1e);
+    border-color:rgba(255,150,130,.55);color:#fff;
+    box-shadow:0 8px 26px rgba(220,60,40,.34), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  button.ghost{font-size:11.5px;padding:8px 14px;min-width:0;color:rgba(255,255,255,.5);background:rgba(255,255,255,.02)}
+  button.ghost:hover{color:#fff}
+  .ico{font-size:12px;line-height:1;opacity:.9;font-family:"Segoe UI Symbol",system-ui}
+
+  .hud.bl{left:24px;bottom:24px;padding:13px 18px;display:flex;flex-direction:column;gap:9px;min-width:288px}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:18px;font-size:11.5px}
+  .row .k{color:rgba(255,255,255,.32);letter-spacing:.12em;white-space:nowrap}
+  .row .v{color:rgba(255,255,255,.85);letter-spacing:.04em;text-align:right;font-variant-numeric:tabular-nums}
+  .v.ok{color:#6fe6c4}
+  .v.bad{color:#ff7b66}
+  .v.warm{color:#f0c27d}
+
+  .hud.br{right:24px;bottom:24px;padding:10px 15px;pointer-events:none}
+  .hint{font-size:11px;color:rgba(255,255,255,.34);letter-spacing:.08em}
+
+  #labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .lbl{
+    position:absolute;left:0;top:0;
+    font-size:11px;letter-spacing:.08em;white-space:nowrap;
+    color:#ffeccd;background:rgba(26,21,15,.72);
+    border:1px solid rgba(226,190,130,.38);
+    padding:4px 10px;border-radius:9px;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    box-shadow:0 8px 22px rgba(0,0,0,.45);
+    opacity:0;transition:opacity .22s;
+    will-change:transform;
+  }
+  .lbl::before{
+    content:'';position:absolute;left:-4px;top:50%;width:6px;height:6px;margin-top:-3px;
+    border-radius:50%;background:#e8bb74;box-shadow:0 0 8px rgba(232,187,116,.9);
+  }
+
+  .tip{
+    position:fixed;z-index:30;left:0;top:0;pointer-events:none;
+    max-width:300px;padding:9px 13px;border-radius:11px;
+    background:rgba(24,19,14,.86);border:1px solid rgba(226,190,130,.3);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    box-shadow:0 12px 34px rgba(0,0,0,.55);
+    opacity:0;transform:translate(-50%,-140%);transition:opacity .14s;
+  }
+  .tip .t{font-size:12px;color:#f4cf95;letter-spacing:.06em;margin-bottom:4px;font-weight:600}
+  .tip .d{font-size:11px;line-height:1.55;color:rgba(255,255,255,.62);letter-spacing:.02em}
+
+  .jam{
+    position:fixed;z-index:16;pointer-events:none;opacity:0;transition:opacity .2s;
+    transform:translate(-50%,-50%);
+    padding:6px 11px;border-radius:9px;white-space:nowrap;
+    background:rgba(58,14,10,.82);border:1px solid rgba(255,110,90,.5);
+    box-shadow:0 8px 26px rgba(180,30,20,.4);
+    font-size:11px;letter-spacing:.06em;color:#ffb0a2;line-height:1.6;
+  }
+  .jam b{color:#fff;font-weight:600;font-size:11.5px}
+
+  .fadein{animation:fade .8s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (max-width:820px){
+    .hud.tl{left:14px;top:14px;padding:12px 16px 14px}
+    .hud h1{font-size:18px}
+    .hud.tr{right:14px;top:14px;padding:8px}
+    button{min-width:132px;font-size:11.5px;padding:8px 12px}
+    .hud.bl{left:14px;bottom:14px;padding:10px 13px;min-width:0}
+    .hud.br{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="tip" class="tip"></div>
+<div id="jamTag" class="jam"></div>
+
+<header class="hud tl fadein">
+  <div class="eyebrow">PIN TUMBLER · 剖面解剖</div>
+  <h1>弹子锁 · 内部构造</h1>
+  <div class="sub">五组弹子 · 全部停在剪切线上，锁芯才转得动</div>
+</header>
+
+<div class="hud tr fadein">
+  <button id="btnExplode"><span class="ico">✦</span><span id="lbExplode">爆炸视图</span></button>
+  <button id="btnWrong" class="danger"><span class="ico">⚿</span><span id="lbWrong">换一把错钥匙</span></button>
+  <button id="btnPause"><span class="ico">❚❚</span><span id="lbPause">暂停</span></button>
+  <button id="btnReset" class="ghost">重置视角</button>
+</div>
+
+<div class="hud bl fadein">
+  <div class="row"><span class="k">当前动作</span><span class="v warm" id="phase">插入钥匙</span></div>
+  <div class="row"><span class="k">剪 切 线</span><span class="v ok" id="align">5 / 5 齐平</span></div>
+  <div class="row"><span class="k">结 果</span><span class="v" id="result">—</span></div>
+</div>
+
+<div class="hud br fadein">
+  <div class="hint">拖拽环绕 · 滚轮缩放（可一直推到钥匙孔前）· 悬停查看部件</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ==================================================================
+   一、关键尺寸（1 单位 ≈ 1 cm）
+   ================================================================== */
+const R          = 0.9;                 // 锁芯半径 —— 就是剪切线高度
+const RC         = 0.145;               // 弹子孔半径
+const CH         = [-1.28, -0.64, 0, 0.64, 1.28];  // 五组弹子孔的轴向位置
+const BODY       = { x0: -1.9, x1: 0, y: 1.75, z: 2.0 };
+const PLUG       = { z0: -1.75, z1: 1.96 };
+const CH_TOP     = 1.62;                 // 外壳弹子孔顶端（弹簧顶住的地方）
+const L_DRV      = 0.30;                // 上弹子长度（五颗一样长）
+const C_OK       = [0.28, 0.10, 0.38, 0.04, 0.22];  // 正确钥匙每处齿顶高度
+const C_BAD      = [0.28, 0.10, 0.18, 0.04, 0.22];  // 错钥匙：第 3 处齿切深了 0.20
+const L_KEYPIN   = C_OK.map(c => R - c);            // 下弹子长度由正确齿高决定
+const REST_B     = -0.10;               // 无钥匙时下弹子底端
+const KW         = { top: 0.50, bot: -0.52, hw: 0.16 };   // 钥匙孔（键槽）
+const BLANK_TOP  = 0.46, CUT_HW = 0.26; // 钥匙坯最高点 / 齿槽半宽
+const BLADE      = { z0: -1.66, z1: 2.15, bot: -0.46, x0: -0.21, x1: 0.02 };
+const SH_X       = -1.35, SH_Z = 0.62;  // 锁梁两条腿的位置
+const TURN_DEG   = 14;                  // 开锁时锁芯转角
+
+/* ==================================================================
+   二、渲染器 / 场景 / 相机 / 灯光
+   ================================================================== */
+const canvas   = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.04;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 1, 0.04, 240);
+const HOME_POS = new THREE.Vector3(7.45, 3.00, 5.40);
+const HOME_TGT = new THREE.Vector3(-0.26, 0.53, 0.73);
+camera.position.copy(HOME_POS);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(HOME_TGT);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.82;
+controls.zoomSpeed = 0.92;
+controls.panSpeed = 0.7;
+controls.minDistance = 0.32;
+controls.maxDistance = 26;
+controls.maxPolarAngle = Math.PI * 0.94;
+controls.update();
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.02).texture;
+
+const lKey   = new THREE.DirectionalLight(0xfff2dd, 2.2); lKey.position.set(10.0, 9.0, 9.0);
+const lFront = new THREE.DirectionalLight(0xffffff, 1.35); lFront.position.set(14.0, 1.6, 3.4);
+const lFill  = new THREE.DirectionalLight(0x9dc0ff, 1.0); lFill.position.set(7.0, 2.0, -6.0);
+const lRim   = new THREE.DirectionalLight(0xffcf92, 1.6); lRim.position.set(-6.0, 4.0, -5.0);
+scene.add(lKey, lFront, lFill, lRim, new THREE.HemisphereLight(0x93a8c8, 0x1a1208, 0.42));
+
+/* ==================================================================
+   三、材质
+   ================================================================== */
+const M = {
+  brass:     new THREE.MeshStandardMaterial({ color: 0xc48f42, metalness: 0.86, roughness: 0.33, envMapIntensity: 1.85 }),
+  brassCut:  new THREE.MeshStandardMaterial({ color: 0xbb9455, metalness: 0.70, roughness: 0.58, envMapIntensity: 1.30 }),
+  plug:      new THREE.MeshStandardMaterial({ color: 0xe3b769, metalness: 0.94, roughness: 0.21, envMapIntensity: 2.15 }),
+  plugCut:   new THREE.MeshStandardMaterial({ color: 0xf0c67e, metalness: 0.92, roughness: 0.26, envMapIntensity: 2.05 }),
+  steel:     new THREE.MeshStandardMaterial({ color: 0xc8ced6, metalness: 1.0, roughness: 0.215, envMapIntensity: 1.85 }),
+  spring:    new THREE.MeshStandardMaterial({ color: 0xb4bbc4, metalness: 1.0, roughness: 0.30, envMapIntensity: 1.75 }),
+  shackle:   new THREE.MeshStandardMaterial({ color: 0xc6cdd6, metalness: 1.0, roughness: 0.19, envMapIntensity: 2.0 }),
+  key:       new THREE.MeshStandardMaterial({ color: 0xdde1e6, metalness: 1.0, roughness: 0.235, envMapIntensity: 2.05 })
+};
+
+/* ==================================================================
+   四、部件登记（悬停高亮 / 说明 / 标签）
+   ================================================================== */
+const PART = {};
+function defPart(id, name, desc) {
+  PART[id] = { id, name, desc, mats: [], key: id };
+  return PART[id];
+}
+const pickables = [];
+
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x120c04, transparent: true, opacity: 0.30 });
+function addEdges(mesh, angle = 26) {
+  const eg = new THREE.EdgesGeometry(mesh.geometry, angle);
+  const ls = new THREE.LineSegments(eg, edgeMat);
+  ls.renderOrder = 2;
+  mesh.add(ls);
+  return ls;
+}
+
+function addMesh(parent, geo, mat, part) {
+  const m = new THREE.Mesh(geo, mat);
+  m.userData.part = part;
+  if (Array.isArray(mat)) mat.forEach(x => part.mats.push(x));
+  else part.mats.push(mat);
+  parent.add(m);
+  pickables.push(m);
+  return m;
+}
+
+/* 常用几何工具 ---------------------------------------------------- */
+const PI = Math.PI;
+
+/** 把 (z,y) 平面里画的轮廓沿 +X 方向挤出到 -X（形状 u→世界Z，挤出→世界-X） */
+function extrudeToX(shape, depth, curveSegments = 32) {
+  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, steps: 1, curveSegments });
+  g.rotateY(-PI / 2);
+  return g;
+}
+
+/* ==================================================================
+   五、锁体（外壳）—— 剖面只留 X<0 的一半
+   ================================================================== */
+const bodyG = new THREE.Group();
+scene.add(bodyG);
+const bodyPart = defPart('body', '锁体 / 外壳',
+  '黄铜壳体，上半部钻出五个弹子孔；它和锁芯的圆柱交界面就是剪切线。');
+
+/* 上半块：孔的位置开出五个凹槽（孔的下半截被剖掉） */
+function shapeBodyTop() {
+  const s = new THREE.Shape();
+  const zL = -BODY.z, zR = BODY.z, yB = R, yT = BODY.y, cr = 0.14;
+  s.moveTo(zL, yB);
+  s.lineTo(zL, yT - cr);
+  s.quadraticCurveTo(zL, yT, zL + cr, yT);
+  s.lineTo(zR - cr, yT);
+  s.quadraticCurveTo(zR, yT, zR, yT - cr);
+  s.lineTo(zR, yB);
+  for (let i = CH.length - 1; i >= 0; i--) {
+    const zc = CH[i], hw = RC + 0.014;
+    s.lineTo(zc + hw, yB);
+    s.lineTo(zc + hw, CH_TOP - 0.06);
+    s.quadraticCurveTo(zc + hw, CH_TOP, zc + hw - 0.06, CH_TOP);
+    s.lineTo(zc - hw + 0.06, CH_TOP);
+    s.quadraticCurveTo(zc - hw, CH_TOP, zc - hw, CH_TOP - 0.06);
+    s.lineTo(zc - hw, yB);
+  }
+  s.lineTo(zL, yB);
+  s.closePath();
+  return s;
+}
+
+/* 下半块 */
+function shapeBodyBottom() {
+  const s = new THREE.Shape();
+  const zL = -BODY.z, zR = BODY.z, yT = -R, yB = -BODY.y, cr = 0.14;
+  s.moveTo(zL, yT);
+  s.lineTo(zL, yB + cr);
+  s.quadraticCurveTo(zL, yB, zL + cr, yB);
+  s.lineTo(zR - cr, yB);
+  s.quadraticCurveTo(zR, yB, zR, yB + cr);
+  s.lineTo(zR, yT);
+  s.closePath();
+  return s;
+}
+
+/* 侧面块：中间挖出圆柱孔壁（真正贴着锁芯的那一圈） */
+function shapeSideBlock() {
+  const s = new THREE.Shape();
+  s.moveTo(BODY.x0, -R);
+  s.lineTo(0, -R);
+  s.absarc(0, 0, R, -PI / 2, -PI * 1.5, true);   // 经 (-R,0) 到 (0,R)
+  s.lineTo(BODY.x0, R);
+  s.closePath();
+  return s;
+}
+
+/* 尾部端盖，把锁芯后方的孔堵上 */
+function shapeRearCap() {
+  const s = new THREE.Shape();
+  s.moveTo(0, R);
+  s.absarc(0, 0, R, PI / 2, PI * 1.5, false);
+  s.closePath();
+  return s;
+}
+
+addMesh(bodyG, extrudeToX(shapeBodyTop(), 1.9, 34), [M.brassCut, M.brass], bodyPart);
+addMesh(bodyG, extrudeToX(shapeBodyBottom(), 1.9, 34), [M.brassCut, M.brass], bodyPart);
+
+const sideGeo = new THREE.ExtrudeGeometry(shapeSideBlock(), { depth: 4.0, bevelEnabled: false, steps: 1, curveSegments: 48 });
+sideGeo.translate(0, 0, -2.0);
+addMesh(bodyG, sideGeo, [M.brassCut, M.brass], bodyPart);
+
+const capGeo = new THREE.ExtrudeGeometry(shapeRearCap(), { depth: 0.24, bevelEnabled: false, steps: 1, curveSegments: 40 });
+capGeo.translate(0, 0, -2.0);
+addMesh(bodyG, capGeo, [M.brassCut, M.brass], bodyPart);
+
+bodyG.children.filter(o => o.isMesh && o.geometry.type === 'ExtrudeGeometry').forEach(m => addEdges(m, 24));
+
+/* 锁梁插孔（顶面两个暗孔） */
+const holeMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, metalness: 0.5, roughness: 0.85, side: THREE.DoubleSide });
+[-SH_Z, SH_Z].forEach(z => {
+  const g = new THREE.CylinderGeometry(0.192, 0.192, 0.16, 22, 1, true);
+  const m = new THREE.Mesh(g, holeMat);
+  m.position.set(SH_X, BODY.y - 0.05, z);
+  bodyG.add(m);
+});
+
+/* ==================================================================
+   六、锁芯 + 钥匙孔
+   ================================================================== */
+const plugG = new THREE.Group();
+scene.add(plugG);
+const plugPart = defPart('plug', '锁芯',
+  '钥匙插在它里面。只有五颗上弹子全部退出剪切线，它才转得动。');
+
+function shapePlug() {
+  const s = new THREE.Shape();
+  s.moveTo(0, R);
+  s.absarc(0, 0, R, PI / 2, PI * 1.5, false);   // 左半圆
+  s.lineTo(0, KW.bot);                          // 下缘 → 钥匙孔
+  s.lineTo(-KW.hw, KW.bot);
+  s.lineTo(-KW.hw, KW.top);
+  s.lineTo(0, KW.top);
+  s.closePath();
+  return s;
+}
+const plugGeo = new THREE.ExtrudeGeometry(shapePlug(), {
+  depth: PLUG.z1 - PLUG.z0, bevelEnabled: false, steps: 1, curveSegments: 52
+});
+plugGeo.translate(0, 0, PLUG.z0);
+addMesh(plugG, plugGeo, [M.plugCut, M.plug], plugPart);
+addEdges(plugG.children[0], 24);
+
+/* ==================================================================
+   七、钥匙（整把保留，不被剖切）
+   ================================================================== */
+const keyG = new THREE.Group();
+plugG.add(keyG);                 // 跟着锁芯一起转
+const keyPart = defPart('key', '钥匙',
+  '五处齿高决定五颗下弹子的高度；任何一处不对，剪切线就断了。');
+
+function shapeBlade(cuts) {
+  const s = new THREE.Shape();
+  const z0 = BLADE.z0, z1 = BLADE.z1, bot = BLADE.bot;
+  s.moveTo(z0, bot);
+  s.lineTo(z0, 0.02);
+  s.lineTo(z0 + 0.15, BLANK_TOP);          // 匙尖倒角
+  for (let i = 0; i < 5; i++) {
+    const zc = CH[i], c = cuts[i];
+    const l = zc - CUT_HW, r = zc + CUT_HW;
+    s.lineTo(l, BLANK_TOP);
+    s.lineTo(l + 0.025, c + 0.035);
+    s.lineTo(l + 0.065, c);
+    s.lineTo(r - 0.065, c);
+    s.lineTo(r - 0.025, c + 0.035);
+    s.lineTo(r, BLANK_TOP);
+  }
+  s.lineTo(z1, BLANK_TOP);
+  s.lineTo(z1, bot);
+  s.closePath();
+  return s;
+}
+
+let bladeMesh = null;
+function buildBlade(cuts) {
+  const w = BLADE.x1 - BLADE.x0;
+  const g = new THREE.ExtrudeGeometry(shapeBlade(cuts), { depth: w, bevelEnabled: false, steps: 1, curveSegments: 6 });
+  g.rotateY(-PI / 2);
+  g.translate(BLADE.x1, 0, 0);
+  if (bladeMesh) {
+    keyG.remove(bladeMesh);
+    const i = pickables.indexOf(bladeMesh);
+    if (i >= 0) pickables.splice(i, 1);
+    bladeMesh.geometry.dispose();
+  }
+  bladeMesh = addMesh(keyG, g, M.key, keyPart);
+}
+buildBlade(C_OK);
+
+/* 钥匙柄 */
+(function bow() {
+  const s = new THREE.Shape();
+  s.absellipse(2.60, 0.18, 0.52, 0.66, 0, PI * 2, false, 0);
+  const h = new THREE.Path();
+  h.absellipse(2.60, 0.18, 0.27, 0.40, 0, PI * 2, true, 0);
+  s.holes.push(h);
+  const w = BLADE.x1 - BLADE.x0;
+  const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: false, steps: 1, curveSegments: 28 });
+  g.rotateY(-PI / 2);
+  g.translate(BLADE.x1, 0, 0);
+  addMesh(keyG, g, M.key, keyPart);
+})();
+
+/* ==================================================================
+   八、五组弹子 + 弹簧
+   ================================================================== */
+const keyPinG = new THREE.Group(); plugG.add(keyPinG);      // 跟着锁芯转
+const drvG    = new THREE.Group(); scene.add(drvG);          // 留在外壳里
+const sprG    = new THREE.Group(); scene.add(sprG);
+
+const pinGeo = new THREE.CylinderGeometry(0.138, 0.138, 1, 24, 1, false);
+
+const keyPins = [], drvPins = [], springMeshes = [];
+const ZH = ['①','②','③','④','⑤'];
+
+for (let i = 0; i < 5; i++) {
+  const kp = defPart('kp' + i, `下弹子 ${ZH[i]}`,
+    '由钥匙的齿高顶起，负责把上面的上弹子送到剪切线。');
+  const km = addMesh(keyPinG, pinGeo, M.steel.clone(), kp);
+  km.position.set(0, 0, CH[i]);
+  keyPins.push(km);
+
+  const dp = defPart('dp' + i, `上弹子 ${ZH[i]}`,
+    '两端都是平的。它正好停在剪切线上时，锁芯才是自由的。');
+  const dm = addMesh(drvG, pinGeo, M.steel.clone(), dp);
+  dm.scale.y = L_DRV;
+  dm.position.set(0, 0, CH[i]);
+  drvPins.push(dm);
+
+  const sp = defPart('sp' + i, `弹簧 ${ZH[i]}`,
+    '始终向下压住整组弹子；没有钥匙时把上弹子推进锁芯，锁就卡死。');
+  const sm = new THREE.Mesh(new THREE.BufferGeometry(), M.spring.clone());
+  sm.userData.part = sp; sm.userData.len = -1;
+  sm.position.set(0, 0, CH[i]);
+  sp.mats.push(sm.material);
+  sprG.add(sm);
+  pickables.push(sm);
+  springMeshes.push(sm);
+}
+
+/* 螺旋线 */
+class HelixCurve extends THREE.Curve {
+  constructor(r, h, coils) { super(); this.r = r; this.h = h; this.c = coils; }
+  getPoint(t, target = new THREE.Vector3()) {
+    const a = t * PI * 2 * this.c;
+    return target.set(Math.cos(a) * this.r, t * this.h, Math.sin(a) * this.r);
+  }
+}
+function springGeo(len) {
+  return new THREE.TubeGeometry(new HelixCurve(0.104, len, 4), 96, 0.0225, 6, false);
+}
+
+/* ==================================================================
+   九、锁梁（淬硬钢 U 形）
+   ================================================================== */
+const shackleG = new THREE.Group();
+scene.add(shackleG);
+const shacklePivot = new THREE.Group();
+shacklePivot.position.set(SH_X, 0, -SH_Z);
+shackleG.add(shacklePivot);
+const shacklePart = defPart('shackle', '锁梁',
+  '淬硬钢整体锻出；只有锁芯转到底，它才会从锁体里弹出来。');
+
+/* U 形路径：以“长腿轴线”为原点解析参数化，拐角干净不抖 */
+class ShackleCurve extends THREE.Curve {
+  constructor() {
+    super();
+    this.legA = 2.40;                 // 长腿：y 0.30 → 2.70
+    this.arc  = PI * SH_Z;            // 半圆弧长
+    this.legB = 1.15;                 // 短腿：y 2.70 → 1.55
+    this.total = this.legA + this.arc + this.legB;
+  }
+  getPoint(t, target = new THREE.Vector3()) {
+    let d = t * this.total;
+    if (d <= this.legA) return target.set(0, 0.30 + d, 0);
+    d -= this.legA;
+    if (d <= this.arc) {
+      const th = d / SH_Z;            // 0 → π
+      return target.set(0, 2.70 + Math.sin(th) * SH_Z, SH_Z - Math.cos(th) * SH_Z);
+    }
+    d -= this.arc;
+    return target.set(0, 2.70 - d, SH_Z * 2);
+  }
+}
+(function buildShackle() {
+  const geo = new THREE.TubeGeometry(new ShackleCurve(), 170, 0.168, 16, false);
+  addMesh(shacklePivot, geo, M.shackle, shacklePart);
+})();
+
+/* ==================================================================
+   十、剪切线（本模型的主角）
+   ================================================================== */
+const shearMat = new THREE.MeshBasicMaterial({ color: 0x24cbb6, transparent: true, opacity: 0.95, depthWrite: false });
+const shearMatDim = new THREE.MeshBasicMaterial({ color: 0x1f9e8e, transparent: true, opacity: 0.35, depthWrite: false });
+const seamMat = new THREE.MeshStandardMaterial({ color: 0x2b1d0c, metalness: 0.4, roughness: 0.9 });
+const shearHalo = new THREE.MeshBasicMaterial({ color: 0x1fb9a6, transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending });
+const C_CYAN = new THREE.Color(0x4fe3d0), C_GREEN = new THREE.Color(0x69ffb8), C_RED = new THREE.Color(0xff5a44);
+
+/* 沿线在两组弹子孔之间断开（弹子孔处本来就该断开） */
+(function buildShearLines() {
+  const segs = [];
+  let a = -BODY.z + 0.03;
+  for (let i = 0; i < 5; i++) {
+    const b = CH[i] - RC - 0.02;
+    if (b - a > 0.05) segs.push([a, b]);
+    a = CH[i] + RC + 0.02;
+  }
+  segs.push([a, BODY.z - 0.03]);
+
+  segs.forEach(([a, b]) => {
+    const len = b - a, mid = (a + b) / 2;
+    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.036, len), seamMat);
+    seam.position.set(0.004, R, mid);
+    scene.add(seam);
+    const halo = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.11, len), shearHalo);
+    halo.position.set(0.020, R, mid);
+    scene.add(halo);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.022, len), shearMat);
+    m.position.set(0.018, R, mid);
+    scene.add(m);
+  });
+
+  const gBot = new THREE.BoxGeometry(0.014, 0.022, BODY.z * 2 - 0.06);
+  const mBot = new THREE.Mesh(gBot, shearMatDim);
+  mBot.position.set(0.008, -R, 0);
+  scene.add(mBot);
+
+  // 端面那一圈：剪切线在正面是一个半圆
+  const t = new THREE.TorusGeometry(R, 0.009, 6, 96, PI);
+  const mt = new THREE.Mesh(t, shearMat);
+  mt.rotation.z = PI / 2;
+  mt.position.set(0, 0, 1.93);
+  scene.add(mt);
+})();
+
+/* ==================================================================
+   十一、卡住标记（差多少，看得见）
+   ================================================================== */
+const jamMat = new THREE.MeshBasicMaterial({ color: 0xff5236, transparent: true, opacity: 0.95, depthWrite: false });
+const jamG = new THREE.Group();
+scene.add(jamG);
+const jamBar  = new THREE.Mesh(new THREE.BoxGeometry(0.014, 1, 0.014), jamMat);
+const jamTop  = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.014, 0.014), jamMat);
+const jamBot  = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.014, 0.014), jamMat);
+jamG.add(jamBar, jamTop, jamBot);
+jamG.visible = false;
+
+const jamTag = document.getElementById('jamTag');
+
+/* ==================================================================
+   十二、标签锚点
+   ================================================================== */
+const labelsEl = document.getElementById('labels');
+const labelItems = [];
+function addLabel(text, parent, pos) {
+  const el = document.createElement('div');
+  el.className = 'lbl';
+  el.textContent = text;
+  labelsEl.appendChild(el);
+  const o = new THREE.Object3D();
+  o.position.copy(pos);
+  parent.add(o);
+  labelItems.push({ el, o });
+}
+
+addLabel('锁体 / 外壳', bodyG,    new THREE.Vector3(-0.95, 1.30, -1.20));
+addLabel('锁芯',        plugG,    new THREE.Vector3(-0.45, 0.10, 0.55));
+addLabel('下弹子 ×5',   keyPinG,  new THREE.Vector3(0.02, 0.58, 0));
+addLabel('上弹子 ×5',   drvG,     new THREE.Vector3(0.02, 1.18, 0));
+addLabel('弹簧 ×5',     sprG,     new THREE.Vector3(0.02, 1.44, 0));
+addLabel('锁梁',        shacklePivot, new THREE.Vector3(0.02, 3.52, 0));
+addLabel('钥匙',        keyG,     new THREE.Vector3(0.02, 0.35, 2.72));
+addLabel('剪切线',      scene,    new THREE.Vector3(0.06, 0.90, -1.30));
+
+/* ==================================================================
+   十三、时间轴（插入 → 转动 → 弹开 → 回位 → 拔出）
+   ================================================================== */
+const TL = {
+  ok: [
+    [0.00, 1.60, 0, 0, '插入钥匙'],
+    [0.23, 0.00, 0, 0, '对齐剪切线'],
+    [0.31, 0.00, 0, 0, '对齐剪切线'],
+    [0.47, 0.00, TURN_DEG, 0, '锁芯转动'],
+    [0.55, 0.00, TURN_DEG, 1, '锁梁弹开'],
+    [0.68, 0.00, TURN_DEG, 1, '锁梁弹开'],
+    [0.78, 0.00, 0, 0, '锁芯回位'],
+    [0.90, 0.00, 0, 0, '拔出钥匙'],
+    [1.00, 1.60, 0, 0, '插入钥匙']
+  ],
+  bad: [
+    [0.00, 1.60, 0, 0, '插入钥匙'],
+    [0.20, 0.00, 0, 0, '对齐剪切线'],
+    [0.27, 0.00, 0, 0, '对齐剪切线'],
+    [0.41, 0.00, 2.4, 0, '顶住 · 卡死'],
+    [0.64, 0.00, 2.4, 0, '顶住 · 卡死'],
+    [0.74, 0.00, 0, 0, '锁芯回弹'],
+    [0.87, 0.00, 0, 0, '拔出钥匙'],
+    [1.00, 1.60, 0, 0, '插入钥匙']
+  ]
+};
+const CYCLE = { ok: 1.42, bad: 2.05 };
+
+function sampleTL(list, p) {
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i], b = list[i + 1];
+    if (p >= a[0] && p <= b[0]) {
+      const k = (p - a[0]) / Math.max(1e-6, b[0] - a[0]);
+      const e = k * k * (3 - 2 * k);
+      return {
+        keyOff: a[1] + (b[1] - a[1]) * e,
+        plug:   a[2] + (b[2] - a[2]) * e,
+        lift:   a[3] + (b[3] - a[3]) * e,
+        label:  a[4]
+      };
+    }
+  }
+  const l = list[list.length - 1];
+  return { keyOff: l[1], plug: l[2], lift: l[3], label: l[4] };
+}
+
+/* ==================================================================
+   十四、状态
+   ================================================================== */
+let mode = 'ok';
+let playing = true;
+let exploded = false, explodeAmt = 0;
+let tNorm = 0;
+let CUR_CUTS = C_OK.slice();
+let hovered = null;
+let jamIdx = -1;
+const gaps = [0, 0, 0, 0, 0];
+
+const keyG_base = { x: 0, y: 0, z: 0 };
+
+/* ==================================================================
+   十五、弹子运动求解
+   ================================================================== */
+function bladeTop(u) {
+  if (u < BLADE.z0 + 0.17 || u > BLADE.z1) return -99;
+  for (let i = 0; i < 5; i++) {
+    if (Math.abs(u - CH[i]) <= CUT_HW) return CUR_CUTS[i];
+  }
+  return BLANK_TOP;
+}
+function pinBottomY(i, off) {
+  let h = -99;
+  for (const d of [-0.128, -0.064, 0, 0.064, 0.128]) {
+    const v = bladeTop(CH[i] - off + d);
+    if (v > h) h = v;
+  }
+  return h === -99 ? REST_B : Math.max(REST_B, h);
+}
+
+function updatePins(off) {
+  for (let i = 0; i < 5; i++) {
+    const b = pinBottomY(i, off);
+    const Lk = L_KEYPIN[i];
+
+    const kp = keyPins[i];
+    kp.scale.y = Lk;
+    kp.position.y = b + Lk / 2;
+
+    const top = b + Lk;
+    const dp = drvPins[i];
+    dp.position.y = top + L_DRV / 2;
+
+    const sb = top + L_DRV;
+    const sl = Math.max(0.16, CH_TOP - sb);
+    const sp = springMeshes[i];
+    if (Math.abs(sl - sp.userData.len) > 0.012) {
+      sp.geometry.dispose();
+      sp.geometry = springGeo(sl);
+      sp.userData.len = sl;
+    }
+    sp.position.y = sb;
+
+    gaps[i] = top - R;      // 上弹子底面相对剪切线的偏差
+  }
+}
+
+/* ==================================================================
+   十六、爆炸
+   ================================================================== */
+const EX = {
+  body:    new THREE.Vector3(-2.05, 0.10, -0.25),
+  plug:    new THREE.Vector3(1.85, -1.20, 0.30),
+  drv:     new THREE.Vector3(-0.55, 1.50, 0.00),
+  spr:     new THREE.Vector3(-1.45, 2.10, -0.15),
+  shackle: new THREE.Vector3(0.55, 0.95, -2.05),
+  key:     new THREE.Vector3(0.10, -1.05, 1.15),
+  keyPin:  new THREE.Vector3(0.55, 0.85, 0.00)
+};
+
+/* ==================================================================
+   十七、渲染循环
+   ================================================================== */
+const tmpV = new THREE.Vector3();
+let hudTick = 0;
+let camGoal = null;   // { pos, tgt } 相机缓动目标
+
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.06);
+
+  /* --- 爆炸插值 --- */
+  const target = exploded ? 1 : 0;
+  explodeAmt += (target - explodeAmt) * Math.min(1, dt * 7);
+  if (Math.abs(target - explodeAmt) < 0.0015) explodeAmt = target;
+  const k = explodeAmt * explodeAmt * (3 - 2 * explodeAmt);
+
+  /* --- 时间轴 --- */
+  if (!exploded && playing) {
+    tNorm += dt / CYCLE[mode];
+    if (tNorm >= 1) tNorm -= 1;
+  }
+  const st = exploded
+    ? { keyOff: 0, plug: 0, lift: 0, label: mode === 'ok' ? '剪切线齐平' : '上弹子挡住' }
+    : sampleTL(TL[mode], tNorm);
+
+  /* --- 应用 --- */
+  keyG.position.set(EX.key.x * k, EX.key.y * k, st.keyOff + EX.key.z * k);
+  plugG.position.set(EX.plug.x * k, EX.plug.y * k, EX.plug.z * k);
+  plugG.rotation.z = -THREE.MathUtils.degToRad(st.plug);
+
+  drvG.position.copy(EX.drv).multiplyScalar(k);
+  sprG.position.copy(EX.spr).multiplyScalar(k);
+  bodyG.position.copy(EX.body).multiplyScalar(k);
+  keyPinG.position.copy(EX.keyPin).multiplyScalar(k);
+  shackleG.position.copy(EX.shackle).multiplyScalar(k);
+
+  shacklePivot.position.y = st.lift * 0.86;
+  shacklePivot.rotation.y = -st.lift * 0.58;
+
+  updatePins(st.keyOff);
+
+  /* --- 剪切线配色 --- */
+  const aligned = gaps.every(g => Math.abs(g) < 0.004);
+  const blocking = mode === 'bad' && st.keyOff < 0.06;
+  const pulse = 0.55 + 0.45 * Math.sin(performance.now() * 0.0075);
+  if (blocking) {
+    shearMat.color.copy(C_RED);
+    shearMat.opacity = 0.75;
+  } else if (aligned) {
+    shearMat.color.copy(C_GREEN);
+    shearMat.opacity = 0.55 + 0.45 * pulse;
+  } else {
+    shearMat.color.copy(C_CYAN);
+    shearMat.opacity = 0.82;
+  }
+  shearMatDim.color.copy(shearMat.color);
+
+  /* --- 卡住的弹子：找出来，标出差值 --- */
+  jamIdx = -1;
+  if (blocking) {
+    let worst = 0;
+    for (let i = 0; i < 5; i++) {
+      if (Math.abs(gaps[i]) > 0.01 && Math.abs(gaps[i]) > Math.abs(worst)) { worst = gaps[i]; jamIdx = i; }
+    }
+  }
+
+  if (jamIdx >= 0) {
+    const i = jamIdx;
+    const top = gaps[i] + R;          // 上弹子底面的高度
+    const yA = R, yB = top;
+    jamG.visible = true;
+    jamG.position.set(0.40, 0, CH[i]);
+    const h = Math.abs(yB - yA);
+    jamBar.scale.y = Math.max(0.001, h);
+    jamBar.position.y = (yA + yB) / 2;
+    jamTop.position.y = yA;
+    jamBot.position.y = yB;
+    jamTag.style.opacity = 1;
+    jamTag.innerHTML = `<b>上弹子 ${ZH[i]} 没到位</b><br>还差 ${Math.abs(gaps[i]).toFixed(2)} · 探入锁芯，顶住了`;
+    tmpV.set(0.40, (yA + yB) / 2, CH[i]).project(camera);
+    jamTag.style.left = ((tmpV.x * 0.5 + 0.5) * innerWidth + 92) + 'px';
+    jamTag.style.top  = ((-tmpV.y * 0.5 + 0.5) * innerHeight) + 'px';
+    jamTag.style.transform = 'translate(0,-50%)';
+  } else {
+    jamG.visible = false;
+    jamTag.style.opacity = 0;
+  }
+
+  /* --- 高亮 --- */
+  const jamPart = jamIdx >= 0 ? PART['dp' + jamIdx] : null;
+  for (const id in PART) {
+    const p = PART[id];
+    const isHover = (p === hovered);
+    const isJam = (p === jamPart);
+    const ec = isJam ? 0xff2a10 : (isHover ? 0xc07a22 : 0x000000);
+    const ei = isJam ? 0.55 : (isHover ? 0.45 : 0.0);
+    for (const m of p.mats) {
+      if (m.emissive) {
+        m.emissive.setHex(ec);
+        m.emissiveIntensity = ei;
+      }
+    }
+  }
+
+  /* --- 标签 --- */
+  const labelOn = explodeAmt > 0.10;
+  for (const it of labelItems) {
+    if (!labelOn) { it.el.style.opacity = 0; continue; }
+    it.o.getWorldPosition(tmpV);
+    tmpV.project(camera);
+    if (tmpV.z > 1) { it.el.style.opacity = 0; continue; }
+    const x = (tmpV.x * 0.5 + 0.5) * innerWidth;
+    const y = (-tmpV.y * 0.5 + 0.5) * innerHeight;
+    it.el.style.opacity = Math.min(1, (explodeAmt - 0.10) * 2.2);
+    it.el.style.transform = `translate(${x}px, ${y}px) translate(-50%,-50%)`;
+  }
+
+  /* --- HUD --- */
+  hudTick += dt;
+  if (hudTick > 0.08) {
+    hudTick = 0;
+    updateHUD(st, aligned, blocking);
+  }
+
+  if (camGoal) {
+    const kk = Math.min(1, dt * 3.2);
+    camera.position.lerp(camGoal.pos, kk);
+    controls.target.lerp(camGoal.tgt, kk);
+    if (camera.position.distanceTo(camGoal.pos) < 0.02) camGoal = null;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ==================================================================
+   十八、HUD 文本
+   ================================================================== */
+const elPhase  = document.getElementById('phase');
+const elAlign  = document.getElementById('align');
+const elResult = document.getElementById('result');
+
+function updateHUD(st, aligned, blocking) {
+  elPhase.textContent = exploded ? '爆炸分解' : st.label;
+
+  const n = gaps.filter(g => Math.abs(g) < 0.004).length;
+  if (blocking) {
+    const g = jamIdx >= 0 ? gaps[jamIdx] : 0;
+    elAlign.textContent = `${n} / 5 齐平 · 第 ${jamIdx + 1} 颗差 ${Math.abs(g).toFixed(2)}`;
+    elAlign.className = 'v bad';
+  } else if (aligned) {
+    elAlign.textContent = '5 / 5 齐平';
+    elAlign.className = 'v ok';
+  } else {
+    elAlign.textContent = `${n} / 5 齐平`;
+    elAlign.className = 'v warm';
+  }
+
+  if (blocking) {
+    elResult.textContent = '卡死 · 上弹子探入锁芯';
+    elResult.className = 'v bad';
+  } else if (mode === 'ok' && (st.plug > TURN_DEG * 0.8)) {
+    elResult.textContent = '已开锁 · 剪切线通畅';
+    elResult.className = 'v ok';
+  } else if (mode === 'bad') {
+    elResult.textContent = '锁芯转不动';
+    elResult.className = 'v bad';
+  } else {
+    elResult.textContent = Math.abs(st.plug) > 1 ? '转动中…' : '—';
+    elResult.className = 'v';
+  }
+}
+
+/* ==================================================================
+   十九、交互：悬停
+   ================================================================== */
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2(-10, -10);
+let ptrDirty = false, ptrInside = false;
+const tip = document.getElementById('tip');
+
+renderer.domElement.addEventListener('pointermove', e => {
+  ptr.x = (e.clientX / innerWidth) * 2 - 1;
+  ptr.y = -(e.clientY / innerHeight) * 2 + 1;
+  ptrDirty = true;
+  ptrInside = true;
+  tip.style.left = e.clientX + 'px';
+  tip.style.top = e.clientY + 'px';
+});
+renderer.domElement.addEventListener('pointerleave', () => {
+  ptrInside = false; ptrDirty = true;
+});
+
+function pick() {
+  if (!ptrDirty || !ptrInside) return;
+  ptrDirty = false;
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(pickables, false);
+  let part = null;
+  if (hits.length) {
+    // 取最靠前、且不是被挡住的
+    part = hits[0].object.userData.part;
+  }
+  if (part !== hovered) {
+    hovered = part;
+    if (part) {
+      tip.innerHTML = `<div class="t">${part.name}</div><div class="d">${part.desc}</div>`;
+      tip.style.opacity = 1;
+      renderer.domElement.style.cursor = 'pointer';
+    } else {
+      tip.style.opacity = 0;
+      renderer.domElement.style.cursor = 'grab';
+    }
+  }
+}
+setInterval(pick, 55);
+
+/* ==================================================================
+   二十、按钮
+   ================================================================== */
+const btnExplode = document.getElementById('btnExplode');
+const btnWrong   = document.getElementById('btnWrong');
+const btnPause   = document.getElementById('btnPause');
+const btnReset   = document.getElementById('btnReset');
+
+btnExplode.addEventListener('click', () => {
+  exploded = !exploded;
+  btnExplode.classList.toggle('on', exploded);
+  document.getElementById('lbExplode').textContent = exploded ? '复位合拢' : '爆炸视图';
+  if (exploded) {
+    tNorm = 0.30;
+    tip.style.opacity = 0;
+    hovered = null;
+    camGoal = { pos: new THREE.Vector3(12.2, 4.1, 8.6), tgt: new THREE.Vector3(0.35, 0.25, 0.45) };
+  } else {
+    camGoal = { pos: HOME_POS.clone(), tgt: HOME_TGT.clone() };
+  }
+});
+
+btnWrong.addEventListener('click', () => {
+  mode = (mode === 'ok') ? 'bad' : 'ok';
+  CUR_CUTS = (mode === 'ok' ? C_OK : C_BAD).slice();
+  buildBlade(CUR_CUTS);
+  tNorm = 0;
+  btnWrong.classList.toggle('on', mode === 'bad');
+  document.getElementById('lbWrong').textContent = mode === 'bad' ? '换回正确钥匙' : '换一把错钥匙';
+});
+
+btnPause.addEventListener('click', () => {
+  playing = !playing;
+  btnPause.classList.toggle('on', !playing);
+  document.getElementById('lbPause').textContent = playing ? '暂停' : '继续';
+});
+
+btnReset.addEventListener('click', () => {
+  camGoal = { pos: HOME_POS.clone(), tgt: HOME_TGT.clone() };
+});
+
+/* ==================================================================
+   二十一、自适应 + 启动
+   ================================================================== */
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+const clock = new THREE.Clock();
+frame();
+</script>
+</body>
+</html>
