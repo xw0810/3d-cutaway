@@ -105,9 +105,16 @@ npm run dist     # 只打当前平台 → ../dist/3D交互模型库-<平台>-<�
 npm run dist:all # 打 Windows / macOS / Linux 全平台
 ```
 
-跨平台打包在 Windows / macOS / Linux 上都能执行，产物是免安装目录：Windows 用 `.exe`，
-macOS 是 `.app`，Linux 直接运行目录内的可执行文件。macOS 应用未做代码签名，如需分发请在
-macOS 上自行签名与公证。
+产物是免安装目录：Windows 用 `.exe`，macOS 是 `.app`，Linux 直接运行目录内的可执行文件，
+macOS 应用未做代码签名（分发前请在 macOS 上签名与公证）。
+
+macOS 的 `.app` 内含符号链接，**Windows 主机无法创建**，所以 Windows 上 `dist:all` 只会产出
+win32 与 linux 目标。macOS 包请在 macOS / Linux（WSL 也可以）上打，zip 会保留符号链接与可执行位：
+
+```bash
+node scripts/package.mjs --platform darwin --arch arm64 --out /tmp/darwin-dist
+cd /tmp/darwin-dist && zip -qry 3D交互模型库-darwin-arm64.zip 3D交互模型库-darwin-arm64
+```
 
 ## 重新生成截图
 

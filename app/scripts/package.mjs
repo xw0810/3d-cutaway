@@ -3,10 +3,13 @@
 //   node scripts/package.mjs                     # host platform (win32-x64 here)
 //   node scripts/package.mjs --all               # every target in TARGETS
 //   node scripts/package.mjs --platform darwin --arch arm64
+//   node scripts/package.mjs --all --out /tmp/dist   # custom output root
 //
 // Output: <repo>/dist/3D交互模型库-<platform>-<arch>/
 // Cross-packaging works from any host; the macOS .app and Linux folder are not
 // code-signed (do that on the target OS if you plan to distribute them).
+// Windows cannot create the symlinks inside a macOS .app, so darwin targets
+// need a Linux/macOS host (WSL is fine) — see the README.
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +18,6 @@ import * as packagerModule from '@electron/packager';
 const packager = packagerModule.packager || packagerModule.default;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(here, '..');
-const outRoot = path.resolve(appRoot, '..', 'dist');
 
 const TARGETS = [
   { platform: 'win32', arch: 'x64' },
@@ -31,6 +33,10 @@ const opt = name => {
   if (i === -1) return null;
   return argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : true;
 };
+
+const outRoot = opt('out')
+  ? path.resolve(process.cwd(), opt('out'))
+  : path.resolve(appRoot, '..', 'dist');
 
 if (!fs.existsSync(path.join(appRoot, 'catalog.json'))) {
   console.error('先运行 npm run sync');

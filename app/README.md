@@ -46,6 +46,9 @@ npm run dist:all # 打 Windows / macOS / Linux 全平台到 ../dist/
 node scripts/package.mjs --platform darwin --arch arm64
 ```
 
+在 Windows 上，macOS 目标会被跳过（`.app` 里的符号链接需要管理员权限/开发者模式）；请在
+macOS、Linux 或 WSL 里执行 darwin 目标，用 `--out` 指到 Linux 本地目录，再打成 zip 取回。
+
 ## 结构
 
 ```
