@@ -27,12 +27,16 @@ const PAGES = [
   { slug: 'ear', file: 'pages/人耳3D解剖.html' },
   { slug: 'knee', file: 'pages/膝关节3D解剖.html' },
   { slug: 'lock', file: 'pages/弹子锁3D解剖.html' },
+  { slug: 'pen', file: 'pages/圆珠笔3D解剖.html' },
   { slug: 'engine', file: 'pages/四冲程发动机3D.html' },
   { slug: 'camera', file: 'pages/单反相机3D解剖.html' },
   { slug: 'hdd', file: 'pages/机械硬盘3D解剖.html' },
   { slug: 'sewing', file: 'pages/锁式线迹缝纫机3D.html' },
   { slug: 'leaf', file: 'pages/叶片光合作用3D.html' },
   { slug: 'espresso', file: 'pages/意式咖啡机3D.html' },
+  { slug: 'rocket', file: 'pages/液体火箭发动机3D.html' },
+  { slug: 'sarcomere', file: 'pages/骨骼肌肌节3D.html' },
+  { slug: 'dujiangyan', file: 'pages/都江堰渠首3D.html' },
 ];
 
 function loadPuppeteer() {
@@ -118,12 +122,16 @@ for (const { slug, file } of pages) {
     await page.goto(base + file.split('/').map(encodeURIComponent).join('/'), { waitUntil: 'networkidle2', timeout: 90000 });
 
     // Every page hides its loader once the scene is assembled.
+    // A fixed-position loader has offsetParent === null even while fully visible,
+    // so check the computed style (and the page's own ready flag) instead.
     await page.waitForFunction(() => {
       const l = document.querySelector('#loading, #loader');
       if (!l) return true;
-      return l.classList.contains('hide') || !l.offsetParent
-        || Number(getComputedStyle(l).opacity) < 0.05;
+      if (window.__ready === true) return true;
+      const cs = getComputedStyle(l);
+      return cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05;
     }, { timeout: 90000, polling: 200 });
+    await sleep(900); // let the loader fade-out transition finish
 
     const failedLoad = await page.evaluate(() => {
       const err = document.getElementById('err');

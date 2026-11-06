@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<link rel="icon" href="data:," />
+<title>都江堰渠首 · 无坝引水剖面</title>
+<style>
+  :root{
+    --ink:#eef7f4;
+    --dim:rgba(206,228,222,.56);
+    --faint:rgba(168,200,194,.40);
+    --line:rgba(140,202,190,.16);
+    --panel:rgba(9,18,19,.66);
+    --accent:#79e0cf;
+    --accent-dim:rgba(121,224,207,.15);
+    --warm:#e5ad6c;
+    --sand:#c9955e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#05090b}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:var(--ink);-webkit-font-smoothing:antialiased;
+    background:radial-gradient(122% 88% at 52% 4%, #27403e 0%, #16292a 38%, #0a1517 72%, #05090b 100%);
+  }
+  #c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab}
+  #c:active{cursor:grabbing}
+
+  .hud{
+    position:fixed;z-index:20;
+    background:linear-gradient(180deg,rgba(16,28,29,.76),rgba(8,15,17,.64));
+    -webkit-backdrop-filter:blur(18px) saturate(135%);
+    backdrop-filter:blur(18px) saturate(135%);
+    border:1px solid var(--line);border-radius:15px;
+    box-shadow:0 24px 64px rgba(0,0,0,.58), inset 0 1px 0 rgba(255,255,255,.055);
+  }
+  .eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;letter-spacing:.34em;color:rgba(150,205,195,.62)}
+  h1{font-size:19px;font-weight:600;letter-spacing:.01em;margin:8px 0 7px;line-height:1.32}
+  h1 span{color:rgba(185,220,212,.5);font-weight:400}
+  .sub{font-size:11.5px;line-height:1.7;color:var(--dim)}
+  .sub em{font-style:normal;color:rgba(215,238,230,.86)}
+  .note{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font-size:9.5px;letter-spacing:.04em;color:rgba(200,190,160,.55)}
+
+  .tl{left:26px;top:24px;padding:16px 20px 15px;max-width:308px}
+  .tr{right:26px;top:24px;padding:13px 16px 12px;min-width:236px}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:3px 0}
+  .row span{font-size:10px;letter-spacing:.08em;color:var(--faint);white-space:nowrap}
+  .row b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;font-weight:500;color:#dff5ee;text-align:right}
+  .gauge{position:relative;height:5px;border-radius:4px;background:rgba(255,255,255,.08);margin:8px 0 10px;overflow:hidden}
+  .gauge i{display:block;height:100%;width:10%;border-radius:4px;background:linear-gradient(90deg,#5fc9b8,#e5ad6c);transition:width .12s linear}
+  .bar{display:flex;height:6px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.06);margin:6px 0 9px}
+  .bar i{display:block;height:100%;transition:width .12s linear}
+  #bIn{background:#6fd9cb}#bOut{background:#c9955e}
+  #sIn{background:#8f7a52}#sOut{background:#d0a468}
+  .phase{margin-top:8px;padding-top:9px;border-top:1px solid var(--line);font-size:10.5px;letter-spacing:.05em;color:var(--accent);display:flex;align-items:center;gap:7px}
+  .phase i{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:bl 1.6s infinite;flex:none}
+  @keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .bl{left:26px;bottom:24px;padding:14px 16px 15px;width:318px}
+  .btns{display:flex;gap:7px;flex-wrap:wrap}
+  .btn{
+    appearance:none;border:1px solid rgba(150,200,190,.20);background:rgba(255,255,255,.035);
+    color:rgba(220,240,234,.84);font-size:11px;letter-spacing:.04em;padding:7px 11px;border-radius:8px;
+    cursor:pointer;font-family:inherit;transition:background .18s,border-color .18s,color .18s,box-shadow .18s;
+  }
+  .btn:hover{background:rgba(121,224,207,.11);border-color:rgba(121,224,207,.42);color:#eafff9}
+  .btn.on{background:var(--accent-dim);border-color:rgba(121,224,207,.52);color:#d8fff4;box-shadow:inset 0 0 18px rgba(121,224,207,.12),0 0 14px rgba(121,224,207,.08)}
+  .btn.primary{background:rgba(255,255,255,.06)}
+  .ctrl{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;letter-spacing:.08em;color:var(--faint);margin-bottom:8px}
+  .ctrl label b{font-family:ui-monospace,monospace;font-size:11px;font-weight:500;color:#dff5ee;letter-spacing:0}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;background:linear-gradient(90deg,rgba(121,224,207,.6),rgba(229,173,108,.5));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#e2fff8;border:1px solid rgba(121,224,207,.9);box-shadow:0 0 10px rgba(121,224,207,.6);cursor:grab}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:#e2fff8;border:1px solid rgba(121,224,207,.9);box-shadow:0 0 10px rgba(121,224,207,.6)}
+  .ticks{display:flex;justify-content:space-between;margin-top:6px;font-size:8.5px;font-family:ui-monospace,monospace;color:rgba(165,200,192,.4)}
+
+  .br{right:26px;bottom:24px;padding:14px 18px 15px;width:312px}
+  .hk{font-family:ui-monospace,monospace;font-size:8.5px;letter-spacing:.3em;color:rgba(150,205,195,.5)}
+  .hn{font-size:14px;font-weight:600;margin:7px 0 6px;color:#f1fcf8;letter-spacing:.02em}
+  .hd{font-size:11px;line-height:1.74;color:rgba(200,224,216,.64);min-height:40px}
+
+  .hint{position:fixed;z-index:12;left:50%;top:26px;transform:translateX(-50%);font-size:10px;letter-spacing:.12em;color:rgba(198,225,216,.36);pointer-events:none;white-space:nowrap}
+
+  #labels{position:fixed;inset:0;z-index:8;pointer-events:none;overflow:hidden}
+  .lab{
+    position:absolute;left:0;top:0;opacity:0;font-size:10.5px;letter-spacing:.07em;color:rgba(228,246,240,.9);
+    background:rgba(7,16,17,.74);border:1px solid rgba(121,224,207,.26);border-radius:20px;padding:3px 9px 3px 8px;
+    white-space:nowrap;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,.45);
+    transition:opacity .25s,color .2s,border-color .2s;
+  }
+  .lab::before{content:"";position:absolute;left:-3px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:rgba(121,224,207,.85);box-shadow:0 0 6px rgba(121,224,207,.8)}
+  .lab.hot{color:#fff;border-color:rgba(121,224,207,.86);background:rgba(20,66,62,.92)}
+  .lab.layerlab{font-size:11.5px;letter-spacing:.16em;padding:5px 13px 5px 12px;color:#eafff8;border-color:rgba(229,173,108,.55);background:rgba(46,34,20,.82)}
+  .lab.layerlab::before{background:rgba(229,173,108,.95);box-shadow:0 0 8px rgba(229,173,108,.9)}
+
+  #loading{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:#071012;color:rgba(214,240,232,.72);font-size:12px;letter-spacing:.28em;transition:opacity .6s}
+  #loading.hide{opacity:0;pointer-events:none}
+  #err{display:none;position:fixed;inset:0;z-index:70;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#071012;color:#e8f6f1;font-size:15px;letter-spacing:.08em;text-align:center;line-height:1.8}
+
+  @media (max-width:1080px){.tl{max-width:238px}.bl{width:274px}.br{width:244px}.tr{min-width:200px}.hint{display:none}}
+  @media (max-width:760px){
+    .tl{left:12px;top:12px;padding:12px 14px;max-width:200px}h1{font-size:15px}.sub{font-size:10px}
+    .tr{right:12px;top:12px;min-width:150px;padding:10px 12px}.row b{font-size:10px}
+    .bl{left:12px;right:12px;bottom:12px;width:auto;padding:11px 13px}.br{bottom:auto;top:96px;right:12px;width:180px;padding:10px 12px}.br .hd{font-size:10px}
+    .lab{font-size:9px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+
+<div class="hud tl">
+  <div class="eyebrow">水 利 剖 面 · 渠 首</div>
+  <h1>都江堰渠首 <span>无坝引水</span></h1>
+  <p class="sub">岷江从山谷奔出，被<em>鱼嘴</em>一分为二：<em>内江</em>窄而深、<em>外江</em>宽而浅。三大件是固定的土、石与竹笼，没有闸门、没有阀门，也没有任何活动部件——变的只有水位；一个水文年被压成约十二秒，中间来一次洪峰。</p>
+  <div class="note">示意比例 · 非量测地图 · 不标注实测数值</div>
+</div>
+
+<div class="hud tr">
+  <div class="row"><span>水文年相位</span><b id="roPhase">枯水期</b></div>
+  <div class="gauge"><i id="gLevel"></i></div>
+  <div class="row"><span>鱼嘴分水（示意）</span><b id="roSplit">内江约六成 · 外江约四成</b></div>
+  <div class="bar"><i id="bIn"></i><i id="bOut"></i></div>
+  <div class="row"><span>泥沙去向（示意）</span><b id="roSand">内江约三成 · 外江约七成</b></div>
+  <div class="bar"><i id="sIn"></i><i id="sOut"></i></div>
+  <div class="phase"><i></i><span id="roEvent">固定几何 · 仅水位变化</span></div>
+</div>
+
+<div class="hud bl">
+  <div class="btns">
+    <button class="btn primary" id="btnLayer">分层查看</button>
+    <button class="btn on" id="btnAuto">自动水文年</button>
+    <button class="btn" id="btnFish">潜入鱼嘴剖面</button>
+    <button class="btn" id="btnReset">复位视角</button>
+  </div>
+  <div class="ctrl">
+    <label>枯水 → 洪水 <b id="lvTxt">自动演进</b></label>
+    <input id="level" type="range" min="0" max="100" step="1" value="8" aria-label="水位" />
+    <div class="ticks"><span>枯水</span><span>平水</span><span>洪峰</span></div>
+  </div>
+</div>
+
+<div class="hud br">
+  <div class="hk">悬 停 查 看</div>
+  <div class="hn" id="hName">整座渠首工程</div>
+  <div class="hd" id="hDesc">把指针移到任意部件或某一股水流上，看它在分水、排沙中的作用。拖拽环绕，滚轮可从渠首一路钻进鱼嘴前的水下剖面。</div>
+</div>
+
+<div class="hint">拖 拽 环 绕　·　滚 轮 缩 放　·　悬 停 查 看 作 用</div>
+
+<div id="loading">正 在 构 筑 渠 首 …</div>
+<div id="err">无法加载三维渲染库<br/><span style="font-size:11px;opacity:.6">请检查网络后刷新页面（需要访问 unpkg.com）</span></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+let THREE, OrbitControls, RoomEnvironment;
+try {
+  THREE = await import('three');
+  ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+  ({ RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js'));
+} catch (e) {
+  document.getElementById('err').style.display = 'flex';
+  document.getElementById('loading').classList.add('hide');
+  throw e;
+}
+start();
+
+function start(){
+/* ═════════════ 一 · 渲染环境 ═════════════ */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.86;
+renderer.setClearColor(0x000000, 0);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, window.innerWidth/window.innerHeight, 0.06, 400);
+const HOME = new THREE.Vector3(12, 24, 52);
+const TGT_HOME = new THREE.Vector3(0, -0.4, -0.5);
+const FISH_TGT = new THREE.Vector3(-11.5, -1.1, 1.0);
+camera.position.copy(HOME);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(TGT_HOME);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.rotateSpeed = 0.78;
+controls.zoomSpeed = 0.92;
+controls.zoomToCursor = true;
+controls.enablePan = false;
+controls.minDistance = 1.1;
+controls.maxDistance = 105;
+controls.maxPolarAngle = Math.PI * 0.93;
+controls.update();
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xbcd9ce, 0x1d1712, 0.46));
+const keyL = new THREE.DirectionalLight(0xffe7c6, 1.55); keyL.position.set(14, 22, 18); scene.add(keyL);
+const fillL = new THREE.DirectionalLight(0x8fc4d6, 0.78); fillL.position.set(-18, 9, -12); scene.add(fillL);
+const rimL  = new THREE.DirectionalLight(0xffb774, 0.72); rimL.position.set(-8, 12, -20); scene.add(rimL);
+const frontL= new THREE.DirectionalLight(0xdff6ee, 0.62); frontL.position.set(4, 7, 26); scene.add(frontL);
+const underL= new THREE.DirectionalLight(0x8fb6b0, 0.34); underL.position.set(6, -12, 12); scene.add(underL);
+
+/* ═════════════ 二 · 程序化贴图（无外部图片） ═════════════ */
+function waterTexture(){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const x = c.getContext('2d');
+  x.fillStyle = '#2d7f88'; x.fillRect(0,0,512,512);
+  for (let i=0;i<520;i++){
+    const y = Math.random()*512, len = 30+Math.random()*230, xx = Math.random()*512;
+    x.strokeStyle = 'rgba('+(150+Math.random()*70|0)+',215,210,'+(0.04+Math.random()*0.16).toFixed(3)+')';
+    x.lineWidth = 0.4+Math.random()*1.6;
+    x.beginPath(); x.moveTo(xx,y); x.bezierCurveTo(xx+len*0.3,y-3,xx+len*0.7,y+3,xx+len,y); x.stroke();
+  }
+  for (let i=0;i<90;i++){
+    const y=Math.random()*512;
+    x.strokeStyle='rgba(255,255,255,'+(0.05+Math.random()*0.12).toFixed(3)+')'; x.lineWidth=0.6;
+    x.beginPath(); x.moveTo(Math.random()*512,y); x.lineTo(Math.random()*512,y+(Math.random()-0.5)*8); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(7,2.2);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+function weaveTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const x=c.getContext('2d');
+  x.fillStyle='#66563a'; x.fillRect(0,0,256,256);
+  for(let i=-256;i<512;i+=22){
+    x.strokeStyle='rgba(214,186,124,.62)'; x.lineWidth=9;
+    x.beginPath(); x.moveTo(i,0); x.lineTo(i+256,256); x.stroke();
+    x.strokeStyle='rgba(74,58,34,.46)'; x.lineWidth=2.2;
+    x.beginPath(); x.moveTo(i+11,0); x.lineTo(i+267,256); x.stroke();
+    x.strokeStyle='rgba(96,78,44,.34)'; x.lineWidth=7;
+    x.beginPath(); x.moveTo(i,256); x.lineTo(i+256,0); x.stroke();
+  }
+  for(let i=0;i<900;i++){
+    x.fillStyle='rgba(0,0,0,'+(Math.random()*0.08).toFixed(3)+')';
+    x.fillRect(Math.random()*256,Math.random()*256,2,2);
+  }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(3,2);
+  t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+function stoneTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=256;
+  const x=c.getContext('2d'); x.fillStyle='#5f5b4d'; x.fillRect(0,0,256,256);
+  for(let i=0;i<360;i++){
+    const px=Math.random()*256,py=Math.random()*256,r=3+Math.random()*11;
+    const g=120+Math.random()*70|0;
+    x.fillStyle='rgba('+g+','+(g-6)+','+(g-18)+',.5)';
+    x.beginPath(); x.ellipse(px,py,r,r*0.72,Math.random()*3,0,Math.PI*2); x.fill();
+    x.strokeStyle='rgba(50,48,42,.35)'; x.lineWidth=1; x.stroke();
+  }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(5,2);
+  t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+function rockTexture(){
+  const c=document.createElement('canvas'); c.width=256; c.height=512;
+  const x=c.getContext('2d'); x.fillStyle='#767c72'; x.fillRect(0,0,256,512);
+  for(let i=0;i<240;i++){
+    const px=Math.random()*256;
+    x.strokeStyle='rgba('+(40+Math.random()*70|0)+','+(45+Math.random()*70|0)+','+(45+Math.random()*65|0)+','+(0.1+Math.random()*0.35).toFixed(2)+')';
+    x.lineWidth=0.5+Math.random()*3;
+    x.beginPath(); x.moveTo(px,0); x.bezierCurveTo(px+8,160,px-9,340,px+3,512); x.stroke();
+  }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,1);
+  t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const TEX = { water:waterTexture(), weave:weaveTexture(), stone:stoneTexture(), rock:rockTexture() };
+
+/* ═════════════ 三 · 数学与几何工具 ═════════════ */
+const clamp01 = v => v<0?0:v>1?1:v;
+function ss(a,b,v){ let t=(v-a)/(b-a); t=clamp01(t); return t*t*(3-2*t); }
+function smoothStep(v){ return v*v*(3-2*v); }
+function kf(t,keys){
+  if(t<=keys[0][0]) return keys[0][1];
+  for(let i=0;i<keys.length-1;i++){
+    const [t0,v0]=keys[i],[t1,v1]=keys[i+1];
+    if(t>=t0&&t<=t1) return v0+(v1-v0)*smoothStep(clamp01((t-t0)/(t1-t0)));
+  }
+  return keys[keys.length-1][1];
+}
+function distToSeg(px,pz,ax,az,bx,bz){
+  const dx=bx-ax,dz=bz-az,L=dx*dx+dz*dz;
+  let t = L>0 ? ((px-ax)*dx+(pz-az)*dz)/L : 0;
+  t=clamp01(t);
+  return Math.hypot(px-(ax+t*dx), pz-(az+t*dz));
+}
+function pathDist(pts,x,z){
+  let m=Infinity;
+  for(let i=0;i<pts.length-1;i++){
+    const d=distToSeg(x,z,pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1]);
+    if(d<m) m=d;
+  }
+  return m;
+}
+function curveOf(pts){ return new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(p[0],0,p[1]))); }
+function frameAt(curve,u){
+  const p=curve.getPointAt(clamp01(u));
+  const t=curve.getTangentAt(clamp01(u)).normalize();
+  const n=new THREE.Vector3(-t.z,0,t.x).normalize();
+  return {p,n};
+}
+function prism(points,y0,y1,mat,bevel){
+  const s=new THREE.Shape();
+  points.forEach((p,i)=>{ const X=p[0], Z=-p[1]; i?s.lineTo(X,Z):s.moveTo(X,Z); });
+  s.closePath();
+  const g=new THREE.ExtrudeGeometry(s,{depth:y1-y0,bevelEnabled:true,bevelSize:bevel||0.06,bevelThickness:bevel||0.06,bevelSegments:2,curveSegments:6});
+  g.rotateX(-Math.PI/2); g.translate(0,y0,0);
+  return new THREE.Mesh(g,mat);
+}
+
+/* ═════════════ 四 · 水系骨架（示意坐标） ═════════════ */
+const MAIN_PTS  = [[-28,-1.2],[-24,-0.6],[-20,0.4],[-16,1.5],[-12,1.3],[-9.2,0.5],[-7,0]];
+const INNER_PTS = [[-7,1.35],[-3,2.5],[2,3.7],[6,4.7],[10,5.6],[13,6.6],[17,8.2],[22,9.6]];
+const OUTER_PTS = [[-7,-2.5],[0,-4.3],[8,-5.8],[16,-7.1],[28,-8.8]];
+const CANAL_PTS = [];
+for(let i=0;i<6;i++){
+  const zEnd = 1.4 + i*2.32;
+  CANAL_PTS.push([[13.4,6.6],[17,6.6+(zEnd-6.6)*0.24],[22,6.6+(zEnd-6.6)*0.67],[28,zEnd]]);
+}
+const CUT_Z = 7.6;
+const X0=-28, X1=28, Z0=-16, Z1=14;
+const Y_BED_MAIN=-2.55, Y_BED_IN=-1.9, Y_BED_OUT=-1.1;
+const W_LOW=0.15, W_HIGH=2.2, CREST_SPILL=1.15;
+
+const CARVE = [
+  {pts:MAIN_PTS,  w:3.7, bed:Y_BED_MAIN},
+  {pts:INNER_PTS, w:1.7, bed:Y_BED_IN},
+  {pts:OUTER_PTS, w:2.2, bed:Y_BED_OUT},
+];
+CANAL_PTS.forEach(p=>CARVE.push({pts:p,w:0.52,bed:0.02}));
+
+function baseLand(x,z){
+  const up = ss(-3,-27,x);
+  let h = 1.5 + 0.28*Math.sin(x*0.31+z*0.22) + 0.16*Math.sin(x*1.1-z*1.7);
+  h += 8.6*up*ss(5,12.5,-z);                    // 左岸山谷
+  h += 6.6*up*ss(6.5,13.5,z);                   // 右岸山谷
+  const spur = ss(4,8.5,x)*(1-ss(15,19,x))*ss(2.6,8.6,z);
+  h += 8.2*spur;                                 // 玉垒山山嘴
+  const plain = ss(13,19,x);
+  h = h*(1-plain) + (1.12 + 0.10*Math.sin(x*0.55+z*0.42))*plain;
+  return h;
+}
+function terrainH(x,z){
+  let h = baseLand(x,z);
+  let carve=0, bed=-2.0;
+  for(const ch of CARVE){
+    const d=pathDist(ch.pts,x,z);
+    const c=1-ss(ch.w*0.60, ch.w*1.50, d);
+    if(c>carve){ carve=c; bed=ch.bed + 0.16*Math.sin(x*0.36+z*0.4); }
+  }
+  h = h*(1-carve) + bed*carve;
+  // 外江宽浅漫滩：低水时露出，涨水后过水 —— 分水比反转的几何来源
+  const dOut=pathDist(OUTER_PTS,x,z);
+  if(dOut<3.3) h=Math.min(h, 0.62 + 0.07*Math.sin(x*0.7));
+  // 宝瓶口：在玉垒山山嘴上凿开的一道窄口
+  const gate=ss(8.6,9.6,x)*(1-ss(12.6,13.8,x));
+  const gap =1-ss(0.72,1.70,Math.abs(z-5.7));
+  const notch=gate*gap;
+  h = h*(1-notch) + (-1.45)*notch;
+  return h;
+}
+function terrainColor(x,z,h){
+  const n=0.88+0.24*(0.5+0.5*Math.sin(x*1.7+z*2.3));
+  let c;
+  if(h<-1.05)      c=new THREE.Color(0.15,0.12,0.09);   // 水下河床
+  else if(h<0.25)  c=new THREE.Color(0.30,0.24,0.15);   // 滩地砂卵石
+  else if(h<2.3)   c=new THREE.Color(0.12,0.17,0.12);   // 表土植被
+  else if(h<5.6)   c=new THREE.Color(0.18,0.20,0.19);   // 岩石
+  else             c=new THREE.Color(0.25,0.27,0.25);   // 山脊
+  return c.multiplyScalar(n);
+}
+function strataColor(y){
+  if(y>0.55)  return new THREE.Color(0.16,0.18,0.12);
+  if(y>-0.7)  return new THREE.Color(0.30,0.24,0.15);
+  if(y>-2.5)  return new THREE.Color(0.22,0.18,0.12);
+  return new THREE.Color(0.10,0.13,0.14);
+}
+function buildGrid(x0,x1,z0,z1,nx,nz,mat){
+  const pos=[],col=[],idx=[];
+  for(let i=0;i<=nx;i++){
+    const x=x0+(x1-x0)*i/nx;
+    for(let j=0;j<=nz;j++){
+      const z=z0+(z1-z0)*j/nz;
+      const h=terrainH(x,z);
+      pos.push(x,h,z);
+      const c=terrainColor(x,z,h); col.push(c.r,c.g,c.b);
+    }
+  }
+  for(let i=0;i<nx;i++) for(let j=0;j<nz;j++){
+    const a=i*(nz+1)+j, b=a+nz+1;
+    idx.push(a,b,a+1, b,b+1,a+1);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setIndex(idx);
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  g.computeVertexNormals();
+  return new THREE.Mesh(g,mat);
+}
+
+/* ═════════════ 五 · 分层容器 ═════════════ */
+const layers = {
+  terrain:  new THREE.Group(),
+  water:    new THREE.Group(),
+  sediment: new THREE.Group(),
+  flow:     new THREE.Group()
+};
+const layerSlides = {
+  terrain:  new THREE.Vector3(0,-3.6,-2.4),
+  water:    new THREE.Vector3(0, 2.8,-0.8),
+  sediment: new THREE.Vector3(0,-7.4, 3.6),
+  flow:     new THREE.Vector3(0, 6.6, 1.4)
+};
+Object.values(layers).forEach(g=>scene.add(g));
+const structures = new THREE.Group(); scene.add(structures);
+
+/* ═════════════ 六 · 地形层 ═════════════ */
+const terrainPart = new THREE.Group();
+{
+  const mat = new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.96, metalness:0.02, side:THREE.DoubleSide});
+  const ground=buildGrid(X0,X1,Z0,CUT_Z,150,58,mat);
+  ground.userData.noPick=true; terrainPart.add(ground);
+  terrainPart.userData.mats=[mat];
+  // 剖块四周与底面
+  const wallMat = new THREE.MeshStandardMaterial({color:0x1a2423, roughness:1, metalness:0, side:THREE.DoubleSide});
+  terrainPart.userData.mats.push(wallMat);
+  const bx = new THREE.Mesh(new THREE.BoxGeometry(56,13,0.3),wallMat); bx.position.set(0,-3.2,Z0); terrainPart.add(bx);
+  const lx = new THREE.Mesh(new THREE.BoxGeometry(0.3,13,30),wallMat); lx.position.set(X0,-3.2,-1); terrainPart.add(lx);
+  const rx = new THREE.Mesh(new THREE.BoxGeometry(0.3,13,30),wallMat); rx.position.set(X1,-3.2,-1); terrainPart.add(rx);
+  const bt = new THREE.Mesh(new THREE.BoxGeometry(56,0.3,30),wallMat); bt.position.set(0,-6.5,-1); terrainPart.add(bt);
+  // 山谷岩块与植被
+  const rockGeo=new THREE.IcosahedronGeometry(0.55,0), treeGeo=new THREE.ConeGeometry(0.27,1.15,5);
+  const rockMat=new THREE.MeshStandardMaterial({color:0x6b726c,roughness:1,flatShading:true});
+  const treeMat=new THREE.MeshStandardMaterial({color:0x2c4a38,roughness:1,flatShading:true});
+  terrainPart.userData.mats.push(rockMat,treeMat);
+  const rocks=new THREE.InstancedMesh(rockGeo,rockMat,110), trees=new THREE.InstancedMesh(treeGeo,treeMat,90);
+  const d=new THREE.Object3D(); let ri=0,ti=0;
+  for(let k=0;k<520&&(ri<110||ti<90);k++){
+    const x=-27+Math.random()*22, z=-15+Math.random()*29, h=terrainH(x,z);
+    if(h<2.6) continue;
+    if(ri<110 && Math.random()<0.55){ d.position.set(x,h+0.18,z); d.rotation.set(Math.random(),Math.random(),Math.random()); d.scale.setScalar(0.5+Math.random()*1.5); d.updateMatrix(); rocks.setMatrixAt(ri++,d.matrix); }
+    else if(ti<90){ d.position.set(x,h+0.5,z); d.rotation.set(0,Math.random()*6,0); d.scale.setScalar(0.7+Math.random()*1.2); d.updateMatrix(); trees.setMatrixAt(ti++,d.matrix); }
+  }
+  rocks.count=ri; trees.count=ti;
+  rocks.instanceMatrix.needsUpdate=true; trees.instanceMatrix.needsUpdate=true;
+  terrainPart.add(rocks,trees);
+}
+layers.terrain.add(terrainPart);
+
+// 剖切面：地层分带 + 近岸被剖去的半透明山体
+const sectionPart = new THREE.Group();
+{
+  const NP=150, NR=34, pos=[],col=[],idx=[];
+  for(let i=0;i<=NP;i++){
+    const x=X0+(X1-X0)*i/NP, top=terrainH(x,CUT_Z);
+    for(let j=0;j<=NR;j++){
+      const y=top+(-6.5-top)*j/NR;
+      pos.push(x,y,CUT_Z);
+      const c=strataColor(y); col.push(c.r,c.g,c.b);
+    }
+  }
+  for(let i=0;i<NP;i++) for(let j=0;j<NR;j++){
+    const a=i*(NR+1)+j, b=a+NR+1;
+    idx.push(a,b,a+1, b,b+1,a+1);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setIndex(idx); g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3)); g.computeVertexNormals();
+  const face=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,transparent:true,opacity:0.30,depthWrite:false,side:THREE.DoubleSide}));
+  face.renderOrder=1; face.userData.noPick=true; sectionPart.add(face); sectionPart.userData.face=face;
+  const ghost=buildGrid(X0,X1,CUT_Z,Z1,90,20,new THREE.MeshBasicMaterial({color:0x3b5a52,transparent:true,opacity:0.045,depthWrite:false,side:THREE.DoubleSide}));
+  ghost.userData.noPick=true; ghost.renderOrder=3; sectionPart.add(ghost); sectionPart.userData.ghost=ghost;
+  // 剖切面上的水平地层线（把地层读成层，而不是一堵实墙）
+  const lp=[];
+  [-3.4,-2.5,-0.7,0.55].forEach(y=>{ for(let i=0;i<NP;i++){ const x0=X0+(X1-X0)*i/NP,x1=X0+(X1-X0)*(i+1)/NP; lp.push(x0,y,CUT_Z+0.02,x1,y,CUT_Z+0.02); } });
+  const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));
+  const strataLines=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0x0d1514,transparent:true,opacity:0.52}));
+  strataLines.userData.noPick=true; sectionPart.add(strataLines); sectionPart.userData.lines=strataLines;
+}
+layers.terrain.add(sectionPart);
+
+// 玉垒山山嘴岩体
+const spurPart = new THREE.Group();
+{
+  const mat=new THREE.MeshBasicMaterial({color:0x8e947f,side:THREE.DoubleSide});
+  for(let i=0;i<14;i++){
+    const x=6.5+Math.random()*11, z=7.8+Math.random()*4.5;
+    const m=new THREE.Mesh(new THREE.IcosahedronGeometry(0.42,0),mat);
+    m.position.set(x,terrainH(x,z)+0.12,z); m.scale.set(1.3,0.7,1.1); m.rotation.set(0.2,i*0.9,0.1); spurPart.add(m);
+  }
+}
+layers.terrain.add(spurPart);
+
+// 成都平原田格（示意，不含量测）
+const plainPart = new THREE.Group();
+{
+  const lp=[];
+  for(let x=15;x<=28;x+=1.6) for(let z=-1;z<=13;z+=1.6){
+    const h=terrainH(x,z)+0.04;
+    lp.push(x,h,z-0.7, x,h,z+0.7);
+    lp.push(x-0.7,h,z, x+0.7,h,z);
+  }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.Float32BufferAttribute(lp,3));
+  const m=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x7d9a6c,transparent:true,opacity:0.22}));
+  m.userData.noPick=true; plainPart.add(m);
+}
+layers.terrain.add(plainPart);
+
+/* ═════════════ 七 · 水体层 ═════════════ */
+const CLEAR = new THREE.Color(0x1c7186), MUD = new THREE.Color(0x6b4d2a);
+const waterChannels = [];
+function makeWaterChannel(pts,opt){
+  const curve=curveOf(pts), NU=opt.nu||80, NV=8;
+  const group=new THREE.Group();
+  const position=new Float32Array((NU+1)*(NV+1)*3), uv=new Float32Array((NU+1)*(NV+1)*2), idx=[];
+  for(let i=0;i<=NU;i++) for(let j=0;j<=NV;j++){
+    uv[(i*(NV+1)+j)*2]=i/NU*3; uv[(i*(NV+1)+j)*2+1]=j/NV;
+  }
+  for(let i=0;i<NU;i++) for(let j=0;j<NV;j++){
+    const a=i*(NV+1)+j,b=a+NV+1; idx.push(a,b,a+1,b,b+1,a+1);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setIndex(idx); g.setAttribute('position',new THREE.BufferAttribute(position,3)); g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  const mat=new THREE.MeshPhysicalMaterial({map:TEX.water,color:CLEAR.clone(),roughness:0.22,metalness:0.03,clearcoat:0.7,clearcoatRoughness:0.22,transparent:true,opacity:0.74,depthWrite:false,side:THREE.DoubleSide,envMapIntensity:0.55});
+  const surf=new THREE.Mesh(g,mat); surf.userData.noPick=true; surf.renderOrder=5; group.add(surf);
+
+  // 近岸竖向剖切面：上清下浑的水柱
+  const fPos=new Float32Array((NU+1)*2*3), fCol=new Float32Array((NU+1)*2*3), fIdx=[];
+  const topC=new THREE.Color(0x3fa9b8), botC=new THREE.Color(0x7a5a30);
+  for(let i=0;i<=NU;i++){
+    fCol[i*6+0]=botC.r; fCol[i*6+1]=botC.g; fCol[i*6+2]=botC.b;
+    fCol[i*6+3]=topC.r; fCol[i*6+4]=topC.g; fCol[i*6+5]=topC.b;
+  }
+  for(let i=0;i<NU;i++){ const a=i*2,b=a+2; fIdx.push(a,b,a+1,b,b+1,a+1); }
+  const fg=new THREE.BufferGeometry();
+  fg.setIndex(fIdx); fg.setAttribute('position',new THREE.BufferAttribute(fPos,3)); fg.setAttribute('color',new THREE.BufferAttribute(fCol,3));
+  const face=new THREE.Mesh(fg,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0.34,depthWrite:false,side:THREE.DoubleSide}));
+  face.renderOrder=6; group.add(face);
+
+  const lPos=new Float32Array((NU+1)*3);
+  const lg=new THREE.BufferGeometry(); lg.setAttribute('position',new THREE.BufferAttribute(lPos,3));
+  const line=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0xa8f6e6,transparent:true,opacity:0.88,depthWrite:false}));
+  line.renderOrder=7; line.userData.noPick=true; group.add(line);
+
+  const obj={group,curve,surf,face,line,mat,opt};
+  obj.update=function(level,waterY,backwater,spill,time){
+    const mud=ss(0.22,0.95,level);
+    mat.color.copy(CLEAR).lerp(MUD,mud*0.78);
+    mat.opacity=0.72+mud*0.10;
+    const lineC=line.material.color;
+    for(let i=0;i<=NU;i++){
+      const u=i/NU, F=frameAt(curve,u), p=F.p, n=F.n;
+      const w=opt.width(u,level);
+      const bw=opt.backwater ? opt.backwater(u,backwater) : 0;
+      const sb=opt.spillBump ? opt.spillBump(u,spill) : 0;
+      const yTop=waterY+bw+sb;
+      const bed=opt.bed(u);
+      for(let j=0;j<=NV;j++){
+        const v=-1+2*j/NV, k=(i*(NV+1)+j)*3;
+        const wave=0.038*Math.sin(p.x*1.6+time*2.1+v*2.4)*(0.4+level);
+        position[k]  =p.x+n.x*v*w*0.5;
+        position[k+1]=yTop+wave;
+        position[k+2]=p.z+n.z*v*w*0.5;
+      }
+      const ex=p.x+n.x*w*0.5, ez=p.z+n.z*w*0.5;
+      const f=i*6;
+      fPos[f]=ex; fPos[f+1]=bed; fPos[f+2]=ez;
+      fPos[f+3]=ex; fPos[f+4]=yTop; fPos[f+5]=ez;
+      lPos[i*3]=ex; lPos[i*3+1]=yTop+0.02; lPos[i*3+2]=ez;
+    }
+    g.attributes.position.needsUpdate=true;
+    fg.attributes.position.needsUpdate=true;
+    lg.attributes.position.needsUpdate=true;
+    g.computeVertexNormals(); fg.computeVertexNormals();
+  };
+  waterChannels.push(obj);
+  return obj;
+}
+const shelfOf = lvl => ss(0.55,1.92,W_LOW+(W_HIGH-W_LOW)*lvl);
+const mainW  = makeWaterChannel(MAIN_PTS,{width:()=>7.2, bed:u=>-2.55+0.35*u});
+const innerW = makeWaterChannel(INNER_PTS,{
+  width:()=>3.0, bed:u=>-1.9+0.15*u,
+  backwater:(u,bw)=>bw*Math.exp(-Math.pow((u-0.62)/0.20,2))*ss(0.05,0.35,u)
+});
+const outerW = makeWaterChannel(OUTER_PTS,{
+  width:(u,lvl)=>4.2+2.03*shelfOf(lvl), bed:u=>-1.1+0.2*u,
+  spillBump:(u,s)=>0.12*s*Math.exp(-Math.pow((u-0.36)/0.13,2))
+});
+layers.water.add(mainW.group,innerW.group,outerW.group);
+CANAL_PTS.forEach((p,i)=>{
+  const c=makeWaterChannel(p,{nu:26,width:()=>0.86,bed:()=>0.0});
+  c.waterYOffset=0.20;
+  layers.water.add(c.group);
+  waterChannels[waterChannels.length-1].isCanal=true;
+});
+
+// 水位尺（无刻度数字，仅示意水位）
+const gaugePart=new THREE.Group();
+let gaugeBand;
+{
+  const rodMat=new THREE.MeshStandardMaterial({color:0x9fb4ad,roughness:0.55,metalness:0.4});
+  const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,6.0,10),rodMat);
+  rod.position.set(2.2,0,7.1); gaugePart.add(rod);
+  const tickMat=new THREE.MeshBasicMaterial({color:0xd8ece4});
+  for(let i=0;i<9;i++){
+    const t=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.035,0.035),tickMat);
+    t.position.set(2.2,-2.7+i*0.68,7.1); gaugePart.add(t);
+  }
+  gaugeBand=new THREE.Mesh(new THREE.TorusGeometry(0.22,0.045,8,24),new THREE.MeshBasicMaterial({color:0x7ff0d8,transparent:true,opacity:0.95}));
+  gaugeBand.rotation.x=Math.PI/2; gaugeBand.position.set(2.2,0.15,7.1); gaugePart.add(gaugeBand);
+}
+layers.water.add(gaugePart);
+
+/* ═════════════ 八 · 三大件（固定土、石与竹笼） ═════════════ */
+const earthMat = ()=>new THREE.MeshStandardMaterial({map:TEX.stone,color:0x6e6449,roughness:0.95,metalness:0.02,side:THREE.DoubleSide});
+const cageMat  = ()=>new THREE.MeshStandardMaterial({map:TEX.weave,color:0x8b7045,roughness:0.95,metalness:0.0,side:THREE.DoubleSide});
+function outline(mesh,color,opacity){
+  const e=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry,28),
+    new THREE.LineBasicMaterial({color,transparent:true,opacity:opacity||0.34}));
+  e.position.copy(mesh.position); e.rotation.copy(mesh.rotation); e.scale.copy(mesh.scale);
+  e.userData.noPick=true; return e;
+}
+function bambooCages(parent,list){
+  const g=new THREE.CylinderGeometry(0.17,0.17,1.12,8), m=cageMat();
+  const inst=new THREE.InstancedMesh(g,m,list.length), d=new THREE.Object3D();
+  list.forEach((p,i)=>{ d.position.set(p[0],p[1],p[2]); d.rotation.set(0,p[3]||0,Math.PI/2); d.scale.setScalar(p[4]||1); d.updateMatrix(); inst.setMatrixAt(i,d.matrix); });
+  inst.instanceMatrix.needsUpdate=true; parent.add(inst); return inst;
+}
+
+// 鱼嘴分水堤
+const fishPart=new THREE.Group();
+{
+  const body=prism([[-9.35,0],[-8.9,-0.30],[-7.7,-0.85],[-6.2,-1.55],[-6.0,1.55],[-7.7,0.85],[-8.9,0.30]],-2.35,2.55,earthMat(),0.09);
+  fishPart.add(body); fishPart.add(outline(body,0xf0c887,0.46));
+  const nose=prism([[-9.5,0],[-9.15,-0.22],[-8.6,-0.42],[-8.6,0.42],[-9.15,0.22]],-2.3,2.30,cageMat(),0.07);
+  fishPart.add(nose);
+  const beak=new THREE.Mesh(new THREE.ConeGeometry(0.44,1.15,4),new THREE.MeshStandardMaterial({color:0xb89158,roughness:0.9,metalness:0.05}));
+  beak.rotation.z=Math.PI/2; beak.rotation.y=Math.PI/4; beak.position.set(-9.55,1.55,0); fishPart.add(beak);
+  const cageList=[];
+  for(let i=0;i<7;i++){
+    const x=-8.7+i*0.38, w=0.35+i*0.16;
+    cageList.push([x,-0.45,-w,0,0.9],[x,-0.45,w,0,0.9]);
+    cageList.push([x,0.55,-w*0.75,0,0.8],[x,0.55,w*0.75,0,0.8]);
+  }
+  bambooCages(fishPart,cageList);
+  const crest=new THREE.Mesh(new THREE.BoxGeometry(3.3,0.14,0.75),new THREE.MeshStandardMaterial({color:0x6e6a58,roughness:1}));
+  crest.position.set(-7.2,2.62,0); fishPart.add(crest);
+}
+structures.add(fishPart);
+
+// 金刚堤
+const dykePart=new THREE.Group();
+{
+  const body=prism([[-6.2,-1.2],[-6.0,1.2],[7.2,1.25],[7.4,-1.25]],-1.7,2.65,earthMat(),0.10);
+  dykePart.add(body); dykePart.add(outline(body,0xd9be8a,0.32));
+  const slabMat=new THREE.MeshStandardMaterial({color:0x777263,roughness:1});
+  for(let i=0;i<13;i++){
+    const s=new THREE.Mesh(new THREE.BoxGeometry(0.86,0.11,1.9),slabMat);
+    s.position.set(-5.7+i*1.02,2.72,0.03); s.rotation.y=0.02*Math.sin(i); dykePart.add(s);
+  }
+  const cages=[];
+  for(let i=0;i<13;i++){
+    const x=-5.8+i*1.02;
+    cages.push([x,-0.5,-1.32,0,0.95],[x,-0.5,1.36,0,0.95]);
+  }
+  bambooCages(dykePart,cages);
+}
+structures.add(dykePart);
+
+// 飞沙堰：低矮溢流堰，顶面低于金刚堤
+const weirPart=new THREE.Group();
+{
+  const body=prism([[4.5,-1.25],[4.5,1.55],[8.3,1.55],[8.3,-1.25]],-1.5,CREST_SPILL,earthMat(),0.07);
+  weirPart.add(body); weirPart.add(outline(body,0xe8c27c,0.40));
+  const ramp=prism([[4.5,-1.25],[4.5,0.2],[8.3,0.2],[8.3,-1.25]],-1.55,0.62,cageMat(),0.05);
+  weirPart.add(ramp);
+  const cages=[];
+  for(let i=0;i<5;i++) cages.push([4.9+i*0.8,0.35,1.62,0,0.95],[4.9+i*0.8,0.35,-1.34,0,0.95]);
+  bambooCages(weirPart,cages);
+  const lip=new THREE.Mesh(new THREE.BoxGeometry(3.9,0.10,0.32),new THREE.MeshStandardMaterial({color:0xd6bd8c,roughness:0.9}));
+  lip.position.set(6.4,CREST_SPILL+0.06,0.15); weirPart.add(lip);
+}
+structures.add(weirPart);
+
+// 宝瓶口：玉垒山山嘴上凿开的岩口
+const bottlePart=new THREE.Group();
+{
+  // 山嘴被凿开后留下的两片岩壁：中间那道缝就是宝瓶口
+  const rm=new THREE.MeshBasicMaterial({map:TEX.rock,color:0xb2ad97,side:THREE.DoubleSide});
+  const edgeMat=new THREE.LineBasicMaterial({color:0xe0c793,transparent:true,opacity:0.55});
+  [4.95,6.45].forEach((z,k)=>{
+    const g=new THREE.PlaneGeometry(4.6,3.7);
+    const wall=new THREE.Mesh(g,rm);
+    wall.position.set(11.15,0.35,z); wall.rotation.y=k?0.04:-0.04;
+    wall.userData.noPick=false; bottlePart.add(wall);
+    const eg=new THREE.LineSegments(new THREE.EdgesGeometry(g),edgeMat);
+    eg.position.copy(wall.position); eg.rotation.copy(wall.rotation); eg.userData.noPick=true;
+    bottlePart.add(eg);
+    // 岩口上缘的碎石，避免出现方盒感
+    for(let i=0;i<5;i++){
+      const r=new THREE.Mesh(new THREE.IcosahedronGeometry(0.34,0),new THREE.MeshBasicMaterial({color:0x9a9c8b}));
+      r.position.set(9.2+i*1.0,2.15+(i%2)*0.12,z+(k?0.18:-0.18)); r.scale.set(1.2,0.6,0.8);
+      bottlePart.add(r);
+    }
+  });
+  const chiselMat=new THREE.MeshBasicMaterial({color:0x3a3a30,transparent:true,opacity:0.36});
+  for(let i=0;i<9;i++){
+    const x=9.2+i*0.48;
+    [[4.93,0.03],[6.47,-0.03]].forEach(([z,o])=>{
+      const l=new THREE.Mesh(new THREE.BoxGeometry(0.03,2.4,0.03),chiselMat);
+      l.position.set(x,0.35,z+o); bottlePart.add(l);
+    });
+  }
+}
+structures.add(bottlePart);
+
+/* ═════════════ 九 · 泥沙层：卧铁 + 成层滚动的推移质 ═════════════ */
+const ironPart=new THREE.Group();
+{
+  const iron=new THREE.MeshStandardMaterial({color:0x5a574f,roughness:0.62,metalness:0.72,emissive:0x4a3418,emissiveIntensity:0.55});
+  const rust=new THREE.MeshStandardMaterial({color:0x9a6738,roughness:0.95,metalness:0.25,emissive:0x3a2410,emissiveIntensity:0.35});
+  [5.9,6.4,6.9].forEach((z,i)=>{
+    const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.085,0.085,2.7,10),i===1?rust:iron);
+    bar.rotation.z=Math.PI/2; bar.position.set(3.0,-2.45-i*0.06,z); ironPart.add(bar);
+    [-1.25,1.25].forEach(dx=>{
+      const st=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.5,0.42),new THREE.MeshStandardMaterial({color:0x77705c,roughness:1}));
+      st.position.set(3.0+dx,-2.72,z); ironPart.add(st);
+    });
+  });
+  // 埋在滩下的半透明砂体
+  const sand=new THREE.Mesh(new THREE.BoxGeometry(3.5,0.75,1.8),new THREE.MeshStandardMaterial({color:0x9a8357,roughness:1,transparent:true,opacity:0.24,depthWrite:false,side:THREE.DoubleSide}));
+  sand.position.set(3.0,-2.05,6.4); sand.renderOrder=2; ironPart.add(sand);
+}
+layers.sediment.add(ironPart);
+
+const bedLoadPart=new THREE.Group();
+const routeOuter=curveOf(MAIN_PTS.concat(OUTER_PTS.slice(1)));
+const routeInner=curveOf(MAIN_PTS.concat(INNER_PTS.slice(1,6)));
+const bedLoad={mesh:null,items:[],dummy:new THREE.Object3D()};
+{
+  const N=270, geo=new THREE.IcosahedronGeometry(0.1,0);
+  const mat=new THREE.MeshBasicMaterial({color:0xffffff});
+  const inst=new THREE.InstancedMesh(geo,mat,N);
+  inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const cols=[new THREE.Color(0xa67a45),new THREE.Color(0xc7a068),new THREE.Color(0x7c6a4c)];
+  for(let i=0;i<N;i++){
+    const outer=Math.random()<0.82;
+    bedLoad.items.push({u:Math.random(),route:outer?routeOuter:routeInner,outer,
+      lat:(Math.random()-0.5)*2.1,layer:i%3,size:0.55+Math.random()*0.85,
+      spd:0.045+Math.random()*0.055,spin:Math.random()*6,phase:Math.random()*6});
+    inst.setColorAt(i,cols[i%3]);
+  }
+  inst.instanceColor.needsUpdate=true;
+  bedLoadPart.add(inst); bedLoad.mesh=inst;
+}
+layers.sediment.add(bedLoadPart);
+
+/* ═════════════ 十 · 流线层 ═════════════ */
+const streams=[];
+function makeStream(pts,color,name,desc,speed,count,radius,opts){
+  opts=opts||{};
+  const group=new THREE.Group();
+  const curve=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(p[0],p[1],p[2])));
+  const tubeGeo=new THREE.TubeGeometry(curve,90,radius||0.105,7,false);
+  let tubeMat;
+  if(opts.gradient){
+    const col=[], pa=tubeGeo.attributes.position;
+    const cyan=new THREE.Color(0x7ce8dc), ochre=new THREE.Color(0xd7a158);
+    for(let i=0;i<pa.count;i++){
+      const y=pa.getY(i), t=clamp01((y+0.85)/1.7);
+      const c=ochre.clone().lerp(cyan,t); col.push(c.r,c.g,c.b);
+    }
+    tubeGeo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+    tubeMat=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0.62,depthWrite:false});
+  } else {
+    tubeMat=new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.55,depthWrite:false});
+  }
+  const tube=new THREE.Mesh(tubeGeo,tubeMat); tube.renderOrder=8; group.add(tube);
+  // 更粗的透明拾取管，方便悬停
+  const pick=new THREE.Mesh(new THREE.TubeGeometry(curve,60,opts.pickR||0.40,6,false),
+    new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,colorWrite:false,depthWrite:false}));
+  pick.renderOrder=0; group.add(pick);
+  const pg=new THREE.SphereGeometry(0.075,8,6), particles=[];
+  for(let i=0;i<(count||7);i++){
+    const m=new THREE.Mesh(pg,new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.9,depthWrite:false,blending:THREE.AdditiveBlending}));
+    m.renderOrder=9; group.add(m); particles.push(m);
+  }
+  const s={group,curve,particles,tube,tubeMat,speed:speed||0.18,count:count||7,gradient:!!opts.gradient,color,info:{name,desc}};
+  group.userData.stream=s;
+  streams.push(s);
+  return s;
+}
+// 表层清水 → 凹岸 → 内江 → 宝瓶口 → 渠网
+const surfaceFlowA=makeStream([
+  [-26,0,-0.5],[-21,0,0.6],[-17,0,1.7],[-13,0,2.5],[-9.5,0,2.4],[-6,0,2.6],
+  [-1,0,3.5],[4,0,4.4],[9,0,5.3],[12,0,5.7],[16,0,7.0],[22,0,9.0],[27,0,10.6]
+],0x8cf2e2,'表层清水 · 入内江','弯道表层流被推向凹岸，含沙少的清水沿这一侧进入内江，再经宝瓶口流向成都平原。',0.16,9,0.105,{pickR:0.30});
+const surfaceFlowB=makeStream([
+  [-25,0,-1.6],[-20,0,0.0],[-16,0,1.1],[-12,0,1.9],[-8.5,0,2.0],[-3,0,3.0],
+  [3,0,4.0],[8,0,5.0],[11.5,0,5.5],[15,0,6.6],[21,0,7.7],[27,0,8.4]
+],0x7de0d6,'凹岸表流','同一股表流贴着凹岸走，枯水期它让内江分到更多水；洪水期宽浅的外江漫滩后来居上。',0.15,7,0.09,{pickR:0.30});
+// 底层挟沙水 → 凸岸 → 外江
+const bottomFlowA=makeStream([
+  [-26,0,-2.2],[-21,0,-1.5],[-17,0,-1.0],[-13,0,-1.4],[-9.5,0,-2.0],[-6,0,-2.8],
+  [0,0,-4.2],[8,0,-5.7],[16,0,-7.0],[27,0,-8.6]
+],0xe2a860,'底层挟沙水 · 入外江','螺旋环流的下半圈把挟沙底流沿凸岸送进外江，这是第一次分沙，也是鱼嘴自动排沙的关键。',0.15,8,0.105,{pickR:0.58});
+const bottomFlowB=makeStream([
+  [-25,0,-3.0],[-20,0,-2.4],[-16,0,-2.0],[-12,0,-2.3],[-8,0,-3.1],[-2,0,-4.5],[6,0,-6.2],[17,0,-7.8],[27,0,-9.2]
+],0xd0934f,'凸岸底流','贴着河床走的底流含沙最多，它沿凸岸滑向外江，把大部分推移质带离灌区。',0.14,7,0.09,{pickR:0.58});
+
+// 弯道螺旋环流（局部坐标，随水深缩放）
+const spiralPart=new THREE.Group();
+const spiralStreams=[];
+for(let k=0;k<3;k++){
+  const pts=[],phase=k*2.1;
+  for(let i=0;i<=90;i++){
+    const s=i/90, x=-20.5+11.5*s;
+    const zc=0.1+1.05*Math.sin(Math.PI*s);
+    const a=2*Math.PI*1.35*s+phase;
+    pts.push([x,0.84*Math.sin(a),zc+2.25*Math.cos(a)]);
+  }
+  const st=makeStream(pts,0xffffff,'弯道螺旋环流','表层清水被推向凹岸流进内江，底层挟沙水沿凸岸滑向外江；上下两层同走一道弯，却各奔一处。',0.11,6,0.075,{gradient:true,pickR:0.34});
+  spiralPart.add(st.group); spiralStreams.push(st);
+}
+layers.flow.add(spiralPart);
+const surfaceGroup=new THREE.Group(); surfaceGroup.add(surfaceFlowA.group,surfaceFlowB.group); layers.flow.add(surfaceGroup);
+const bottomGroup=new THREE.Group(); bottomGroup.add(bottomFlowA.group,bottomFlowB.group); layers.flow.add(bottomGroup);
+
+// 飞沙堰溢洪与二次排沙
+const spillPart=new THREE.Group();
+const spillStreams=[];
+for(let k=0;k<3;k++){
+  const zz=4.9-k*0.55;
+  const st=makeStream([
+    [3.3,0,zz],[5.0,0.25,zz-0.4],[6.4,0.06,1.1],[6.6,-0.15,-1.0],[7.4,-0.35,-3.3],[10.5,-0.45,-5.2],[16,-0.5,-6.8]
+  ],0xdcc59a,'飞沙堰溢洪 · 二次分选','水位涨过堰顶，多余的水翻堰泄入外江；旋流顺带把沙甩出去，完成第二次分沙。',0.24,7,0.085,{pickR:0.48});
+  spillPart.add(st.group); spillStreams.push(st);
+}
+layers.flow.add(spillPart);
+
+// 上游白水泡沫
+const foamPart=new THREE.Group();
+const foam=[];
+{
+  const g=new THREE.SphereGeometry(0.07,6,5),m=new THREE.MeshBasicMaterial({color:0xdff7f0,transparent:true,opacity:0.62,depthWrite:false});
+  for(let i=0;i<26;i++){ const s=new THREE.Mesh(g,m); s.renderOrder=9; foamPart.add(s); foam.push({m:s,u:Math.random(),lat:(Math.random()-0.5)*4.4,spd:0.12+Math.random()*0.09}); }
+  foamPart.userData.noPick=true;
+}
+layers.flow.add(foamPart);
+
+/* ═════════════ 十一 · 部件注册与标签 ═════════════ */
+const labelsEl=document.getElementById('labels');
+const parts=[], pickables=[];
+function addPart(obj,name,desc,anchor,mode,className,labelOnly){
+  const el=document.createElement('div');
+  el.className='lab'+(className?' '+className:'');
+  el.textContent=name; labelsEl.appendChild(el);
+  const p={obj,name,desc,anchor:new THREE.Vector3(anchor[0],anchor[1],anchor[2]),mode:mode||'always',el,isLayer:!!className};
+  if(!labelOnly){
+    obj.traverse(o=>{
+      if(o.isMesh && !o.userData.noPick){ o.userData.part=p; pickables.push(o); }
+    });
+  }
+  parts.push(p); obj.userData.part=p;
+  return p;
+}
+addPart(fishPart,'鱼嘴分水堤','顶着水流的分水嘴：枯水时内江河床更低，约六成入内江；洪水时外江宽浅漫滩过水，比例自动反过来。',[-7.7,3.0,0],'always');
+addPart(dykePart,'金刚堤','鱼嘴身后长长的固定石堤，把江水一分为二：一侧内江，一侧外江。它不调节、不启闭。',[0.5,3.4,0.2],'always');
+addPart(weirPart,'飞沙堰','侧面这段特意做低的堰。水位一旦涨过堰顶，多余的水自动翻堰泄走，旋流顺带把沙甩入外江。',[6.4,2.0,0.6],'always');
+addPart(bottlePart,'宝瓶口','在玉垒山山嘴上凿开的窄口，扼住进入灌区的流量。水在它上游壅起，才给了飞沙堰溢洪的机会。',[11,2.9,5.7],'always');
+addPart(mainW.group,'岷江出山口','岷江从山谷奔出，带着泥沙在弯道里形成螺旋环流，为第一次分水与分沙准备好条件。',[-20,1.6,0.6],'always');
+addPart(innerW.group,'内江','窄而深的一支。表层清水沿凹岸进来，经宝瓶口进入成都平原渠网。',[1.0,0.9,3.7],'always');
+addPart(outerW.group,'外江','宽而浅的一支，还带一片低水时露出的漫滩。洪水一到，漫滩过水，它便接走多的那份。',[4.0,0.9,-4.7],'always');
+addPart(CANAL_PTS.length?waterChannels[3].group:gaugePart,'成都平原渠网','出宝瓶口后呈扇形铺开的渠系，把被两次分选过的水送到平原。',[21,1.6,8.4],'always');
+addPart(terrainPart,'河谷与山体（地形层）','山谷、河床与两岸地形。河床在这里被剖开，才看得见水下的环流、泥沙与卧铁。',[-18,5.2,-9],'hidden');
+addPart(sectionPart,'河床剖面 · 地层','剖开的地层自上而下分为表土、砂卵石与基岩；岁修淘滩的深度就参照埋在滩下的卧铁。',[0,-3.4,7.7],'hidden');
+addPart(spurPart,'玉垒山山嘴','伸进江边的山嘴。宝瓶口正是从它身上凿开的一道缺口，别无旁路。',[9.5,9.2,9.2],'hidden');
+addPart(plainPart,'成都平原','口外平坦的灌区，按示意比例铺开田格与渠网，并非可量测的地理图。',[22,1.2,12],'hidden');
+addPart(ironPart,'卧铁','埋在滩下的铁条，标记每年岁修该淘到多深。它不动、不控制水流，只是一把固定的尺。',[3.0,-1.9,6.5],'hidden');
+addPart(bedLoadPart,'推移质泥沙','沿河底成层滚动的卵石与粗沙。越贴底越慢，整层都被底层环流推向外江。',[-6,-1.9,1.0],'hidden');
+addPart(gaugePart,'水位尺（示意）','全工程唯一在变的东西：水位。三大件与河床几何始终固定。',[2.2,1.3,7.1],'hidden');
+addPart(spiralPart,'弯道螺旋环流','表层清水被推向凹岸流进内江，底层挟沙水沿凸岸滑向外江；这是第一次分选。',[-15.2,1.5,0.8],'hidden');
+addPart(surfaceGroup,'表层清水','含沙少的表层流沿凹岸进入内江，是灌区取用的那一部分水。',[-1.5,1.1,3.2],'hidden');
+addPart(bottomGroup,'底层挟沙水','贴底的高含沙水流沿凸岸滑向外江，带走大部分推移质。',[2,-1.3,-3.6],'hidden');
+addPart(spillPart,'飞沙堰溢洪','宝瓶口壅水后涨过堰顶的那部分水，翻堰归外江，同时把沙甩出去完成第二次分选。',[7.0,1.9,-1.6],'hidden');
+addPart(layers.terrain,'① 地形层 · 山体与河床','地形层',[-23,3.0,-3],'layer','layerlab',true);
+addPart(layers.water,'② 水体层 · 内外江与渠网','水体层',[-23,3.0,-3],'layer','layerlab',true);
+addPart(layers.sediment,'③ 泥沙层 · 推移质与卧铁','泥沙层',[-23,3.0,-3],'layer','layerlab',true);
+addPart(layers.flow,'④ 流线层 · 环流与分选','流线层',[-23,3.0,-3],'layer','layerlab',true);
+// 渠网各支与泡沫不参与拾取
+waterChannels.forEach((c,i)=>{ if(i>3){ c.surf.userData.noPick=true; c.face.userData.noPick=true; } });
+
+/* ═════════════ 十二 · 交互状态 ═════════════ */
+const state={t:1.2,level:0.08,levelSmooth:0.08,manual:false,layerTarget:0,layer:0,hovered:null,time:0,focus:0};
+const CYCLE=12;
+const $=id=>document.getElementById(id);
+const btnLayer=$('btnLayer'),btnAuto=$('btnAuto'),btnFish=$('btnFish'),btnReset=$('btnReset');
+const levelEl=$('level'),lvTxt=$('lvTxt');
+const roPhase=$('roPhase'),roSplit=$('roSplit'),roSand=$('roSand'),roEvent=$('roEvent');
+const gLevel=$('gLevel'),bIn=$('bIn'),bOut=$('bOut'),sIn=$('sIn'),sOut=$('sOut');
+const hName=$('hName'),hDesc=$('hDesc');
+const hintEl=document.querySelector('.hint');
+const DEFAULT_HOVER={name:'整座渠首工程',desc:'把指针移到任意部件或某一股水流上，看它在分水、排沙中的作用。拖拽环绕，滚轮可从渠首一路钻进鱼嘴前的水下剖面。'};
+
+function yearLevel(p){
+  return kf(p,[[0,0.06],[0.20,0.08],[0.30,0.22],[0.40,0.86],[0.47,1.00],[0.56,0.96],[0.64,0.62],[0.78,0.20],[0.88,0.07],[1,0.06]]);
+}
+function phaseName(p){ return p<0.22?'枯水期':p<0.40?'涨水期':p<0.60?'洪峰过境':p<0.84?'退水期':'枯水期'; }
+function levelName(l){ return l<0.18?'枯水位':l<0.48?'平水位':l<0.78?'涨水中':'洪水位'; }
+const CN=['一','二','三','四','五','六','七','八','九','十'];
+function cheng(f){ const n=Math.max(1,Math.min(10,Math.round(f*10))); return '约'+CN[n-1]+'成'; }
+
+/* 悬停高亮 */
+const ray=new THREE.Raycaster(), pointer=new THREE.Vector2(-10,-10);
+const matCache=new Map();
+function setHighlight(p,on){
+  if(!p) return;
+  p.obj.traverse(o=>{
+    if(!o.isMesh||!o.material) return;
+    const mats=Array.isArray(o.material)?o.material:[o.material];
+    mats.forEach(m=>{
+      if(on){
+        if(!matCache.has(m.uuid)) matCache.set(m.uuid,{c:m.color?m.color.getHex():null,op:m.opacity,e:m.emissive?m.emissive.getHex():null,ei:m.emissiveIntensity});
+        if(m.color) m.color.lerp(new THREE.Color(0xa9ffe8),0.42);
+        if(m.emissive){ m.emissive.setHex(0x2f7a68); m.emissiveIntensity=0.65; }
+        if(m.transparent) m.opacity=Math.min(1,(matCache.get(m.uuid).op||m.opacity)+0.22);
+      } else {
+        const s=matCache.get(m.uuid);
+        if(s){ if(m.color&&s.c!==null) m.color.setHex(s.c); if(m.transparent) m.opacity=s.op; if(m.emissive&&s.e!==null){ m.emissive.setHex(s.e); m.emissiveIntensity=s.ei; } }
+      }
+    });
+  });
+}
+function applyHover(p){
+  if(state.hovered===p) return;
+  if(state.hovered){ setHighlight(state.hovered,false); state.hovered.el.classList.remove('hot'); }
+  state.hovered=p;
+  if(p){ setHighlight(p,true); p.el.classList.add('hot'); hName.textContent=p.name; hDesc.textContent=p.desc; }
+  else { hName.textContent=DEFAULT_HOVER.name; hDesc.textContent=DEFAULT_HOVER.desc; }
+}
+function onPointer(e){
+  const r=canvas.getBoundingClientRect();
+  pointer.x=((e.clientX-r.left)/r.width)*2-1;
+  pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+}
+canvas.addEventListener('pointermove',onPointer);
+canvas.addEventListener('pointerdown',e=>{ camTween=null; onPointer(e); });
+canvas.addEventListener('pointerleave',()=>{ pointer.set(-10,-10); applyHover(null); });
+function visibleChain(o){ while(o){ if(!o.visible) return false; o=o.parent; } return true; }
+
+/* 按钮 */
+let camTween=null;
+function tweenCam(pos,tgt,dur){ camTween={p0:camera.position.clone(),p1:pos.clone(),t0:controls.target.clone(),t1:tgt.clone(),t:0,dur:dur||1.15}; }
+btnLayer.onclick=()=>{
+  state.layerTarget=state.layerTarget>0.5?0:1;
+  btnLayer.classList.toggle('on',state.layerTarget>0.5);
+  btnLayer.textContent=state.layerTarget>0.5?'合拢复位':'分层查看';
+};
+btnAuto.onclick=()=>{
+  state.manual=!state.manual;
+  btnAuto.classList.toggle('on',!state.manual);
+  btnAuto.textContent=state.manual?'恢复自动演进':'自动水文年';
+  if(state.manual) state.level=+levelEl.value/100;
+};
+levelEl.oninput=()=>{
+  state.manual=true; state.level=+levelEl.value/100;
+  btnAuto.classList.remove('on'); btnAuto.textContent='恢复自动演进';
+};
+btnFish.onclick=()=>tweenCam(new THREE.Vector3(-5.0,1.8,7.6),new THREE.Vector3(-12.2,-1.0,0.8),1.25);
+btnReset.onclick=()=>{ tweenCam(HOME,TGT_HOME,1.1); };
+window.addEventListener('keydown',e=>{
+  if(e.key==='l'||e.key==='L') btnLayer.click();
+  if(e.key==='r'||e.key==='R') btnReset.click();
+  if(e.key===' '){ e.preventDefault(); btnAuto.click(); }
+});
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+/* ═════════════ 十三 · 主循环 ═════════════ */
+const clock=new THREE.Clock();
+const tmp=new THREE.Vector3(), tmp2=new THREE.Vector3();
+let labelTick=0, appliedDolly=1, focusMode=false;
+const placed=[];
+
+function updateLevel(dt){
+  state.t+=dt;
+  const p=(state.t%CYCLE)/CYCLE;
+  if(!state.manual){ state.level=yearLevel(p); levelEl.value=Math.round(state.level*100); }
+  state.levelSmooth+=(state.level-state.levelSmooth)*Math.min(1,dt*3.6);
+  return p;
+}
+function hydraulics(lvl){
+  const waterY=W_LOW+(W_HIGH-W_LOW)*lvl;
+  const hIn=Math.max(0.05,waterY-Y_BED_IN), hOut=Math.max(0.05,waterY-Y_BED_OUT);
+  const wIn=3.0, wOut=4.2+2.03*ss(0.55,1.92,waterY);
+  const qIn=wIn*Math.pow(hIn,1.5), qOut=wOut*Math.pow(hOut,1.5);
+  const fracIn=qIn/(qIn+qOut);                       // 由固定河床几何推出
+  const throttle=ss(0.32,1.0,lvl);                  // 宝瓶口扼流 → 上游壅水
+  const backwater=0.78*throttle;
+  const spill=clamp01(ss(0,0.95,waterY+backwater-CREST_SPILL));
+  const sandIn=0.30-0.10*spill;                     // 二次分选后的泥沙去向
+  return {waterY,fracIn,throttle,backwater,spill,sandIn,mud:ss(0.22,0.95,lvl)};
+}
+function updateFlows(H,dt){
+  state.time+=dt*(0.55+1.25*state.levelSmooth);
+  TEX.water.offset.x-=dt*(0.05+0.11*state.levelSmooth);
+  // 表流、底流随水位与河床各自就位
+  const surfY=H.waterY-0.30, botY=-1.85+0.34*state.levelSmooth;
+  surfaceGroup.position.y=surfY;
+  bottomGroup.position.y=botY;
+  const mid=(H.waterY+Y_BED_MAIN)*0.5, half=Math.max(0.55,(H.waterY-Y_BED_MAIN)*0.5);
+  spiralPart.position.y=mid; spiralPart.scale.y=half/0.84;
+  spillPart.visible=H.spill>0.02;
+  spillPart.position.y=Math.max(CREST_SPILL,H.waterY-0.12);
+  spillPart.children.forEach(g=>{ g.visible=H.spill>0.02; });
+  streams.forEach(s=>{
+    const grad=s.gradient;
+    if(s.tubeMat.opacity!==undefined){
+      const base=grad?0.62:0.55;
+      s.tubeMat.opacity=base*(s.group.parent===spillPart?clamp01(H.spill*1.3):1)*(0.75+0.25*state.levelSmooth);
+    }
+    s.particles.forEach((m,i)=>{
+      const u=(state.time*s.speed+i/s.count)%1;
+      s.curve.getPointAt(u,tmp);
+      m.position.copy(tmp);
+      if(grad){
+        const t=clamp01((tmp.y+0.85)/1.7);
+        m.material.color.setRGB(0.85-0.31*t,0.63+0.28*t,0.34+0.52*t);
+      }
+      m.material.opacity=(s.group.parent===spillPart?clamp01(H.spill*1.4):1)*(0.55+0.4*Math.sin(u*Math.PI));
+    });
+  });
+  // 上游白水泡沫
+  foam.forEach(f=>{
+    f.u+=dt*f.spd*(0.6+1.5*state.levelSmooth);
+    if(f.u>1) f.u-=1;
+    const F=frameAt(mainW.curve,clamp01(f.u));
+    f.m.position.set(F.p.x,H.waterY+0.05,F.p.z+f.lat);
+    f.m.material.opacity=0.35+0.35*Math.sin(f.u*Math.PI);
+  });
+  // 成层滚动的推移质
+  const d=bedLoad.dummy;
+  bedLoad.items.forEach((it,i)=>{
+    it.u+=dt*it.spd*(0.55+1.8*state.levelSmooth);
+    if(it.u>1) it.u-=1;
+    it.route.getPointAt(it.u,tmp2);
+    const bed=it.outer ? -2.5+1.4*ss(-12,14,tmp2.x) : -2.5+0.6*ss(-12,10,tmp2.x);
+    d.position.set(tmp2.x,bed+0.11+it.layer*0.14+0.035*Math.sin(it.phase+state.time*3),tmp2.z+it.lat);
+    d.rotation.set(it.spin+state.time*it.spd*8,0,it.spin*0.5+state.time*it.spd*9);
+    const sc=it.size*(0.85+0.35*state.levelSmooth);
+    d.scale.setScalar(sc); d.updateMatrix();
+    bedLoad.mesh.setMatrixAt(i,d.matrix);
+  });
+  bedLoad.mesh.instanceMatrix.needsUpdate=true;
+  gaugeBand.position.y=H.waterY;
+}
+function updateReadout(p,H){
+  roPhase.textContent=state.manual?('手动停在 · '+levelName(state.level)):phaseName(p);
+  gLevel.style.width=(10+state.levelSmooth*88).toFixed(1)+'%';
+  roSplit.textContent='内江'+cheng(H.fracIn)+' · 外江'+cheng(1-H.fracIn);
+  bIn.style.width=(H.fracIn*100).toFixed(1)+'%'; bOut.style.width=((1-H.fracIn)*100).toFixed(1)+'%';
+  roSand.textContent='内江'+cheng(H.sandIn)+' · 外江'+cheng(1-H.sandIn);
+  sIn.style.width=(H.sandIn*100).toFixed(1)+'%'; sOut.style.width=((1-H.sandIn)*100).toFixed(1)+'%';
+  roEvent.textContent=H.spill>0.06?'飞沙堰溢洪 · 二次排沙':(H.throttle>0.35?'宝瓶口扼流 · 上游壅水':'固定几何 · 仅水位变化');
+  lvTxt.textContent=state.manual?('手动 · '+levelName(state.level)):('自动演进 · '+levelName(state.level));
+}
+function updateLabels(e){
+  const w=window.innerWidth,h=window.innerHeight;
+  placed.length=0;
+  const items=[];
+  scene.updateMatrixWorld(true);
+  camera.updateMatrixWorld(true);
+  parts.forEach(p=>{
+    let show=false;
+    if(p.mode==='always') show=true;
+    else if(p.mode==='layer') show=e>0.15;
+    else show=(e>0.15)||state.focus>0.55||state.hovered===p;
+    if(!show||!visibleChain(p.obj)){ if(p.el.style.opacity!=='0') p.el.style.opacity='0'; return; }
+    tmp.copy(p.anchor); p.obj.localToWorld(tmp); tmp.project(camera);
+    const x=(tmp.x*0.5+0.5)*w, y=(-tmp.y*0.5+0.5)*h;
+    const outside=tmp.z>1||x<-90||x>w+90||y<-40||y>h+40;
+    items.push({p,x,y,outside});
+  });
+  items.sort((a,b)=>a.y-b.y);
+  items.forEach(it=>{
+    if(it.outside){ it.p.el.style.opacity='0'; return; }
+    const wEst=it.p.el.textContent.length*11+24;
+    let y=it.y;
+    for(let pass=0;pass<3;pass++){
+      for(const q of placed){
+        if(Math.abs(q.x-it.x)<(q.w+wEst)*0.5 && Math.abs(q.y-y)<22) y=q.y+22;
+      }
+    }
+    placed.push({x:it.x,y,w:wEst});
+    it.p.el.style.opacity=String(it.p.mode==='layer'?Math.min(1,(e-0.15)*4):0.92);
+    it.p.el.style.transform='translate(-50%,-50%) translate('+it.x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+  });
+}
+
+function tick(){
+  const dt=Math.min(clock.getDelta(),0.05);
+  const p=updateLevel(dt);
+  const H=hydraulics(state.levelSmooth);
+  waterChannels.forEach(c=>{
+    const wl=c.isCanal?Math.min(0.55,state.levelSmooth):state.levelSmooth;
+    const wy=c.isCanal?(0.32+0.55*state.levelSmooth):H.waterY;
+    c.update(wl,wy,c===innerW?H.backwater:0,c===outerW?H.spill:0,state.time);
+  });
+  updateFlows(H,dt);
+
+  // 分层滑开 / 复位合拢
+  state.layer+=(state.layerTarget-state.layer)*Math.min(1,dt*3.6);
+  const e=smoothStep(clamp01(state.layer));
+  Object.keys(layers).forEach(k=>{
+    layers[k].position.copy(layerSlides[k]).multiplyScalar(e);
+  });
+
+  // 缩放潜入：越靠近，视线越落到鱼嘴前的水下剖面
+  const dist=camera.position.distanceTo(controls.target);
+  state.focus=1-ss(7,27,dist);
+  const fm=state.focus>0.55;
+  if(fm!==focusMode){
+    focusMode=fm;
+    terrainPart.userData.mats.forEach(m=>{
+      if(fm){ m.transparent=true; m.opacity=0.17; m.depthWrite=false; }
+      else { m.transparent=false; m.opacity=1; m.depthWrite=true; }
+      m.needsUpdate=true;
+    });
+  }
+  const tgt=tmp2.copy(TGT_HOME).lerp(FISH_TGT,state.focus*0.90);
+  controls.target.lerp(tgt,Math.min(1,dt*2.6));
+  if(state.focus>0.55){
+    waterChannels.forEach(c=>{ if(c.face) c.face.material.opacity=0.20; });
+    if(sectionPart.userData.face) sectionPart.userData.face.material.opacity=0.035;
+    if(sectionPart.userData.ghost) sectionPart.userData.ghost.material.opacity=0.01;
+    if(sectionPart.userData.lines) sectionPart.userData.lines.visible=false;
+    hintEl.textContent='鱼 嘴 水 下 剖 面 · 表 层 清 水 / 底 层 挟 沙 水';
+  } else {
+    waterChannels.forEach(c=>{ if(c.face) c.face.material.opacity=0.34; });
+    if(sectionPart.userData.face) sectionPart.userData.face.material.opacity=0.30;
+    if(sectionPart.userData.ghost) sectionPart.userData.ghost.material.opacity=0.045;
+    if(sectionPart.userData.lines) sectionPart.userData.lines.visible=true;
+    hintEl.textContent='拖 拽 环 绕　·　滚 轮 缩 放　·　悬 停 查 看 作 用';
+  }
+
+  // 相机补间
+  if(camTween){
+    camTween.t+=dt/camTween.dur;
+    const u=smoothStep(clamp01(camTween.t));
+    camera.position.copy(camTween.p0).lerp(camTween.p1,u);
+    controls.target.copy(camTween.t0).lerp(camTween.t1,u);
+    if(camTween.t>=1) camTween=null;
+  }
+  // 分层时自动拉远一点，保证四层都在画面里
+  const dollyTarget=1+e*0.30;
+  if(Math.abs(dollyTarget-appliedDolly)>1e-5){
+    const off=new THREE.Vector3().copy(camera.position).sub(controls.target);
+    const len=Math.max(controls.minDistance,Math.min(controls.maxDistance,off.length()*(dollyTarget/appliedDolly)));
+    off.setLength(len); camera.position.copy(controls.target).add(off);
+    appliedDolly=dollyTarget;
+  }
+
+  // 悬停
+  ray.setFromCamera(pointer,camera);
+  const hits=ray.intersectObjects(pickables,false);
+  let first=null, picked=null;
+  for(const hit of hits){
+    if(hit.object.userData.part && visibleChain(hit.object)){ first=hit; picked=hit.object.userData.part; break; }
+  }
+  // 流线/泥沙常被半透明水面挡住一小段距离，给它们一点拾取优先级
+  if(first){
+    for(const hit of hits){
+      if(hit.distance-first.distance>7) break;
+      const p=hit.object.userData.part;
+      if(p && /流|挟沙|清水|溢洪|推移质|卧铁/.test(p.name) && visibleChain(hit.object)){ picked=p; break; }
+    }
+  }
+  applyHover(picked);
+
+  labelTick+=dt;
+  if(labelTick>0.016){ labelTick=0; updateLabels(e); }
+  updateReadout(p,H);
+  controls.update();
+  renderer.render(scene,camera);
+}
+renderer.setAnimationLoop(tick);
+document.getElementById('loading').classList.add('hide');
+
+// 便于外部驱动的调试入口（不影响交互）
+window.__DBG={camera,controls,state,scene,renderer,ray,pickables,pointer,streams,
+  setLevel:v=>{ state.manual=true; state.level=v; state.levelSmooth=v; levelEl.value=Math.round(v*100); btnAuto.classList.remove('on'); },
+  setLayer:v=>{ state.layerTarget=v; state.layer=v; btnLayer.classList.toggle('on',v>0.5); },
+  tick:()=>tick()
+};
+}
+</script>
+</body>
+</html>

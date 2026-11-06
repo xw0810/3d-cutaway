@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<link rel="icon" href="data:," />
+<title>圆珠笔 · 交互式 3D 笔尖剖面</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#05070c}
+  body{
+    font-family:"PingFang SC","HarmonyOS Sans SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    color:#fff;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(ellipse 82% 68% at 54% 42%, #172334 0%, #0c111b 44%, #05070c 100%);
+  }
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:
+      linear-gradient(rgba(160,198,240,.030) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(160,198,240,.030) 1px, transparent 1px);
+    background-size:56px 56px;
+    -webkit-mask-image:radial-gradient(ellipse 76% 66% at 52% 44%, #000 10%, transparent 78%);
+    mask-image:radial-gradient(ellipse 76% 66% at 52% 44%, #000 10%, transparent 78%);
+  }
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;z-index:1}
+  #c:active{cursor:grabbing}
+
+  .hud{
+    position:fixed;z-index:20;
+    background:linear-gradient(180deg, rgba(22,30,42,.78), rgba(10,14,21,.68));
+    -webkit-backdrop-filter:blur(18px) saturate(140%);
+    backdrop-filter:blur(18px) saturate(140%);
+    border:1px solid rgba(150,190,235,.16);
+    border-radius:16px;
+    box-shadow:0 20px 54px rgba(0,0,0,.55), inset 0 1px 0 rgba(210,232,255,.07);
+  }
+  .hud.tl{left:24px;top:24px;padding:16px 22px 18px}
+  .eyebrow{font-size:9.5px;letter-spacing:.36em;color:rgba(140,190,240,.62);margin-bottom:9px}
+  .hud h1{font-size:23px;font-weight:600;letter-spacing:.05em;line-height:1.12;
+    background:linear-gradient(180deg,#fff 0%,#a9c9f2 135%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hud .sub{font-size:11.5px;color:rgba(255,255,255,.44);margin-top:8px;letter-spacing:.04em}
+
+  .hud.tr{right:24px;top:24px;padding:10px;display:flex;flex-direction:column;gap:7px}
+  button{
+    font-family:inherit;font-size:12px;letter-spacing:.05em;color:rgba(255,255,255,.9);cursor:pointer;
+    border:1px solid rgba(150,190,235,.2);border-radius:10px;
+    background:linear-gradient(180deg,rgba(200,225,255,.09),rgba(200,225,255,.02));
+    padding:8px 14px;min-width:152px;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:transform .18s cubic-bezier(.2,.8,.3,1),background .2s,border-color .2s,box-shadow .25s,color .2s;
+  }
+  button:hover{transform:translateY(-1px);border-color:rgba(150,200,255,.5);background:linear-gradient(180deg,rgba(200,225,255,.17),rgba(200,225,255,.04))}
+  button:active{transform:translateY(0) scale(.985)}
+  button.on{
+    background:linear-gradient(180deg,#6fa9e8,#2f66ad);
+    border-color:rgba(180,220,255,.62);color:#061324;
+    box-shadow:0 8px 26px rgba(90,155,230,.34), inset 0 1px 0 rgba(255,255,255,.38);
+    font-weight:600;
+  }
+  button.ghost{font-size:11px;padding:7px 12px;min-width:0;color:rgba(255,255,255,.5);background:rgba(255,255,255,.02)}
+  button.ghost:hover{color:#fff}
+  .ico{font-size:11px;line-height:1;opacity:.9}
+
+  .hud.bl{left:24px;bottom:24px;padding:13px 18px;display:flex;flex-direction:column;gap:8px;min-width:288px}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:18px;font-size:11.5px}
+  .row .k{color:rgba(255,255,255,.33);letter-spacing:.12em;white-space:nowrap}
+  .row .v{color:rgba(255,255,255,.86);letter-spacing:.03em;text-align:right;font-variant-numeric:tabular-nums}
+  .v.warm{color:#f0c27d}
+  .v.ok{color:#6fe6c4}
+  .v.blue{color:#8db9ff}
+  .rule{margin-top:4px;padding-top:9px;border-top:1px solid rgba(255,255,255,.09);
+    font-size:10.5px;line-height:1.68;color:rgba(255,255,255,.46);max-width:280px}
+  .rule b{color:#f0c27d;font-weight:600}
+
+  .hud.br{right:24px;bottom:24px;padding:10px 15px;pointer-events:none}
+  .hint{font-size:11px;color:rgba(255,255,255,.36);letter-spacing:.08em}
+
+  #labels{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .lbl,.pin,.anno{
+    position:absolute;left:0;top:0;white-space:nowrap;opacity:0;
+    will-change:transform;
+  }
+  .lbl{
+    font-size:10px;letter-spacing:.06em;color:#ffeccd;background:rgba(22,28,38,.84);
+    border:1px solid rgba(224,190,130,.4);padding:3px 9px;border-radius:8px;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    box-shadow:0 8px 22px rgba(0,0,0,.45);transition:opacity .2s;
+  }
+  .lbl::before{content:'';position:absolute;left:-4px;top:50%;width:6px;height:6px;margin-top:-3px;
+    border-radius:50%;background:#e8bb74;box-shadow:0 0 8px rgba(232,187,116,.9)}
+  .pin{
+    font-size:9.5px;letter-spacing:.05em;color:#bfe0ff;background:rgba(12,24,42,.78);
+    border:1px solid rgba(120,180,245,.34);padding:2px 8px;border-radius:7px;
+    box-shadow:0 6px 18px rgba(0,0,0,.4);transition:opacity .3s;
+  }
+  .pin::before{content:'';position:absolute;left:-3px;top:50%;width:5px;height:5px;margin-top:-2.5px;
+    border-radius:50%;background:#6fb4ff;box-shadow:0 0 7px rgba(110,180,255,.9)}
+  .anno{
+    font-size:10px;letter-spacing:.13em;color:rgba(190,216,245,.62);
+    text-shadow:0 2px 10px rgba(0,0,0,.8);transition:opacity .4s;
+  }
+
+  .tip{
+    position:fixed;z-index:30;left:0;top:0;pointer-events:none;
+    max-width:296px;padding:9px 13px;border-radius:11px;
+    background:rgba(16,23,34,.92);border:1px solid rgba(150,195,240,.34);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    box-shadow:0 12px 34px rgba(0,0,0,.62);
+    opacity:0;transform:translate(-50%,-140%);transition:opacity .14s;
+  }
+  .tip .t{font-size:12px;color:#a9d0ff;letter-spacing:.06em;margin-bottom:4px;font-weight:600}
+  .tip .d{font-size:11px;line-height:1.6;color:rgba(255,255,255,.68);letter-spacing:.02em}
+
+  .callout{
+    position:fixed;z-index:16;pointer-events:none;left:0;top:0;
+    padding:6px 11px;border-radius:9px;white-space:nowrap;
+    background:rgba(12,34,52,.84);border:1px solid rgba(110,205,235,.46);
+    box-shadow:0 8px 26px rgba(0,0,0,.45);
+    font-size:11px;letter-spacing:.05em;color:#a8ecff;
+    opacity:0;transition:opacity .25s;transform:translate(-50%,-50%);
+  }
+
+  #loader{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;background:#05070c;transition:opacity .55s;
+    font-size:12px;letter-spacing:.28em;color:rgba(180,210,245,.66)}
+  #loader.hide{display:none}
+  #loader i{display:block;width:38px;height:38px;border-radius:50%;
+    border:2px solid rgba(120,180,245,.18);border-top-color:#7fb6f5;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #err{display:none;position:fixed;z-index:70;left:50%;top:50%;transform:translate(-50%,-50%);
+    max-width:420px;padding:22px 26px;border-radius:14px;background:rgba(38,18,18,.94);
+    border:1px solid rgba(255,130,110,.45);font-size:13px;line-height:1.8;color:#ffcfc4;text-align:center}
+
+  .fadein{animation:fade .8s ease both}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (max-width:900px){
+    .hud.tl{left:12px;top:12px;padding:11px 14px 13px}
+    .hud h1{font-size:17px}
+    .hud .sub{font-size:10px}
+    .hud.tr{right:12px;top:12px;padding:7px;gap:5px}
+    button{min-width:112px;font-size:11px;padding:7px 10px}
+    .hud.bl{left:12px;bottom:12px;padding:9px 12px;min-width:0}
+    .row{font-size:10px}
+    .rule,.hud.br{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="tip" class="tip"></div>
+<div id="callout" class="callout"></div>
+
+<header class="hud tl fadein">
+  <div class="eyebrow">圆 珠 笔 · 笔 尖 剖 面 解 剖</div>
+  <h1>圆珠笔 · 一颗球珠的两份工作</h1>
+  <div class="sub">既是阀门，也是转印辊：内侧蘸墨，外侧把墨印到纸上</div>
+</header>
+
+<div class="hud tr fadein">
+  <button id="btnExplode"><span class="ico">✦</span><span id="lbExplode">爆炸视图</span></button>
+  <button id="btnClick"><span class="ico">↓</span><span>按动笔帽</span></button>
+  <button id="btnClose"><span class="ico">◎</span><span id="lbClose">球珠特写</span></button>
+  <button id="btnPause"><span class="ico">❚❚</span><span id="lbPause">暂停</span></button>
+  <button id="btnSlow"><span class="ico">◷</span><span id="lbSlow">慢动作</span></button>
+  <button id="btnReset" class="ghost">重置视角</button>
+</div>
+
+<div class="hud bl fadein">
+  <div class="row"><span class="k">当前阶段</span><span class="v blue" id="phase">正在书写</span></div>
+  <div class="row"><span class="k">走 笔 速 度</span><span class="v" id="speed">3.6 毫米 / 秒</span></div>
+  <div class="row"><span class="k">球 珠 转 速</span><span class="v" id="rpm">0.0 转 / 秒</span></div>
+  <div class="row"><span class="k">一 圈 线 迹</span><span class="v ok">约 3.1 毫米</span></div>
+  <div class="row"><span class="k">油 墨 柱</span><span class="v warm" id="ink">下移 0.00 毫米</span></div>
+  <div class="row"><span class="k">油 脂 塞</span><span class="v" id="plug">同步下移 · 隔绝空气</span></div>
+  <div class="row"><span class="k">按 动 机 构</span><span class="v" id="click">笔芯收回</span></div>
+  <div class="rule"><b>看不见的关键：</b>球珠与座之间只留十几微米的转动余隙。停笔时，油墨的表面张力正好把这圈缝隙封住，既不漏墨，也不让空气钻进去把油墨柱截断。</div>
+</div>
+
+<div class="hud br fadein">
+  <div class="hint">拖拽环绕 · 滚轮缩放（可一直钻进球珠座）· 悬停查看部件</div>
+</div>
+
+<div id="loader"><i></i><span>正在装配圆珠笔…</span></div>
+<div id="err">无法加载三维渲染库。请检查网络连接后刷新页面。<br>本页首次打开需要联网载入固定版本的三维运行时。</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+let THREE, OrbitControls, RoomEnvironment;
+try {
+  THREE = await import('three');
+  ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+  ({ RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js'));
+} catch (e) {
+  document.getElementById('err').style.display = 'block';
+  document.getElementById('loader').classList.add('hide');
+  throw e;
+}
+try { start(); }
+catch (e) {
+  document.getElementById('err').style.display = 'block';
+  document.getElementById('err').textContent = '三维场景装配失败：' + e.message;
+  document.getElementById('loader').classList.add('hide');
+  throw e;
+}
+
+function start(){
+/* ==================================================================
+   一、尺度约定
+   放大剖面：1 单位 = 1 毫米，球珠直径 1 单位。
+   整笔剖面：同样的毫米坐标，整体缩小 10 倍作为参照物。
+   ================================================================== */
+const PI  = Math.PI;
+const V   = (x,y,z)=>new THREE.Vector3(x,y,z);
+const RB  = 0.5;                 // 球珠半径（直径 1 毫米）
+const BY  = 0.5;                 // 球心高度：球底正好贴纸面 y=0
+const CLEAR = 0.014;             // 转动余隙约 14 微米
+const TUBE_TOP = 10.60;
+const LINE_X0 = -6.4;            // 线迹起点（这一段始终画好，保证「线划到一半」一直在）
+const PEN_X0 = 1.2, PEN_X1 = 9.0;
+const CYCLE = 4.2, WRITE_END = 0.52, RESET_AT = 0.80;
+const PEN_A_SCALE = 0.10;
+const A_POS = V(-9.2, 0, -1.2);
+const smooth = t => { t = Math.max(0, Math.min(1, t)); return t*t*(3-2*t); };
+const lerp = THREE.MathUtils.lerp;
+
+/* ==================================================================
+   二、渲染器 / 场景 / 相机 / 灯光
+   ================================================================== */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.10;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.02, 320);
+const HOME_POS = V(13.5, 10.2, 26.5);
+const HOME_TGT = V(-0.8, 5.1, 0);
+const WIDE_POS = V(19.5, 13.5, 34.0);
+const WIDE_TGT = V(-1.2, 5.4, 0);
+camera.position.copy(HOME_POS);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(HOME_TGT);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.8;
+controls.zoomSpeed = 0.95;
+controls.enablePan = false;
+controls.zoomToCursor = true;      // 滚轮朝光标下的结构推进，可以一路钻进球珠座
+controls.minDistance = 0.18;
+controls.maxDistance = 78;
+controls.maxPolarAngle = Math.PI * 0.93;
+controls.update();
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.02).texture;
+
+const lKey  = new THREE.DirectionalLight(0xfff1dc, 2.05); lKey.position.set(11, 13, 12);
+const lFront= new THREE.DirectionalLight(0xffffff, 1.30); lFront.position.set(3, 3, 16);
+const lFill = new THREE.DirectionalLight(0x8fbaff, 1.05); lFill.position.set(-10, 5, 7);
+const lRim  = new THREE.DirectionalLight(0xffd39a, 1.55); lRim.position.set(-5, 9, -10);
+const lBall = new THREE.PointLight(0xbcd8ff, 9, 16, 2);
+scene.add(lKey, lFront, lFill, lRim, lBall, new THREE.HemisphereLight(0x9db6d6, 0x0c1020, 0.50));
+
+/* ==================================================================
+   三、程序化贴图（不使用任何图片文件）
+   ================================================================== */
+function makeBallTexture(){
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512;
+  const x = cv.getContext('2d');
+  const g = x.createLinearGradient(0,0,0,512);
+  g.addColorStop(0,'#9aa3ad'); g.addColorStop(.30,'#cbd3dc');
+  g.addColorStop(.58,'#e2e8ee'); g.addColorStop(1,'#7f8892');
+  x.fillStyle = g; x.fillRect(0,0,1024,512);
+  let seed = 20261106;
+  const rnd = ()=>{ seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; };
+  /* 碳化钨球珠表面的微坑：既增加摩擦，也让滚动看得见 */
+  for(let i=0;i<1350;i++){
+    const px = rnd()*1024, py = rnd()*512, r = 0.7 + rnd()*2.8;
+    x.beginPath(); x.arc(px,py,r,0,PI*2);
+    x.fillStyle = `rgba(48,56,68,${0.07+rnd()*0.19})`; x.fill();
+    x.beginPath(); x.arc(px-r*0.28,py-r*0.32,r*0.72,0,PI*2);
+    x.strokeStyle = 'rgba(240,247,255,.16)'; x.lineWidth = 0.8; x.stroke();
+  }
+  /* 两块沾上的油墨膜，随球珠一起转，用来看清「阀门 + 转印辊」 */
+  for(const [cx,cy,rx,ry] of [[210,300,120,74],[700,180,96,58]]){
+    const q = x.createRadialGradient(cx,cy,4,cx,cy,rx);
+    q.addColorStop(0,'rgba(24,52,168,.78)'); q.addColorStop(.62,'rgba(30,68,200,.42)');
+    q.addColorStop(1,'rgba(30,68,200,0)');
+    x.save(); x.translate(cx,cy); x.scale(1,ry/rx); x.translate(-cx,-cy);
+    x.fillStyle = q; x.beginPath(); x.arc(cx,cy,rx,0,PI*2); x.fill(); x.restore();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+function makePaperTexture(){
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#f3efe4'; x.fillRect(0,0,1024,512);
+  let seed = 77123;
+  const rnd = ()=>{ seed = (seed*1103515245 + 12345) >>> 0; return seed/4294967296; };
+  for(let i=0;i<9000;i++){
+    const px = rnd()*1024, py = rnd()*512;
+    x.fillStyle = `rgba(${rnd()<.5?120:255},${rnd()<.5?118:255},${rnd()<.5?110:255},${rnd()*0.055})`;
+    x.fillRect(px,py,1+rnd()*2.2,0.6+rnd());
+  }
+  for(let i=0;i<420;i++){
+    const px = rnd()*1024, py = rnd()*512, len = 6+rnd()*32, a = rnd()*PI;
+    x.strokeStyle = `rgba(150,142,124,${0.025+rnd()*0.05})`; x.lineWidth = 0.7;
+    x.beginPath(); x.moveTo(px,py); x.lineTo(px+Math.cos(a)*len, py+Math.sin(a)*len); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3,1.6);
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+function makeShadowTexture(){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const x = cv.getContext('2d');
+  const g = x.createRadialGradient(128,128,4,128,128,124);
+  g.addColorStop(0,'rgba(4,10,22,.55)'); g.addColorStop(.42,'rgba(4,10,22,.24)');
+  g.addColorStop(1,'rgba(4,10,22,0)');
+  x.fillStyle = g; x.fillRect(0,0,256,256);
+  return new THREE.CanvasTexture(cv);
+}
+const BALL_TEX = makeBallTexture();
+const PAPER_TEX = makePaperTexture();
+const SHADOW_TEX = makeShadowTexture();
+
+/* ==================================================================
+   四、材质库（每次装配都克隆，保证悬停高亮只作用于单个部件）
+   ================================================================== */
+const M = {
+  barrel : new THREE.MeshPhysicalMaterial({ color:0x16243a, metalness:0.28, roughness:0.26, clearcoat:0.95, clearcoatRoughness:0.12, side:THREE.DoubleSide, envMapIntensity:1.4 }),
+  barrelCut: new THREE.MeshStandardMaterial({ color:0x3b5273, metalness:0.22, roughness:0.66, side:THREE.DoubleSide }),
+  brass  : new THREE.MeshStandardMaterial({ color:0xc79a4c, metalness:0.88, roughness:0.23, envMapIntensity:2.0, side:THREE.DoubleSide }),
+  brassCut: new THREE.MeshStandardMaterial({ color:0xb08a4c, metalness:0.48, roughness:0.58, side:THREE.DoubleSide }),
+  nib    : new THREE.MeshStandardMaterial({ color:0xb58a46, metalness:0.90, roughness:0.25, envMapIntensity:2.0, side:THREE.DoubleSide }),
+  nibCut : new THREE.MeshStandardMaterial({ color:0xa87f3d, metalness:0.48, roughness:0.60, side:THREE.DoubleSide }),
+  ink    : new THREE.MeshPhysicalMaterial({ color:0x102a9e, metalness:0.06, roughness:0.16, clearcoat:1, clearcoatRoughness:0.07,
+             emissive:0x071650, emissiveIntensity:0.38, side:THREE.DoubleSide, envMapIntensity:1.5 }),
+  inkCut : new THREE.MeshStandardMaterial({ color:0x3672ff, metalness:0.12, roughness:0.30,
+             emissive:0x14389c, emissiveIntensity:0.48, side:THREE.DoubleSide }),
+  grease : new THREE.MeshPhysicalMaterial({ color:0xe9d9ae, metalness:0.02, roughness:0.30, clearcoat:0.9,
+             clearcoatRoughness:0.14, side:THREE.DoubleSide, envMapIntensity:1.1 }),
+  greaseCut: new THREE.MeshStandardMaterial({ color:0xf6e8c6, metalness:0.02, roughness:0.52, side:THREE.DoubleSide }),
+  ball   : new THREE.MeshStandardMaterial({ map:BALL_TEX, bumpMap:BALL_TEX, bumpScale:0.014,
+             metalness:0.92, roughness:0.15, envMapIntensity:2.5 }),
+  steel  : new THREE.MeshStandardMaterial({ color:0xc6d0da, metalness:0.95, roughness:0.21, envMapIntensity:2.1 }),
+  chrome : new THREE.MeshStandardMaterial({ color:0x9aa8b8, metalness:0.94, roughness:0.24, envMapIntensity:2.0 }),
+  spring : new THREE.MeshStandardMaterial({ color:0xb5c0cc, metalness:0.96, roughness:0.28, envMapIntensity:1.9 }),
+  groove : new THREE.MeshStandardMaterial({ color:0x0a1c58, metalness:0.35, roughness:0.38,
+             emissive:0x123ba8, emissiveIntensity:0.62, side:THREE.DoubleSide }),
+  bead   : new THREE.MeshBasicMaterial({ color:0x67a0ff }),
+  paper  : new THREE.MeshStandardMaterial({ map:PAPER_TEX, color:0xd8d3c6, metalness:0, roughness:0.95 }),
+  line   : new THREE.MeshPhysicalMaterial({ color:0x142f96, metalness:0.03, roughness:0.22, clearcoat:1,
+             clearcoatRoughness:0.06, emissive:0x0a1c66, emissiveIntensity:0.38 }),
+  wet    : new THREE.MeshBasicMaterial({ color:0x3a68e0, transparent:true, opacity:0.85, depthWrite:false }),
+  film   : new THREE.MeshPhysicalMaterial({ color:0x1f4ad8, metalness:0.05, roughness:0.12,
+             transparent:true, opacity:0.52, depthWrite:false, side:THREE.DoubleSide }),
+  seal   : new THREE.MeshBasicMaterial({ color:0x7ae9ff, transparent:true, opacity:0.0,
+             depthWrite:false, blending:THREE.AdditiveBlending }),
+  hintLn : new THREE.LineBasicMaterial({ color:0x6fb4ff, transparent:true, opacity:0.34 }),
+  shadow : new THREE.MeshBasicMaterial({ map:SHADOW_TEX, transparent:true, opacity:0.85, depthWrite:false })
+};
+
+/* ==================================================================
+   五、部件登记 / 网格工具
+   ================================================================== */
+const ROOT = new THREE.Group(); scene.add(ROOT);
+const PARTS = {}, partOrder = [], pickables = [];
+function P(id, name, desc, ex, anchor, parent, showLabel = true){
+  const exGroup = new THREE.Group(); (parent || ROOT).add(exGroup);
+  const group = new THREE.Group(); exGroup.add(group);
+  const p = { id, name, desc, exGroup, group, mats:[],
+              ex:V(ex[0],ex[1],ex[2]), anchor:V(anchor[0],anchor[1],anchor[2]), showLabel };
+  PARTS[id] = p; partOrder.push(p); return p;
+}
+function bind(p, mat){
+  if (mat.emissive){ mat.userData.e0 = mat.emissive.getHex(); mat.userData.i0 = mat.emissiveIntensity; }
+  p.mats.push(mat);
+}
+function addGeo(p, geo, matBase, o = {}){
+  const mat = matBase.clone(); bind(p, mat);
+  const m = new THREE.Mesh(geo, mat);
+  if (o.pos) m.position.set(o.pos[0],o.pos[1],o.pos[2]);
+  if (o.rot) m.rotation.set(o.rot[0],o.rot[1],o.rot[2]);
+  if (o.scale) m.scale.set(o.scale[0],o.scale[1],o.scale[2]);
+  if (o.order !== undefined) m.renderOrder = o.order;
+  m.userData.part = p; p.group.add(m);
+  if (!o.noPick) pickables.push(m);
+  return m;
+}
+function deco(parent, geo, mat, o = {}){
+  const m = new THREE.Mesh(geo, mat);
+  if (o.pos) m.position.set(o.pos[0],o.pos[1],o.pos[2]);
+  if (o.rot) m.rotation.set(o.rot[0],o.rot[1],o.rot[2]);
+  if (o.scale) m.scale.set(o.scale[0],o.scale[1],o.scale[2]);
+  if (o.order !== undefined) m.renderOrder = o.order;
+  parent.add(m); return m;
+}
+/** 半剖旋转体：只保留 z<=0 的后半，前端剖开；再补两片 z=0 的切断面 */
+function addShell(p, profile, shellBase, cutBase, o = {}){
+  const loop = profile.concat([profile[0]]);
+  const pts = loop.map(([r,y]) => new THREE.Vector2(Math.max(0.0001,r), y));
+  const lg = new THREE.LatheGeometry(pts, o.seg || 64, PI/2, PI);
+  const sm = shellBase.clone(); bind(p, sm);
+  const shell = new THREE.Mesh(lg, sm);
+  shell.userData.part = p; shell.renderOrder = o.order || 0;
+  p.group.add(shell); pickables.push(shell);
+
+  const shape = new THREE.Shape();
+  shape.moveTo(Math.max(0.0001,profile[0][0]), profile[0][1]);
+  for (let i=1;i<profile.length;i++) shape.lineTo(Math.max(0.0001,profile[i][0]), profile[i][1]);
+  shape.closePath();
+  const cg = new THREE.ShapeGeometry(shape, 20);
+  const cm = cutBase.clone(); bind(p, cm);
+  for (const sx of [1,-1]){
+    const c = new THREE.Mesh(cg, cm);
+    c.scale.x = sx;
+    c.userData.part = p; c.renderOrder = (o.order || 0) + 1;
+    p.group.add(c); pickables.push(c);
+  }
+  return shell;
+}
+
+/* ==================================================================
+   六、纸面 / 线迹 / 落影（不随笔移动）
+   ================================================================== */
+const pPaper = P('paper','纸面',
+  '纸的纤维把球珠压出一小块接触面；油墨靠毛细作用被拽出，渗进纤维里就固定了。',
+  [0,0,0],[0,0,0], ROOT, false);
+const paperMesh = addGeo(pPaper, new THREE.PlaneGeometry(46, 20), M.paper,
+  { pos:[0,-0.035,0], rot:[-PI/2,0,0] });
+paperMesh.receiveShadow = true;
+
+const pLine = P('line','蓝色线迹',
+  '球珠每转一整圈约留下 3.1 毫米线迹；线的宽度只有零点几毫米，是球珠接触区的压痕。',
+  [0,0,0],[0,0,0], ROOT, false);
+const lineMesh = addGeo(pLine, new THREE.BoxGeometry(1,0.018,0.34), M.line, { pos:[0,0.006,0] });
+const wetMesh  = addGeo(pLine, new THREE.BoxGeometry(0.62,0.022,0.30), M.wet, { pos:[0,0.014,0], order:8, noPick:true });
+
+function shadowPlane(parent, x, z, size){
+  const m = deco(parent, new THREE.PlaneGeometry(1,1), M.shadow,
+    { pos:[x,0.002,z], rot:[-PI/2,0,0], order:2 });
+  m.scale.set(size,size,1); return m;
+}
+shadowPlane(ROOT, A_POS.x, A_POS.z, 5.2);
+const shadowB = shadowPlane(ROOT, PEN_X0, 0, 6.4);
+
+/* 整笔笔尖处的放大指示圈 */
+const hintRing = deco(ROOT, new THREE.TorusGeometry(1.05,0.018,6,64),
+  new THREE.MeshBasicMaterial({color:0x6fb4ff, transparent:true, opacity:0.42, depthWrite:false}),
+  { pos:[A_POS.x,0.05,A_POS.z], rot:[PI/2,0,0], order:3 });
+
+/* ==================================================================
+   七、放大剖面：笔尖（1 单位 = 1 毫米）
+   ================================================================== */
+const penB = new THREE.Group(); ROOT.add(penB);
+
+/* 球珠座内表面：从卷边 lip 起沿球面留出 CLEAR 余隙，再张开成油墨腔 */
+const INNER_R = [
+  [0.28,0.463],[0.34,0.488],[0.40,0.504],[0.50,0.500+CLEAR],[0.60,0.490+CLEAR],
+  [0.70,0.458+CLEAR],[0.78,0.414+CLEAR],[0.86,0.50],[0.96,0.56],[1.06,0.62],
+  [1.30,0.66],[1.70,0.78],[2.05,0.90],[2.20,1.00]
+];
+function innerR(y){
+  if (y <= INNER_R[0][0]) return INNER_R[0][1];
+  for (let i=0;i<INNER_R.length-1;i++){
+    const a = INNER_R[i], b = INNER_R[i+1];
+    if (y <= b[0]) return lerp(a[1], b[1], (y-a[0])/(b[0]-a[0]));
+  }
+  return INNER_R[INNER_R.length-1][1];
+}
+const SOCKET_OUT = [
+  [0.62,0.28],[0.66,0.34],[0.74,0.50],[0.86,0.72],[1.00,1.00],
+  [1.10,1.40],[1.18,1.80],[1.22,2.20]
+];
+const SOCKET_PROFILE = SOCKET_OUT.concat(INNER_R.slice().reverse().map(([y,r])=>[r,y]));
+const TUBE_PROFILE = [
+  [1.22,2.20],[1.22,10.30],[1.25,10.44],[1.25,10.56],[1.20,10.60],
+  [1.00,10.60],[1.00,2.20]
+];
+const INK_PROFILE = [
+  [0.0001,1.00],[0.24,1.01],[0.40,1.05],[0.50,1.10],[0.58,1.20],[0.62,1.34],
+  [0.70,1.62],[0.80,2.00],[0.90,2.20],[0.90,8.46],
+  [0.88,8.52],[0.72,8.47],[0.40,8.42],[0.0001,8.40]
+];
+const PLUG_PROFILE = [
+  [0.0001,8.40],[0.40,8.42],[0.72,8.47],[0.88,8.52],[0.90,8.56],
+  [0.90,9.48],[0.87,9.56],[0.60,9.61],[0.0001,9.61]
+];
+
+const pTubeB = P('tubeB','黄铜笔芯管（放大）',
+  '薄壁黄铜管把油墨从笔杆一路送到笔尖；内壁的毛细作用让油墨柱不会断。',
+  [0,4.6,-1.2],[1.4,7.6,0], penB);
+addShell(pTubeB, TUBE_PROFILE, M.brass, M.brassCut, { order:0 });
+/* 管口卷边 */
+addGeo(pTubeB, new THREE.TorusGeometry(1.22,0.055,8,48,PI), M.brass,
+  { pos:[0,10.34,0], rot:[PI/2,0,PI/2], noPick:true });
+
+const pSocket = P('socket','球珠座（笔尖铜头）',
+  '内腔是按球珠磨出的球面杯，只留十几微米余隙；下缘卷边把球珠扣住，不让它掉出来。',
+  [-3.1,-1.1,0.2],[-1.1,1.35,0], penB);
+addShell(pSocket, SOCKET_PROFILE, M.nib, M.nibCut, { order:0, seg:72 });
+/* 卷边唇口的一圈高光 */
+addGeo(pSocket, new THREE.TorusGeometry(0.62,0.032,8,64), M.nib,
+  { pos:[0,0.28,0], rot:[PI/2,0,0], noPick:true });
+
+const pInkB = P('inkB','黏稠蓝色油墨柱（放大）',
+  '高黏度油墨靠毛细作用与重力缓缓下行；弯月面贴着球珠顶部，把墨送进沟槽。',
+  [3.0,1.0,0.4],[1.0,5.4,0], penB);
+addShell(pInkB, INK_PROFILE, M.ink, M.inkCut, { order:3, seg:72 });
+
+const pPlugB = P('plugB','油脂塞（放大）',
+  '一小段惰性油脂封住油墨柱尾端：跟着墨面下移，既挡住空气，也防油墨倒流、干结。',
+  [3.6,3.9,0],[1.1,9.0,0], penB);
+addShell(pPlugB, PLUG_PROFILE, M.grease, M.greaseCut, { order:4, seg:64 });
+
+const pBall = P('ball','抛光碳化钨球珠',
+  '直径约 1 毫米，硬度极高。滚动时内侧蘸墨、外侧印到纸上：既是阀门，也是转印辊。',
+  [-1.6,-2.4,2.2],[0.72,0.52,0.3], penB);
+const ballMesh = addGeo(pBall, new THREE.SphereGeometry(RB, 64, 40), M.ball,
+  { pos:[0,BY,0], order:6 });
+/* 球珠上半部浸在油墨里的膜（不随球转，持续被补充） */
+deco(penB, new THREE.SphereGeometry(RB*1.014, 40, 20, 0, PI*2, 0, PI*0.40), M.film,
+  { pos:[0,BY,0], order:7 });
+/* 球珠与座之间那圈十几微米的转动余隙 */
+deco(penB, new THREE.TorusGeometry(RB+0.012,0.009,6,64),
+  new THREE.MeshBasicMaterial({color:0x8fe6ff, transparent:true, opacity:0.46, depthWrite:false}),
+  { pos:[0,BY,0], rot:[PI/2,0,0], order:9 });
+
+/* 三条在座上刻出的细微油墨沟槽 */
+const pGroove = P('groove','座内油墨沟槽',
+  '球珠座内壁上刻出的细槽，把油墨从墨腔均匀引到球珠背面，供它一路带走。',
+  [1.4,-2.6,1.8],[-0.8,1.65,0], penB);
+class GrooveCurve extends THREE.Curve {
+  constructor(phi){ super(); this.phi = phi; }
+  getPoint(t, target = new THREE.Vector3()){
+    const y = lerp(2.02, 0.36, t);
+    const r = innerR(Math.min(2.02, Math.max(0.28,y))) + 0.008;
+    return target.set(r*Math.sin(this.phi), y, r*Math.cos(this.phi));
+  }
+}
+const grooveCurves = [];
+for (const phi of [PI/2 + 0.26, PI, 3*PI/2 - 0.26]){
+  const c = new GrooveCurve(phi); grooveCurves.push(c);
+  addGeo(pGroove, new THREE.TubeGeometry(c, 46, 0.030, 6, false), M.groove,
+    { order:6 });
+}
+/* 切断面上再描出两条刻槽：从墨腔一路通到球珠背面，剖面里看得最清楚 */
+class CutGrooveCurve extends THREE.Curve {
+  constructor(sx){ super(); this.sx = sx; }
+  getPoint(t, target = new THREE.Vector3()){
+    const y = lerp(2.04, 0.42, t);
+    const r = innerR(Math.min(2.04, Math.max(0.28,y))) + 0.010;
+    return target.set(this.sx*r, y, 0.012);
+  }
+}
+const cutCurves = [];
+for (const sx of [1,-1]){
+  const c = new CutGrooveCurve(sx); cutCurves.push(c);
+  addGeo(pGroove, new THREE.TubeGeometry(c, 54, 0.040, 6, false), M.groove,
+    { order:12 });
+  addGeo(pGroove, new THREE.TubeGeometry(c, 54, 0.013, 4, false), M.bead,
+    { order:13, noPick:true });
+}
+/* 沿沟槽下行的油墨微粒 */
+const inkBeads = [];
+for (const c of cutCurves){
+  for (let j=0;j<3;j++){
+    const m = addGeo(pGroove, new THREE.SphereGeometry(0.055,10,8), M.bead,
+      { order:14, noPick:true });
+    inkBeads.push({ m, c, off:j/3 });
+  }
+}
+/* 球珠与纸的接触点：刚转印上去、还发亮的湿墨 */
+const wetDot = addGeo(pBall, new THREE.SphereGeometry(0.17,18,10), M.wet,
+  { pos:[0,0.014,0], scale:[1,0.14,1], order:9, noPick:true });
+/* 停笔时表面张力封住的那圈缝隙 */
+const sealMat = M.seal.clone();
+const sealRing = deco(penB, new THREE.TorusGeometry(0.468,0.016,8,64), sealMat,
+  { pos:[0,0.30,0], rot:[PI/2,0,0], order:10 });
+
+/* ==================================================================
+   八、整笔剖面（同一毫米坐标，整体缩小 10 倍）
+   ================================================================== */
+const penA = new THREE.Group();
+penA.scale.setScalar(PEN_A_SCALE);
+penA.position.copy(A_POS);
+penA.rotation.z = 0.14;
+ROOT.add(penA);
+
+const A_OUT = [[2.20,2.2],[2.70,4],[3.40,7],[4.10,12],[4.60,18],[4.60,112],
+               [4.55,118],[4.30,124],[4.00,128]];
+const A_IN  = [[1.90,2.2],[2.40,6],[3.20,12],[3.70,18],[3.70,112],
+               [3.70,124],[3.60,128]];
+const A_BARREL = A_OUT.concat(A_IN.slice().reverse());   // A_OUT / A_IN 都是 [半径, 高度]
+const pBarrel = P('barrel','笔杆 / 外壳',
+  '深色树脂笔杆，前侧沿轴线剖开一半，好让里面的笔芯、油墨柱和按动机构露出来。',
+  [-42,0,-4],[-5.2,70,0], penA);
+addShell(pBarrel, A_BARREL, M.barrel, M.barrelCut, { order:0, seg:72 });
+
+/* 顶部金属圈 + 笔夹 */
+const pClip = P('clip','笔夹',
+  '一片弹性钢片，扣在笔杆顶端的金属圈上，把笔别在口袋或本子上。',
+  [-24,10,16],[6.4,116,4.6], penA);
+(function buildClip(){
+  const s = new THREE.Shape();
+  const w = 1.35, y0 = -14, y1 = 14, r = 1.25;
+  s.moveTo(-w, y0+r);
+  s.quadraticCurveTo(-w,y0,-w+r,y0);
+  s.lineTo(w-r,y0); s.quadraticCurveTo(w,y0,w,y0+r);
+  s.lineTo(w,y1-r); s.quadraticCurveTo(w,y1,w-r,y1);
+  s.lineTo(-w+r,y1); s.quadraticCurveTo(-w,y1,-w,y1-r);
+  s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth:0.62, bevelEnabled:true,
+    bevelSize:0.10, bevelThickness:0.09, bevelSegments:2, curveSegments:10 });
+  addGeo(pClip, g, M.steel, { pos:[3.62,115,3.62], rot:[0,PI/4,0] });
+  addGeo(pClip, new THREE.SphereGeometry(1.15,18,12), M.steel,
+    { pos:[3.70,101.3,3.70], scale:[1,0.55,1] });
+  /* 顶端固定圈 */
+  addGeo(pClip, new THREE.CylinderGeometry(4.92,4.92,3.6,40,1,true), M.chrome,
+    { pos:[0,127,0] });
+})();
+
+/* 按动钮 */
+const pBtn = P('button','按动钮',
+  '拇指按下的那一截。每按一次，下方的旋转凸轮就转过一个齿，笔芯在伸出与收回之间切换。',
+  [0,34,0],[0,140,0], penA);
+addGeo(pBtn, new THREE.CylinderGeometry(3.30,3.30,9.0,40), M.chrome, { pos:[0,134,0] });
+addGeo(pBtn, new THREE.SphereGeometry(3.30,32,16,0,PI*2,0,PI/2), M.chrome,
+  { pos:[0,138.5,0], scale:[1,0.42,1] });
+addGeo(pBtn, new THREE.TorusGeometry(3.30,0.22,8,40), M.steel,
+  { pos:[0,130,0], rot:[PI/2,0,0], noPick:true });
+
+/* 旋转凸轮 */
+const pCam = P('cam','旋转凸轮',
+  '八齿小凸轮，按动钮每压一次就转过 45 度，卡进不同的深槽里锁住笔芯的位置。',
+  [18,20,0],[2.8,120,0], penA);
+addGeo(pCam, new THREE.CylinderGeometry(2.90,2.90,2.6,8), M.chrome,
+  { pos:[0,121.2,0], rot:[0,PI/8,0] });
+for (let i=0;i<8;i++){
+  const a = i*PI/4;
+  addGeo(pCam, new THREE.BoxGeometry(1.05,1.45,0.95), M.steel, {
+    pos:[Math.cos(a)*2.10, 123.2, Math.sin(a)*2.10],
+    rot:[0,-a,0.42], noPick:true
+  });
+}
+addGeo(pCam, new THREE.CylinderGeometry(0.72,0.72,4.4,20), M.chrome,
+  { pos:[0,117.8,0], noPick:true });
+
+/* 复位弹簧 */
+const pSpring = P('spring','复位弹簧',
+  '压住笔芯往回顶；松开拇指时，弹簧把凸轮推回浅槽，笔尖就缩回笔杆里。',
+  [-20,12,0],[-3.2,108,0], penA);
+class Helix extends THREE.Curve {
+  constructor(r,h,c){ super(); this.r=r; this.h=h; this.c=c; }
+  getPoint(t, target = new THREE.Vector3()){
+    const a = t*PI*2*this.c;
+    return target.set(Math.cos(a)*this.r, t*this.h, Math.sin(a)*this.r);
+  }
+}
+const springMesh = addGeo(pSpring,
+  new THREE.TubeGeometry(new Helix(2.35,15.0,7.5), 220, 0.27, 6, false), M.spring,
+  { pos:[0,100,0] });
+
+/* 黄铜笔芯管（整笔） */
+const pTubeA = P('tubeA','细长黄铜笔芯管',
+  '整根可替换笔芯的骨架：薄壁黄铜管，前端压装笔尖铜头，尾端敞开由油脂塞封住。',
+  [26,-6,0],[2.4,64,0], penA);
+addShell(pTubeA, [[1.60,6],[1.60,123],[1.15,123],[1.15,6]], M.brass, M.brassCut,
+  { order:1, seg:56 });
+
+const pInkA = P('inkA','蓝色油墨柱',
+  '一柱几乎不流动的蓝色油墨，从笔杆一直贯到笔尖；靠毛细作用和重力一点点下行。',
+  [34,-10,0],[1.6,62,0], penA);
+addShell(pInkA, [
+  [0.0001,13],[1.10,13],[1.10,108],[1.07,108.6],[0.70,108.3],[0.0001,108.2]
+], M.ink, M.inkCut, { order:3, seg:56 });
+
+const pPlugA = P('plugA','油脂塞（尾封）',
+  '跟着墨面一起下移，把空气挡在外面，也防止油墨倒流或从尾端干掉。',
+  [38,8,0],[1.6,112,0], penA);
+addShell(pPlugA, [
+  [0.0001,108.2],[0.70,108.3],[1.07,108.6],[1.10,109],[1.10,116],
+  [1.06,116.6],[0.60,116.8],[0.0001,116.8]
+], M.grease, M.greaseCut, { order:4, seg:56 });
+
+/* 整笔的笔尖铜头 + 球珠 */
+const A_TIP_OUT = [[0.60,0.28],[0.70,0.60],[0.90,1.20],[1.20,2.20],[1.45,3.60],[1.60,6.0]];
+const A_TIP_IN  = [[0.463,0.28],[0.514,0.50],[0.472,0.70],[0.50,1.00],[0.70,1.80],[1.05,3.40],[1.15,6.0]];
+const pTipA = P('tipA','笔尖铜头',
+  '前端的锥形铜头，里面就是放大剖面里那颗球珠和它的球珠座。',
+  [14,-26,0],[1.8,3.2,0], penA);
+addShell(pTipA, A_TIP_OUT.concat(A_TIP_IN.slice().reverse()),
+  M.nib, M.nibCut, { order:0, seg:48 });
+
+const pBallA = P('ballA','球珠（整笔）',
+  '和放大剖面里是同一颗球珠：直径约 1 毫米，在这里只有笔杆直径的九分之一。',
+  [14,-34,0],[0,0.5,0], penA);
+const ballA = addGeo(pBallA, new THREE.SphereGeometry(RB,24,16), M.ball,
+  { pos:[0,BY,0], order:6 });
+
+/* ==================================================================
+   九、标签 / 指示
+   ================================================================== */
+const labelsEl = document.getElementById('labels');
+const labelItems = [], pinItems = [];
+function makeLabel(cls, text, parent, pos, list){
+  const el = document.createElement('div');
+  el.className = cls; el.textContent = text; labelsEl.appendChild(el);
+  const o = new THREE.Object3D(); o.position.copy(pos); parent.add(o);
+  const item = { el, o }; list.push(item); return item;
+}
+partOrder.forEach(p=>{ if (p.showLabel) makeLabel('lbl', p.name, p.group, p.anchor, labelItems); });
+
+/* 常态下常驻的四枚细节指示 */
+makeLabel('pin','碳化钨球珠 · 直径 1 毫米', pBall.group, V(2.05,0.28,0.5), pinItems);
+makeLabel('pin','球珠座 · 十余微米转动余隙', pSocket.group, V(-2.25,1.02,0), pinItems);
+makeLabel('pin','座内油墨沟槽', pGroove.group, V(-2.55,2.55,0), pinItems);
+makeLabel('pin','油脂塞 · 封住尾端', pPlugB.group, V(2.15,9.10,0), pinItems);
+
+/* 细节指示的引线 */
+const pinLeaders = [];
+function leader(parent, a, b){
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]), M.hintLn);
+  parent.add(l); pinLeaders.push(l);
+}
+leader(pBall.group,   V(0.46,0.50,0.18),  V(1.95,0.30,0.48));
+leader(pSocket.group, V(-0.78,0.72,-0.1), V(-2.15,1.02,0));
+leader(pGroove.group, V(-0.62,1.62,-0.1), V(-2.45,2.55,0));
+leader(pPlugB.group,  V(0.85,9.00,0),     V(2.05,9.10,0));
+
+const annoA = document.createElement('div'); annoA.className = 'anno';
+annoA.textContent = '整笔剖面 · 缩小 10 倍'; labelsEl.appendChild(annoA);
+const annoB = document.createElement('div'); annoB.className = 'anno';
+annoB.textContent = '笔尖放大 10 倍 · 1 单位 = 1 毫米'; labelsEl.appendChild(annoB);
+const annoC = document.createElement('div'); annoC.className = 'anno';
+annoC.textContent = '↗ 由此放大'; labelsEl.appendChild(annoC);
+
+const tmpV = V(0,0,0);
+function placeAnno(el, pos, opacity){
+  tmpV.copy(pos).project(camera);
+  if (tmpV.z > 1){ el.style.opacity = 0; return; }
+  el.style.left = ((tmpV.x*0.5+0.5)*innerWidth) + 'px';
+  el.style.top  = ((-tmpV.y*0.5+0.5)*innerHeight) + 'px';
+  el.style.transform = 'translate(-50%,-50%)';
+  el.style.opacity = opacity;
+}
+
+/* ==================================================================
+   十、状态
+   ================================================================== */
+let tNorm = 0.20;                 // 起始就停在线划到一半的那一刻
+let playing = true, slow = false;
+let exploded = false, explodeAmt = 0;
+let closeUp = false, closeReady = false, prevCloseX = PEN_X0, camGoal = null;
+let hovered = null;
+let ballSpin = 0, prevPenX = PEN_X0, beadT = 0;
+let clickT = -1, camAngle = 0, camAngleGoal = 0;
+let hudTick = 0;
+const clock = new THREE.Clock();
+
+/* ==================================================================
+   十一、交互：悬停
+   ================================================================== */
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2(-10,-10);
+let ptrDirty = false, ptrInside = false;
+const tip = document.getElementById('tip');
+renderer.domElement.addEventListener('pointermove', e => {
+  ptr.x = (e.clientX/innerWidth)*2 - 1;
+  ptr.y = -(e.clientY/innerHeight)*2 + 1;
+  ptrDirty = true; ptrInside = true;
+  tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px';
+});
+renderer.domElement.addEventListener('pointerleave', ()=>{ ptrInside = false; ptrDirty = true; });
+function pick(){
+  if (!ptrDirty || !ptrInside) return;
+  ptrDirty = false;
+  ray.setFromCamera(ptr, camera);
+  const hits = ray.intersectObjects(pickables, false);
+  const part = hits.length ? hits[0].object.userData.part : null;
+  if (part !== hovered){
+    hovered = part;
+    if (part){
+      tip.innerHTML = `<div class="t">${part.name}</div><div class="d">${part.desc}</div>`;
+      tip.style.opacity = 1;
+      renderer.domElement.style.cursor = 'pointer';
+    } else {
+      tip.style.opacity = 0;
+      renderer.domElement.style.cursor = 'grab';
+    }
+  }
+}
+setInterval(pick, 55);
+
+/* ==================================================================
+   十二、按钮
+   ================================================================== */
+const $ = id => document.getElementById(id);
+$('btnExplode').addEventListener('click', ()=>{
+  exploded = !exploded;
+  $('btnExplode').classList.toggle('on', exploded);
+  $('lbExplode').textContent = exploded ? '复位合拢' : '爆炸视图';
+  if (exploded){
+    tNorm = 0.20;
+    tip.style.opacity = 0; hovered = null;
+    camGoal = { pos:WIDE_POS.clone(), tgt:WIDE_TGT.clone() };
+    closeUp = false; closeReady = false;
+    $('lbClose').textContent = '球珠特写';
+    $('btnClose').classList.remove('on');
+  } else {
+    camGoal = { pos:HOME_POS.clone(), tgt:HOME_TGT.clone() };
+  }
+});
+$('btnClick').addEventListener('click', ()=>{ clickT = 0; camAngleGoal += PI/4; });
+$('btnClose').addEventListener('click', ()=>{
+  closeUp = !closeUp;
+  $('btnClose').classList.toggle('on', closeUp);
+  $('lbClose').textContent = closeUp ? '回到全景' : '球珠特写';
+  if (closeUp){ closeReady = false; camGoal = null; }
+  else { camGoal = { pos:HOME_POS.clone(), tgt:HOME_TGT.clone() }; }
+});
+$('btnPause').addEventListener('click', ()=>{
+  playing = !playing;
+  $('btnPause').classList.toggle('on', !playing);
+  $('lbPause').textContent = playing ? '暂停' : '继续';
+});
+$('btnSlow').addEventListener('click', ()=>{
+  slow = !slow;
+  $('btnSlow').classList.toggle('on', slow);
+  $('lbSlow').textContent = slow ? '恢复正常' : '慢动作';
+});
+$('btnReset').addEventListener('click', ()=>{
+  closeUp = false; closeReady = false;
+  $('lbClose').textContent = '球珠特写'; $('btnClose').classList.remove('on');
+  camGoal = exploded
+    ? { pos:WIDE_POS.clone(), tgt:WIDE_TGT.clone() }
+    : { pos:HOME_POS.clone(), tgt:HOME_TGT.clone() };
+});
+addEventListener('keydown', e=>{
+  if (e.code === 'Space'){ e.preventDefault(); $('btnPause').click(); }
+  if (e.key === 'e' || e.key === 'E') $('btnExplode').click();
+  if (e.key === 'r' || e.key === 'R') $('btnReset').click();
+});
+
+/* ==================================================================
+   十三、HUD
+   ================================================================== */
+function updateHUD(state){
+  $('phase').textContent = exploded ? '爆炸分解' :
+    (state.writing ? '正在书写 · 球珠滚动转印' :
+     state.stopped ? '停笔 · 表面张力封住缝隙' : '抬笔复位 · 准备下一笔');
+  $('phase').className = 'v ' + (state.stopped ? 'ok' : 'blue');
+  const v = (PEN_X1-PEN_X0)/(CYCLE*WRITE_END);
+  $('speed').textContent = (v/(slow?2.4:1)).toFixed(1) + ' 毫米 / 秒';
+  $('rpm').textContent = state.writing ? (v/(slow?2.4:1)/(PI*2*RB)).toFixed(2) + ' 转 / 秒' : '0.00 转 / 秒';
+  $('ink').textContent = '下移 ' + (state.sink).toFixed(2) + ' 毫米';
+  $('plug').textContent = state.stopped ? '静止 · 尾端密封' : '同步下移 · 隔绝空气';
+  $('click').textContent = (Math.round(camAngleGoal/(PI/4)) % 2 === 1) ? '凸轮转过一齿 · 笔芯伸出' : '笔芯收回';
+}
+
+/* ==================================================================
+   十四、渲染循环
+   ================================================================== */
+function frame(){
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.06);
+  const rate = slow ? 2.4 : 1;
+
+  /* --- 时间轴 --- */
+  if (playing && !exploded){
+    tNorm += dt/(CYCLE*rate);
+    if (tNorm >= 1) tNorm -= 1;
+  }
+  const p = Math.min(1, tNorm/WRITE_END);
+  const resetU = tNorm >= RESET_AT ? smooth((tNorm-RESET_AT)/(1-RESET_AT)) : 0;
+  let penX;
+  if (tNorm < WRITE_END) penX = lerp(PEN_X0, PEN_X1, p);
+  else if (tNorm < RESET_AT) penX = PEN_X1;
+  else penX = lerp(PEN_X1, PEN_X0, resetU);
+  const writing = tNorm < WRITE_END && !exploded && playing;
+  const stopped = tNorm >= WRITE_END && tNorm < RESET_AT && !exploded;
+  const frozen  = !playing || exploded;
+
+  let lineEnd;
+  if (tNorm < WRITE_END) lineEnd = penX;
+  else if (tNorm < RESET_AT) lineEnd = PEN_X1;
+  else lineEnd = lerp(PEN_X1, PEN_X0, resetU);
+
+  const sink = 0.58 * p * (1-resetU);
+  const lift = Math.sin(resetU*PI) * 0.18;
+
+  /* --- 爆炸插值 --- */
+  const target = exploded ? 1 : 0;
+  explodeAmt += (target-explodeAmt)*Math.min(1, dt*6.5);
+  if (Math.abs(target-explodeAmt) < 0.0015) explodeAmt = target;
+  const k = smooth(explodeAmt);
+  for (const part of partOrder) part.exGroup.position.copy(part.ex).multiplyScalar(k);
+
+  /* --- 整笔与放大剖面就位 --- */
+  penB.position.set(penX, lift, 0);
+  lBall.position.set(penX+1.8, 2.4, 3.2);
+  shadowB.position.x = penX;
+  shadowB.material.opacity = 0.85 - lift*0.35;
+
+  /* --- 球珠滚动：走过 Δx，转过 Δx/r 弧度 --- */
+  if (writing) ballSpin += (penX-prevPenX)/RB;
+  prevPenX = penX;
+  ballMesh.rotation.z = -ballSpin;
+  ballA.rotation.z = -ballSpin;
+  wetDot.position.x = 0;
+
+  /* --- 油墨柱与油脂塞同步下移 --- */
+  pInkB.group.position.y  = -sink;
+  pPlugB.group.position.y = -sink;
+  pInkA.group.position.y  = -sink*8;
+  pPlugA.group.position.y = -sink*8;
+
+  /* --- 沟槽里的墨滴 --- */
+  if (writing) beadT += dt/rate*0.52;
+  for (const b of inkBeads){
+    const u = (beadT + b.off) % 1;
+    b.c.getPoint(u, b.m.position);
+    b.m.visible = !exploded;
+  }
+
+  /* --- 纸面线迹 --- */
+  const len = Math.max(0.001, lineEnd - LINE_X0);
+  lineMesh.scale.x = len;
+  lineMesh.position.x = LINE_X0 + len/2;
+  wetMesh.position.x = lineEnd - 0.22;
+  wetMesh.visible = tNorm < RESET_AT;
+  for (const l of pinLeaders) l.visible = explodeAmt < 0.20;
+
+  /* --- 停笔：表面张力把缝隙封住 --- */
+  const sealOn = (stopped || frozen) && !exploded;
+  sealMat.opacity = sealOn
+    ? 0.32 + 0.24*Math.sin(performance.now()*0.005)
+    : 0;
+  sealRing.visible = sealMat.opacity > 0.01;
+  const callout = $('callout');
+  if (sealOn && !exploded){
+    tmpV.set(penX-1.5, 0.92, 0).project(camera);
+    callout.style.left = ((tmpV.x*0.5+0.5)*innerWidth) + 'px';
+    callout.style.top  = ((-tmpV.y*0.5+0.5)*innerHeight) + 'px';
+    callout.textContent = '停笔 · 表面张力封住球珠四周的缝隙';
+    callout.style.opacity = 0.92;
+  } else callout.style.opacity = 0;
+
+  /* --- 按动机构 --- */
+  if (clickT >= 0){
+    clickT += dt;
+    if (clickT > 0.9) clickT = -1;
+  }
+  const press = clickT >= 0 ? Math.sin(Math.min(1,clickT/0.9)*PI) : 0;
+  camAngle += (camAngleGoal-camAngle)*Math.min(1, dt*8);
+  pCam.group.rotation.y = camAngle;
+  pBtn.group.position.y = -2.8*press;
+  pCam.group.position.y = -1.9*press;
+  pTubeA.group.position.y = -1.7*press;
+  springMesh.scale.y = 1 - 0.18*press;
+
+  /* --- 悬停高亮 --- */
+  for (const part of partOrder){
+    const on = (part === hovered);
+    for (const m of part.mats){
+      if (!m.emissive) continue;
+      if (on){ m.emissive.setHex(0x3f86ff); m.emissiveIntensity = Math.max(0.62, m.userData.i0 || 0); }
+      else { m.emissive.setHex(m.userData.e0 || 0); m.emissiveIntensity = m.userData.i0 || 0; }
+    }
+  }
+
+  /* --- 标签：爆炸视图显示全部，常态只留细节指示 --- */
+  camera.updateMatrixWorld(true);
+  const labelOn = explodeAmt > 0.20;
+  const placed = [];
+  const placeSet = (list, opacity, allowHide) => {
+    for (const it of list){
+      if (opacity <= 0){ it.el.style.opacity = 0; continue; }
+      it.o.getWorldPosition(tmpV); tmpV.project(camera);
+      if (tmpV.z > 1){ it.el.style.opacity = 0; continue; }
+      const x = (tmpV.x*0.5+0.5)*innerWidth, y = (-tmpV.y*0.5+0.5)*innerHeight;
+      if (x < 4 || x > innerWidth-4 || y < 4 || y > innerHeight-4){ it.el.style.opacity = 0; continue; }
+      let yy = null;
+      for (const dy of [0,-22,22,-44,44,-66,66,-88,88,-110,110,-132,132]){
+        const cy = y+dy;
+        let ok = true;
+        for (const r of placed){ if (Math.abs(x-r.x) < Math.max(120,r.w) && Math.abs(cy-r.y) < 20){ ok=false; break; } }
+        if (ok){ yy = cy; break; }
+      }
+      if (yy === null || yy < 8 || yy > innerHeight-8){ it.el.style.opacity = 0; continue; }
+      placed.push({ x, y:yy, w:it.el.offsetWidth || 80 });
+      it.el.style.opacity = opacity;
+      it.el.style.transform = `translate(${x}px, ${yy}px) translate(-50%,-50%)`;
+    }
+  };
+  if (labelOn){ placeSet(pinItems, 0, true); placeSet(labelItems, Math.min(1,(explodeAmt-0.20)*2.6), true); }
+  else { placeSet(labelItems, 0, true); placeSet(pinItems, 1 - explodeAmt*3, true); }
+
+  /* --- 常驻比例说明 --- */
+  const annoOp = exploded ? 0 : 0.9;
+  placeAnno(annoA, V(A_POS.x+0.6, 15.0, A_POS.z), annoOp);
+  placeAnno(annoB, V(penX, 11.6, 0), annoOp);
+  placeAnno(annoC, V(A_POS.x-1.5, 1.05, A_POS.z+0.4), annoOp*0.8);
+
+  /* --- HUD --- */
+  hudTick += dt;
+  if (hudTick > 0.09){ hudTick = 0; updateHUD({ writing, stopped, sink }); }
+
+  /* --- 相机：特写镜头先飞近，再与走笔同步平移，始终锁住球珠 --- */
+  if (closeUp){
+    const dp = tmpV.set(penX+2.15, 1.72, 3.20);
+    const wantT = V(penX, 0.60, 0);
+    if (!closeReady){
+      const a = Math.min(1, dt*3.4);
+      camera.position.lerp(dp, a);
+      controls.target.lerp(wantT, a);
+      if (camera.position.distanceTo(dp) < 0.05) closeReady = true;
+    } else {
+      const dx = penX - prevCloseX;
+      camera.position.x += dx; controls.target.x += dx;
+    }
+  } else if (camGoal){
+    const a = Math.min(1, dt*3.2);
+    camera.position.lerp(camGoal.pos, a);
+    controls.target.lerp(camGoal.tgt, a);
+    if (camera.position.distanceTo(camGoal.pos) < 0.02) camGoal = null;
+  }
+  prevCloseX = penX;
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ==================================================================
+   十五、自适应 + 启动
+   ================================================================== */
+function resize(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+document.getElementById('loader').classList.add('hide');
+frame();
+}
+</script>
+</body>
+</html>

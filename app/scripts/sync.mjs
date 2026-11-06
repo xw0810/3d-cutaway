@@ -25,7 +25,9 @@ const CATALOG = {
     { file: '人耳3D解剖.html', slug: 'ear', title: '人耳', sub: '声波 · 听小骨 · 耳蜗 · 听神经',
       tags: ['听觉', '鼓膜', '耳蜗', '听神经', '基底膜'], accent: '#35c7c7' },
     { file: '膝关节3D解剖.html', slug: 'knee', title: '膝关节', sub: '骨与软骨 · 半月板 · 韧带',
-      tags: ['关节', '韧带', '半月板', '屈伸', '髌骨'], accent: '#7fd6e8' }
+      tags: ['关节', '韧带', '半月板', '屈伸', '髌骨'], accent: '#7fd6e8' },
+    { file: '骨骼肌肌节3D.html', slug: 'sarcomere', title: '骨骼肌肌节', sub: '六级缩放 · 横桥循环 · A/I/H 带测量',
+      tags: ['肌肉', '肌节', '肌动蛋白', '肌球蛋白', '横桥', '钙离子', '肌质网', '滑行丝学说'], accent: '#ff9d72' }
   ],
   '机械与工程': [
     { file: '弹子锁3D解剖.html', slug: 'lock', title: '弹子锁', sub: '五颗弹子 · 剪切线 · 错钥匙',
@@ -37,7 +39,13 @@ const CATALOG = {
     { file: '机械硬盘3D解剖.html', slug: 'hdd', title: '机械硬盘', sub: '盘片 · 磁头 · 音圈电机',
       tags: ['存储', '磁盘', '磁道', '磁头', '寻道'], accent: '#69d6f0' },
     { file: '锁式线迹缝纫机3D.html', slug: 'sewing', title: '锁式线迹缝纫机', sub: '机针 · 旋梭 · 送布',
-      tags: ['缝纫', '线迹', '旋梭', '送布牙', '挑线杆'], accent: '#d8b26a' }
+      tags: ['缝纫', '线迹', '旋梭', '送布牙', '挑线杆'], accent: '#d8b26a' },
+    { file: '液体火箭发动机3D.html', slug: 'rocket', title: '液体火箭发动机', sub: '喷注器 · 再生冷却 · 涡轮泵 · 钟形喷管',
+      tags: ['火箭', '喷注器', '再生冷却', '涡轮泵', '超音速', '万向节'], accent: '#ffab5e' },
+    { file: '圆珠笔3D解剖.html', slug: 'pen', title: '圆珠笔', sub: '球珠 · 球珠座 · 油墨沟槽 · 油脂塞',
+      tags: ['书写', '球珠', '笔尖', '油墨', '油脂塞', '碳化钨', '毛细作用'], accent: '#8db9ff' },
+    { file: '都江堰渠首3D.html', slug: 'dujiangyan', title: '都江堰渠首', sub: '鱼嘴 · 飞沙堰 · 宝瓶口 · 四六分水',
+      tags: ['水利', '都江堰', '鱼嘴', '飞沙堰', '宝瓶口', '分水', '排沙', '无坝引水', '水位'], accent: '#79e0cf' }
   ],
   '自然与生活': [
     { file: '叶片光合作用3D.html', slug: 'leaf', title: '叶片光合作用', sub: '栅栏组织 · 叶绿体 · 气孔',

@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>液体火箭发动机 · 交互式三维剖视与推进剂循环</title>
+<link rel="icon" href="data:," />
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#05070b}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+    color:#eef3f7;-webkit-font-smoothing:antialiased;
+    background:
+      radial-gradient(ellipse 66% 60% at 52% 6%, #20303c 0%, rgba(18,26,34,0) 66%),
+      radial-gradient(ellipse 92% 70% at 12% 96%, #2a1a12 0%, rgba(10,12,16,0) 60%),
+      radial-gradient(ellipse 64% 56% at 88% 78%, #12283a 0%, rgba(8,10,14,0) 62%),
+      linear-gradient(165deg,#0d1117 0%,#080b10 48%,#040609 100%);
+  }
+  #c{position:fixed;inset:0;display:block;touch-action:none;cursor:grab;outline:none}
+  #c:active{cursor:grabbing}
+
+  .panel{
+    position:fixed;z-index:20;
+    background:linear-gradient(180deg,rgba(24,31,39,.82),rgba(10,14,19,.76));
+    -webkit-backdrop-filter:blur(20px) saturate(135%);
+    backdrop-filter:blur(20px) saturate(135%);
+    border:1px solid rgba(255,171,94,.15);
+    border-radius:15px;
+    box-shadow:0 22px 58px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.055);
+  }
+
+  .hud-tl{left:26px;top:24px;padding:17px 22px 18px;max-width:340px}
+  .eyebrow{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9px;letter-spacing:.22em;color:rgba(255,177,104,.8);font-weight:600}
+  .hud-tl h1{font-size:22px;font-weight:650;letter-spacing:.01em;margin:8px 0 8px;line-height:1.2}
+  .hud-tl h1 span{color:#9aa9b6;font-weight:400;font-size:13px;letter-spacing:.05em;margin-left:7px}
+  .hud-tl .sub{font-size:11px;line-height:1.8;color:rgba(206,220,231,.62)}
+  .hud-tl .sub em{font-style:normal;color:rgba(255,186,112,.95)}
+
+  .hud-tr{right:26px;top:24px;width:240px;padding:15px 17px 14px}
+  .cap{font-family:ui-monospace,monospace;font-size:9px;letter-spacing:.22em;color:rgba(206,220,231,.42);margin-bottom:10px}
+  .bigline{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+  .bigline b{font-family:ui-monospace,monospace;font-size:30px;font-weight:500;color:#ffb46f;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .bigline i{font-style:normal;font-size:10.5px;color:rgba(206,220,231,.48);letter-spacing:.05em}
+  .rows{border-top:1px solid rgba(255,171,94,.13);padding-top:7px}
+  .rows div{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:10.5px;color:rgba(206,220,231,.5)}
+  .rows b{font-family:ui-monospace,monospace;font-size:11.5px;font-weight:500;color:#e9f1f7;font-variant-numeric:tabular-nums}
+  .pbar{height:3px;border-radius:3px;background:rgba(255,255,255,.08);margin:11px 0 9px;overflow:hidden}
+  .pbar i{display:block;height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#4aa8ff,#8fe6d0,#ffb264,#ff6a32)}
+  .stages{display:flex;gap:3px;margin:0 0 9px}
+  .stages span{flex:1;height:16px;border-radius:3px;background:rgba(255,255,255,.07);font-size:8px;line-height:16px;text-align:center;color:rgba(206,220,231,.34);transition:all .18s;white-space:nowrap;overflow:hidden}
+  .stages span.on{background:rgba(255,171,94,.28);color:#ffd7a5;box-shadow:inset 0 0 0 1px rgba(255,190,120,.3)}
+  .phase{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.03em;color:#ffbd7e;min-height:16px}
+  .phase i{width:5px;height:5px;border-radius:50%;background:#ff9d4d;box-shadow:0 0 9px #ff9d4d;animation:bl 1.7s infinite;flex:none}
+  @keyframes bl{0%,100%{opacity:1}50%{opacity:.28}}
+
+  .toolbar{left:50%;transform:translateX(-50%);bottom:26px;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 9px;border-radius:15px;flex-wrap:nowrap;max-width:calc(100vw - 32px)}
+  button{
+    font:inherit;font-size:11.5px;color:#dfe9f1;background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:7px 10px;cursor:pointer;
+    transition:all .16s;letter-spacing:.01em;white-space:nowrap;
+  }
+  button:hover{background:rgba(255,171,94,.14);border-color:rgba(255,171,94,.42);color:#fff3e4}
+  button:active{transform:translateY(1px)}
+  button.on{background:rgba(255,171,94,.17);border-color:rgba(255,171,94,.52);color:#ffd9ae;box-shadow:inset 0 0 16px rgba(255,171,94,.1)}
+  button.primary{background:linear-gradient(180deg,#e09a4b,#b2642b);border-color:rgba(255,190,120,.55);color:#1b1108;font-weight:650;box-shadow:0 5px 18px rgba(178,100,43,.28)}
+  button.primary:hover{background:linear-gradient(180deg,#f2b165,#c27635);color:#1b1108}
+  .sep{width:1px;height:21px;background:rgba(255,255,255,.1);margin:0 2px}
+
+  .hud-br{right:26px;bottom:26px;width:300px;padding:14px 17px 15px}
+  .hk{font-family:ui-monospace,monospace;font-size:8.5px;letter-spacing:.22em;color:rgba(255,177,104,.6)}
+  .hn{font-size:14.5px;font-weight:600;margin:8px 0 7px;color:#ffdfbd;letter-spacing:.02em}
+  .hd{font-size:11px;line-height:1.75;color:rgba(206,220,231,.68);min-height:38px}
+
+  .hint{position:fixed;left:26px;bottom:28px;z-index:20;font-size:10.5px;line-height:1.9;color:rgba(200,214,226,.38);letter-spacing:.03em;pointer-events:none}
+  .hint b{color:rgba(255,177,104,.78);font-weight:500}
+
+  #labels,#micro{position:fixed;inset:0;z-index:15;pointer-events:none;overflow:hidden}
+  .lbl{
+    position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;
+    font-size:9.5px;letter-spacing:.04em;padding:3px 9px 3px 8px;border-radius:20px;
+    color:#ffe2bd;background:rgba(12,18,24,.9);
+    border:1px solid rgba(255,171,94,.46);
+    box-shadow:0 5px 18px rgba(0,0,0,.6);
+    opacity:0;transition:opacity .26s,color .18s,border-color .18s,background .18s;pointer-events:none;
+  }
+  .lbl::before{content:'';position:absolute;left:-3.5px;top:50%;width:5px;height:5px;border-radius:50%;background:#ffa454;transform:translateY(-50%);box-shadow:0 0 8px #ffa454}
+  .lbl.hot{color:#fff;border-color:rgba(255,206,140,.95);background:rgba(88,48,20,.94);box-shadow:0 0 0 1px rgba(255,206,140,.25),0 6px 22px rgba(0,0,0,.65)}
+  .mlbl{
+    position:absolute;left:0;top:0;transform:translate(-50%,-50%);white-space:nowrap;
+    font-size:10px;letter-spacing:.05em;padding:3px 9px;border-radius:5px;
+    color:#dff3ff;background:rgba(9,20,30,.86);border:1px solid rgba(120,205,255,.5);
+    box-shadow:0 4px 14px rgba(0,0,0,.6);opacity:0;transition:opacity .25s;pointer-events:none;
+  }
+  .mlbl::before{content:'';position:absolute;left:-4px;top:50%;width:5px;height:5px;border-radius:50%;background:#6cc9ff;transform:translateY(-50%);box-shadow:0 0 8px #6cc9ff}
+
+  #loading{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:#05070b;color:#9e8b76;font-size:12px;letter-spacing:.24em;transition:opacity .7s}
+  #loading.hide{opacity:0;pointer-events:none}
+  #err{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#05070b;color:#b6a18c;font-size:13px;text-align:center;padding:30px}
+
+  @media (max-width:1180px){.hint{display:none}.hud-br{width:254px}}
+  @media (max-width:900px){
+    .hud-tr{display:none}.hud-br{display:none}
+    .hud-tl{left:12px;top:12px;padding:11px 14px;max-width:220px}
+    .hud-tl h1{font-size:16px}.hud-tl h1 span{font-size:11px}.hud-tl .sub{font-size:9.5px}
+    .toolbar{bottom:12px;gap:5px;padding:7px 8px;overflow-x:auto;justify-content:flex-start}
+    button{padding:7px 9px;font-size:11px}.sep{display:none}
+    .lbl{font-size:9px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="labels"></div>
+<div id="micro"></div>
+
+<div class="panel hud-tl">
+  <div class="eyebrow">交 互 式 三 维 剖 视 · 液 体 火 箭 发 动 机</div>
+  <h1>液体火箭发动机<span>再生冷却剖视</span></h1>
+  <div class="sub">燃料先当<em>冷却剂</em>：出贮箱经燃料泵增压，沿室壁铣出的狭长通道一路下行，吸走三千度燃气传给壁面的热量，再回流到喷注器充当<em>燃料</em>。氧化剂直接入喷注器，两者从数百个同轴孔喷出雾化混合；燃气在喉部达到音速，在钟形喷管里膨胀到超音速。</div>
+</div>
+
+<div class="panel hud-tr">
+  <div class="cap">实 时 读 数</div>
+  <div class="bigline"><b id="roF">845</b><i>千牛 海平面推力</i></div>
+  <div class="rows">
+    <div><span>燃烧室压力</span><b id="roP">10.2 兆帕</b></div>
+    <div><span>燃气总温</span><b id="roT">3300 开尔文</b></div>
+    <div><span>喉部马赫数</span><b id="roM1">1.00</b></div>
+    <div><span>喷管出口马赫数</span><b id="roM2">4.60</b></div>
+    <div><span>推进剂循环</span><b id="roC">1.00 秒 / 圈</b></div>
+  </div>
+  <div class="pbar"><i id="roBar"></i></div>
+  <div class="stages" id="stages">
+    <span>增压</span><span>冷却</span><span>回流</span><span>喷注</span><span>喉部</span><span>膨胀</span>
+  </div>
+  <div class="phase"><i></i><span id="roPhase">燃料泵与氧化剂泵建立压差</span></div>
+</div>
+
+<div class="panel toolbar">
+  <button id="btnFlow" class="primary">暂停流动</button>
+  <button id="btnSlow">慢动作</button>
+  <div class="sep"></div>
+  <button id="btnEx">爆炸视图</button>
+  <button id="btnCut" class="on">剖开壁面</button>
+  <div class="sep"></div>
+  <button id="btnInj">钻进喷注孔</button>
+  <button id="btnSound">开启声音</button>
+  <button id="btnReset">复位视角</button>
+</div>
+
+<div class="panel hud-br">
+  <div class="hk">部 件 说 明</div>
+  <div class="hn" id="hName">整台液体火箭发动机</div>
+  <div class="hd" id="hDesc">把指针移到任意部件上，它会高亮，并说明自己在推进剂循环与推力生成中的作用。</div>
+</div>
+
+<div class="hint">
+  <b>拖拽</b> 环绕观察　·　<b>滚轮</b> 缩放，可一路钻进单个同轴喷注孔<br/>
+  <b>空格键</b> 暂停或继续　·　<b>按钮</b> 展开、剖切、特写、复位
+</div>
+
+<div id="loading">正在装配发动机…</div>
+<div id="err">无法加载三维渲染库<br/><span style="font-size:11px;opacity:.6">请检查网络后刷新页面（需要访问 unpkg.com）</span></div>
+
+<script>
+  window.addEventListener('error',function(){ if(!window.__ready){ document.getElementById('err').style.display='flex'; } });
+  setTimeout(function(){ if(!window.__ready){ document.getElementById('err').style.display='flex'; } },12000);
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+let THREE, OrbitControls, RoomEnvironment;
+try {
+  THREE = await import('three');
+  ({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+  ({ RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js'));
+} catch (e) {
+  document.getElementById('err').style.display = 'flex';
+  document.getElementById('loading').classList.add('hide');
+  throw e;
+}
+start();
+
+function start(){
+/* ═══════════════════════════════════════════════════
+   一 · 渲染环境
+   ═══════════════════════════════════════════════════ */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.14;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const FOV = 38;
+const camera = new THREE.PerspectiveCamera(FOV, innerWidth/innerHeight, 0.02, 300);
+const HOME = new THREE.Vector3(14.2, 9.4, 23.4);
+const TGT_HOME = new THREE.Vector3(0.45, 1.15, 0);
+camera.position.copy(HOME);
+
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(TGT_HOME);
+controls.enableDamping = true;
+controls.dampingFactor = 0.065;
+controls.rotateSpeed = 0.82;
+controls.zoomSpeed = 0.92;
+controls.zoomToCursor = true;
+controls.enablePan = false;
+controls.minDistance = 0.09;
+controls.maxDistance = 66;
+controls.maxPolarAngle = Math.PI * 0.93;
+controls.update();
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.035).texture;
+
+scene.add(new THREE.HemisphereLight(0xbfd8f5, 0x1a1410, 0.66));
+const key = new THREE.DirectionalLight(0xfff0dc, 2.6); key.position.set(11, 18, 15); scene.add(key);
+const fill = new THREE.DirectionalLight(0x7fa8de, 1.35); fill.position.set(-14, 7, -9); scene.add(fill);
+const rim  = new THREE.DirectionalLight(0xff9a55, 1.15); rim.position.set(-9, 4, -15); scene.add(rim);
+const topL = new THREE.DirectionalLight(0xdcecff, 1.15); topL.position.set(0, 24, 4); scene.add(topL);
+const frontL= new THREE.DirectionalLight(0xffe2bd, 1.05); frontL.position.set(6, 6, 19); scene.add(frontL);
+const innerL= new THREE.DirectionalLight(0xffc889, 1.1); innerL.position.set(-6, 5, 12); scene.add(innerL);
+const chamberLight = new THREE.PointLight(0xff7a2a, 3.2, 12, 1.7); chamberLight.position.set(0, 4.4, 0); scene.add(chamberLight);
+const throatLight  = new THREE.PointLight(0xffb35a, 2.4, 9, 1.8); throatLight.position.set(0, 1.7, 0.5); scene.add(throatLight);
+const plumeLight    = new THREE.PointLight(0x7fa8ff, 2.0, 14, 1.8); plumeLight.position.set(0, -4.4, 0); scene.add(plumeLight);
+const ggLight       = new THREE.PointLight(0xff6b30, 1.8, 5, 1.9); ggLight.position.set(3.0, 7.1, -1.2); scene.add(ggLight);
+
+/* ═══════════════════════════════════════════════════
+   二 · 程序化贴图（无任何外部图片）
+   ═══════════════════════════════════════════════════ */
+function brushed(){
+  const c=document.createElement('canvas'); c.width=c.height=512;
+  const x=c.getContext('2d'); x.fillStyle='#8d8d8d'; x.fillRect(0,0,512,512);
+  for(let i=0;i<3400;i++){
+    const y=Math.random()*512, v=90+Math.random()*130;
+    x.strokeStyle='rgba('+v+','+v+','+v+','+(0.04+Math.random()*0.2).toFixed(3)+')';
+    x.lineWidth=0.25+Math.random()*1.1;
+    x.beginPath(); x.moveTo(0,y); x.lineTo(512,y+(Math.random()-0.5)*1.6); x.stroke();
+  }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,2); t.anisotropy=8;
+  return t;
+}
+const BRUSH=brushed();
+
+/* 同轴喷注孔排布：9 圈、按弧长等距，共 328 个单元 */
+const INJ_RINGS=[];
+(function(){
+  const step=0.14, spacing=0.12;
+  for(let k=1;k<=9;k++){
+    const r=k*step, n=Math.max(6,Math.round(2*Math.PI*r/spacing));
+    for(let i=0;i<n;i++) INJ_RINGS.push({r, a:i/n*Math.PI*2+k*0.31});
+  }
+  INJ_RINGS.push({r:0,a:0});
+})();
+const INJ_COUNT=INJ_RINGS.length;
+
+function injectorTexture(){
+  const S=1024, c=document.createElement('canvas'); c.width=c.height=S;
+  const x=c.getContext('2d'), cx=S/2, cy=S/2, R=486, scale=R/1.32;
+  const g=x.createRadialGradient(cx-120,cy-150,20,cx,cy,R*1.1);
+  g.addColorStop(0,'#3d454c'); g.addColorStop(.62,'#262d33'); g.addColorStop(1,'#171c21');
+  x.fillStyle=g; x.fillRect(0,0,S,S);
+  for(let i=0;i<2600;i++){
+    const a=Math.random()*Math.PI*2, rr=Math.sqrt(Math.random())*R;
+    x.strokeStyle='rgba(210,225,235,'+(0.015+Math.random()*0.055).toFixed(3)+')';
+    x.lineWidth=0.4+Math.random();
+    x.beginPath(); x.arc(cx,cy,rr,a,a+0.02+Math.random()*0.05); x.stroke();
+  }
+  x.strokeStyle='rgba(180,205,220,.35)'; x.lineWidth=4;
+  x.beginPath(); x.arc(cx,cy,R-10,0,Math.PI*2); x.stroke();
+  for(const o of INJ_RINGS){
+    const px=cx+Math.cos(o.a)*o.r*scale, py=cy+Math.sin(o.a)*o.r*scale;
+    const rr=0.058*scale;
+    x.fillStyle='#0c1115'; x.beginPath(); x.arc(px,py,rr+2,0,Math.PI*2); x.fill();
+    x.strokeStyle='rgba(126,222,214,.92)'; x.lineWidth=Math.max(1.4,0.012*scale);
+    x.beginPath(); x.arc(px,py,rr,0,Math.PI*2); x.stroke();
+    x.fillStyle='rgba(255,186,98,.95)'; x.beginPath(); x.arc(px,py,Math.max(1.2,0.019*scale),0,Math.PI*2); x.fill();
+  }
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8;
+  return t;
+}
+const INJ_TEX=injectorTexture();
+
+function nameplateTexture(){
+  const c=document.createElement('canvas'); c.width=512; c.height=128;
+  const x=c.getContext('2d'); x.fillStyle='#20272d'; x.fillRect(0,0,512,128);
+  x.strokeStyle='rgba(226,196,150,.6)'; x.lineWidth=3; x.strokeRect(7,7,498,114);
+  x.textAlign='center'; x.textBaseline='middle'; x.fillStyle='#e4c79c';
+  x.font='600 38px "Microsoft YaHei","PingFang SC",sans-serif'; x.fillText('液体火箭发动机',256,50);
+  x.font='500 19px "Microsoft YaHei",sans-serif'; x.fillStyle='rgba(220,200,172,.72)';
+  x.fillText('再生冷却 · 同轴喷注 · 燃气发生器循环',256,94);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+/* ═══════════════════════════════════════════════════
+   三 · 材质
+   ═══════════════════════════════════════════════════ */
+const M={
+  steel:  new THREE.MeshStandardMaterial({color:0xc4ced7,metalness:0.9,roughness:0.27,roughnessMap:BRUSH,bumpMap:BRUSH,bumpScale:0.009,envMapIntensity:2.0,side:THREE.DoubleSide}),
+  light:  new THREE.MeshStandardMaterial({color:0xe6edf2,metalness:0.94,roughness:0.16,envMapIntensity:2.3,side:THREE.DoubleSide}),
+  dark:   new THREE.MeshStandardMaterial({color:0x39424a,metalness:0.82,roughness:0.42,envMapIntensity:1.3,side:THREE.DoubleSide}),
+  black:  new THREE.MeshStandardMaterial({color:0x161b20,metalness:0.3,roughness:0.62,side:THREE.DoubleSide}),
+  copper: new THREE.MeshStandardMaterial({color:0xa9683f,metalness:0.86,roughness:0.33,envMapIntensity:1.5,side:THREE.DoubleSide}),
+  liner:  new THREE.MeshStandardMaterial({color:0x8d5336,metalness:0.83,roughness:0.38,envMapIntensity:1.35,side:THREE.DoubleSide}),
+  cut:    new THREE.MeshBasicMaterial({color:0xb97748,side:THREE.DoubleSide}),
+  cutDark:new THREE.MeshBasicMaterial({color:0x40291d,side:THREE.DoubleSide}),
+  brass:  new THREE.MeshStandardMaterial({color:0xd0a05c,metalness:0.9,roughness:0.3,envMapIntensity:1.5,side:THREE.DoubleSide}),
+  teal:   new THREE.MeshStandardMaterial({color:0x66cfb8,metalness:0.7,roughness:0.28,emissive:0x0c3b34,emissiveIntensity:0.5,side:THREE.DoubleSide}),
+  amber:  new THREE.MeshStandardMaterial({color:0xf2a653,metalness:0.72,roughness:0.3,emissive:0x4a2408,emissiveIntensity:0.5,side:THREE.DoubleSide}),
+  turbine:new THREE.MeshStandardMaterial({color:0xd9a066,metalness:0.9,roughness:0.26,envMapIntensity:1.8,side:THREE.DoubleSide}),
+  pipeF:  new THREE.MeshStandardMaterial({color:0x4d9fe0,metalness:0.72,roughness:0.28,transparent:true,opacity:0.58,depthWrite:false,emissive:0x123a63,emissiveIntensity:0.45,side:THREE.DoubleSide}),
+  pipeO:  new THREE.MeshStandardMaterial({color:0x65d9c2,metalness:0.72,roughness:0.28,transparent:true,opacity:0.58,depthWrite:false,emissive:0x0c463c,emissiveIntensity:0.45,side:THREE.DoubleSide}),
+  pipeH:  new THREE.MeshStandardMaterial({color:0xe08045,metalness:0.76,roughness:0.3,transparent:true,opacity:0.6,depthWrite:false,emissive:0x6b2508,emissiveIntensity:0.5,side:THREE.DoubleSide}),
+  pipeE:  new THREE.MeshStandardMaterial({color:0x9aa9b6,metalness:0.82,roughness:0.32,transparent:true,opacity:0.52,depthWrite:false,emissive:0x253742,emissiveIntensity:0.35,side:THREE.DoubleSide}),
+  ghost:  new THREE.MeshBasicMaterial({color:0x7fa6bd,transparent:true,opacity:0.10,depthWrite:false,side:THREE.DoubleSide}),
+  channel:new THREE.MeshStandardMaterial({color:0x41291c,metalness:0.72,roughness:0.5,side:THREE.DoubleSide}),
+  coolTx: new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0.92,side:THREE.DoubleSide}),
+  plate:  new THREE.MeshStandardMaterial({color:0x2b3238,metalness:0.82,roughness:0.36,side:THREE.DoubleSide}),
+  face:   new THREE.MeshStandardMaterial({map:INJ_TEX,metalness:0.28,roughness:0.5,side:THREE.DoubleSide}),
+  nameplate:new THREE.MeshStandardMaterial({map:nameplateTexture(),metalness:0.35,roughness:0.5}),
+  gasVol: new THREE.MeshBasicMaterial({color:0xff6a22,transparent:true,opacity:0.058,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),
+  fireVol:new THREE.MeshBasicMaterial({color:0xffd08a,transparent:true,opacity:0.075,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),
+  spray:  new THREE.MeshBasicMaterial({color:0xffb160,transparent:true,opacity:0.10,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),
+  shock:  new THREE.MeshBasicMaterial({color:0xffb066,transparent:true,opacity:0.30,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),
+  igniter:new THREE.MeshStandardMaterial({color:0xff9a45,emissive:0xff5a10,emissiveIntensity:2.2,metalness:0.4,roughness:0.3})
+};
+
+/* ═══════════════════════════════════════════════════
+   四 · 型线与回转几何（全部代码生成）
+   ═══════════════════════════════════════════════════ */
+const Y_INJ=6.35, Y_CONV=3.45, Y_THROAT=2.15, Y_EXIT=-3.45;
+const R_CH=1.32, R_TH=0.55, R_EX=2.85, WALL=0.17;
+const smooth=t=>{t=t<0?0:t>1?1:t; return t*t*(3-2*t);};
+const clamp01=t=>t<0?0:t>1?1:t;
+
+function radiusAt(y){
+  if(y>=Y_CONV) return R_CH;
+  if(y>=Y_THROAT){
+    const t=(Y_CONV-y)/(Y_CONV-Y_THROAT);
+    return R_TH+(R_CH-R_TH)*(1-smooth(t));
+  }
+  const t=(Y_THROAT-y)/(Y_THROAT-Y_EXIT);
+  const e=0.70*t+0.30*(1-Math.pow(1-t,3));
+  return R_TH+(R_EX-R_TH)*e;
+}
+/* 内壁型线：从喷管出口一路向上到喷注器面板 */
+const PROF=[];
+for(let i=0;i<=150;i++){
+  const y=Y_EXIT+(Y_INJ-Y_EXIT)*i/150;
+  PROF.push(new THREE.Vector2(radiusAt(y),y));
+}
+const PROF_OUT=PROF.map(p=>new THREE.Vector2(p.x+WALL,p.y));
+
+/* 自定义回转面：phi = 0 → +X，phi = π/2 → +Z，法线朝外 */
+function revolve(prof,phiStart,phiLength,mat,steps){
+  steps=steps||96;
+  const n=prof.length, pos=new Float32Array((steps+1)*n*3), idx=[];
+  for(let j=0;j<=steps;j++){
+    const phi=phiStart+phiLength*j/steps, cs=Math.cos(phi), sn=Math.sin(phi);
+    for(let i=0;i<n;i++){
+      const k=(j*n+i)*3, r=prof[i].x;
+      pos[k]=r*cs; pos[k+1]=prof[i].y; pos[k+2]=r*sn;
+    }
+  }
+  for(let j=0;j<steps;j++) for(let i=0;i<n-1;i++){
+    const a=j*n+i, b=a+1, d=a+n, e=d+1;
+    idx.push(a,b,d, b,e,d);
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g,mat);
+}
+/* 剖切端面：在固定 phi 的径向平面上补出壁厚，避免读成实心棒 */
+function cutFace(phi,rFn,mat){
+  const pos=[], idx=[], cs=Math.cos(phi), sn=Math.sin(phi);
+  for(const p of PROF){
+    const ri=rFn(p.x,p.y), ro=ri+WALL;
+    pos.push(ri*cs,p.y,ri*sn, ro*cs,p.y,ro*sn);
+  }
+  for(let i=0;i<PROF.length-1;i++){ const a=i*2; idx.push(a,a+1,a+2, a+1,a+3,a+2); }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g,mat);
+}
+function axialCurve(phi,radial,smoothN){
+  const pts=[];
+  for(let i=0;i<=smoothN;i++){
+    const y=Y_EXIT+0.12+(Y_INJ-0.22-(Y_EXIT+0.12))*i/smoothN;
+    const r=radiusAt(y)+radial;
+    pts.push(new THREE.Vector3(r*Math.cos(phi),y,r*Math.sin(phi)));
+  }
+  return new THREE.CatmullRomCurve3(pts);
+}
+function coloredTube(curve,r,seg,colFn){
+  const geo=new THREE.TubeGeometry(curve,seg,r,6,false);
+  const cnt=geo.attributes.position.count, col=new Float32Array(cnt*3);
+  for(let i=0;i<cnt;i++){
+    const c=colFn(geo.attributes.position.getY(i));
+    col[i*3]=c[0]; col[i*3+1]=c[1]; col[i*3+2]=c[2];
+  }
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  return new THREE.Mesh(geo,M.coolTx);
+}
+
+/* 基础几何工具 */
+function box(w,h,d,mat,x=0,y=0,z=0){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); return m; }
+function cyl(rt,rb,h,mat,seg=32,open=false,ts=0,tl=Math.PI*2){ return new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg,1,open,ts,tl),mat); }
+function ball(r,mat,x=0,y=0,z=0,seg=20){ const m=new THREE.Mesh(new THREE.SphereGeometry(r,seg,Math.max(8,Math.floor(seg/2))),mat); m.position.set(x,y,z); return m; }
+function torus(R,r,mat,x=0,y=0,z=0){ const m=new THREE.Mesh(new THREE.TorusGeometry(R,r,10,48),mat); m.position.set(x,y,z); return m; }
+function tube(pts,r,mat,seg=80){
+  const curve=new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(p[0],p[1],p[2])));
+  return {mesh:new THREE.Mesh(new THREE.TubeGeometry(curve,seg,r,9,false),mat),curve};
+}
+function tag(o,n){ o.userData.tag=n; return o; }
+function nopick(o){ o.userData.nopick=true; return o; }
+
+/* ═══════════════════════════════════════════════════
+   五 · 部件注册（爆炸 / 悬停 / 标签）
+   ═══════════════════════════════════════════════════ */
+const root=new THREE.Group(); scene.add(root);
+const parts=[], pickables=[], refs={};
+const labelsEl=document.getElementById('labels');
+function P(name,desc,obj,ex,opt={}){
+  obj.position.set(...(opt.pos||[0,0,0]));
+  const p={name,desc,obj,base:obj.position.clone(),
+    ex:new THREE.Vector3(...ex).multiplyScalar(1.4),
+    delay:opt.delay??0,labelOff:new THREE.Vector3(...(opt.labelOff||[0,0.55,0])),_ei:0};
+  const map=new Map();
+  obj.userData.part=p;
+  obj.traverse(o=>{
+    if(!o.isMesh) return;
+    o.userData.part=p;
+    if(o.userData.tag) refs[o.userData.tag]=o;
+    const src=o.material;
+    if(!Array.isArray(src)){
+      if(!map.has(src)) map.set(src,src.clone());
+      o.material=map.get(src);
+    }
+    if(!o.userData.nopick) pickables.push(o);
+  });
+  const el=document.createElement('div'); el.className='lbl'; el.textContent=name;
+  labelsEl.appendChild(el); p.el=el;
+  parts.push(p); root.add(obj); return obj;
+}
+function grabRefs(obj){ obj.traverse(o=>{ if(o.userData.tag) refs[o.userData.tag]=o; }); }
+
+/* ═══════════════════════════════════════════════════
+   六 · 燃烧室内衬 / 外壁夹套 / 剖切
+   ═══════════════════════════════════════════════════ */
+const CUT_A=0, CUT_B=Math.PI/2;   /* 朝向默认相机的一整个象限被剖开 */
+const cutFaceMeshes=[];
+
+/* 内衬：后 3/4 不透明，靠相机的 1/4 做成极淡幽灵面 */
+(function(){
+  const g=new THREE.Group();
+  g.add(revolve(PROF,CUT_B,Math.PI*2-CUT_B,M.liner,110));
+  const ghost=tag(revolve(PROF,CUT_A,CUT_B,M.ghost,40),'linerGhost'); g.add(ghost);
+  /* 内壁上一圈圈环形加强筋，帮助读出内部曲面 */
+  for(const y of [5.9,4.9,3.9,3.1,1.3,0,-1.4,-2.7]){
+    const r=radiusAt(y)-0.012;
+    const ring=torus(r,0.026,M.copper,0,y,0); ring.rotation.x=Math.PI/2; ring.userData.nopick=true; g.add(ring);
+  }
+  P('燃烧室内衬（铜合金）','壁厚不到两毫米的铜合金内衬，直接面对三千度燃气；导热极快，靠外侧再生冷却通道不断把热量带走才不会烧穿。',
+    g,[0,-0.5,-3.2],{delay:0.10,labelOff:[0,1.4,0]});
+})();
+
+/* 外壁夹套：3/4 实壁 + 可剖开的 1/4 */
+(function(){
+  const g=new THREE.Group();
+  g.add(revolve(PROF_OUT,CUT_B,Math.PI*2-CUT_B,M.steel,110));
+  const front=tag(revolve(PROF_OUT,CUT_A,CUT_B,M.steel,40),'jacketFront'); g.add(front);
+  /* 剖切端面：内外两条边都能看到真实壁厚 */
+  for(const cf of [cutFace(CUT_A,p=>p,M.cut),cutFace(CUT_B,p=>p,M.cut),
+                    cutFace(CUT_A,p=>p+0.055,M.cutDark),cutFace(CUT_B,p=>p+0.055,M.cutDark)]){
+    cutFaceMeshes.push(cf); g.add(cf);
+  }
+  for(const y of [Y_INJ,Y_CONV,Y_THROAT,Y_EXIT,-2.0,-0.3,1.1,4.4,5.6]){
+    const r=radiusAt(y)+WALL*0.5;
+    const ring=torus(r,WALL*0.5,M.brass,0,y,0); ring.rotation.x=Math.PI/2; ring.userData.nopick=true; g.add(ring);
+  }
+  const lip=torus(R_EX+WALL*0.5,0.095,M.light,0,Y_EXIT,0); lip.rotation.x=Math.PI/2; g.add(lip);
+  P('外壁夹套与钟形喷管','外层承力夹套把内衬与冷却通道封成一条条密闭流道；向下张开的钟形曲线让燃气在喉部之后继续膨胀，把热能换成排气速度。',
+    g,[3.9,-0.4,2.0],{delay:0.16,labelOff:[1.4,-1.0,0]});
+})();
+
+/* 喉部衬套 */
+(function(){
+  const g=new THREE.Group();
+  const prof=[];
+  for(let i=0;i<=34;i++){
+    const y=Y_THROAT-0.62+(1.24)*i/34;
+    prof.push(new THREE.Vector2(radiusAt(y)+0.008,y));
+  }
+  g.add(revolve(prof,0,Math.PI*2,M.brass,64));
+  const ring=torus(R_TH+0.03,0.06,M.light,0,Y_THROAT,0); ring.rotation.x=Math.PI/2; g.add(ring);
+  P('喉部音速衬套','整台发动机最窄的一圈。燃气在这里恰好达到音速并被「扼流」，上游燃烧室压力因此得以维持，下游再怎么抽气也传不回来。',
+    g,[0,-1.5,-2.4],{delay:0.24,labelOff:[0,0.7,0]});
+})();
+
+/* 再生冷却通道：48 条沿轴向铣出的狭长流道，剖开象限内完整可见 */
+const CHANNEL_N=48, channelCurves=[];
+(function(){
+  const g=new THREE.Group();
+  for(let k=0;k<CHANNEL_N;k++){
+    const phi=(k+0.5)/CHANNEL_N*Math.PI*2;
+    const cv=axialCurve(phi,0.086,60);
+    if(phi<CUT_B+0.02) channelCurves.push(cv);
+    /* 单根带冷→热渐变的流道本体；暗色「岸」放在相邻角度，避免把渐变整根遮住 */
+    const glow=nopick(coloredTube(cv,0.050,96,y=>{
+      const t=clamp01((Y_INJ-y)/(Y_INJ-Y_EXIT));
+      /* 窄过渡：避免蓝色与橙色在中间混成灰白 */
+      const k=smooth((t-0.30)/0.40);
+      return [0.08+0.90*k,0.58-0.20*k,0.98-0.92*k];
+    })); g.add(glow);
+  }
+  /* 槽间的暗色「岸」放在流道内侧（半径更小），只作分隔、不遮住冷→热渐变 */
+  for(let k=1;k<12;k++){
+    const phi=CUT_A+(CUT_B-CUT_A)*k/12;
+    const cv=axialCurve(phi+0.004,0.028,60);
+    g.add(nopick(new THREE.Mesh(new THREE.TubeGeometry(cv,96,0.036,6,false),M.channel)));
+  }
+  for(const y of [5.8,3.2,0.8,-1.6,-3.1]){
+    const r=radiusAt(y)+0.135;
+    const arc=new THREE.Mesh(new THREE.TorusGeometry(r,0.035,7,26,CUT_B-CUT_A),M.dark);
+    arc.rotation.x=Math.PI/2; arc.rotation.z=0; arc.position.y=y; arc.userData.nopick=true;
+    /* TorusGeometry 起始角在 +X，绕 Y 旋转后与我们的 phi 定义一致 */
+    g.add(arc);
+  }
+  P('再生冷却通道（狭长铣槽）','沿室壁一路铣到喷管出口的轴向狭长流道。冷燃料从顶端下行，逐段吸走壁面热量，出口处已被加热，再回流到喷注器当作燃料烧掉。',
+    g,[-3.4,-1.2,3.0],{delay:0.20,labelOff:[-1.2,0.9,0]});
+})();
+
+/* 顶部冷却剂进口集液环 / 喷管出口回流集液环 */
+(function(){
+  const g=new THREE.Group();
+  const r=R_CH+0.10;
+  const t=torus(r,0.14,M.teal,0,Y_INJ-0.28,0); t.rotation.x=Math.PI/2; g.add(t);
+  const t2=torus(r+0.09,0.045,M.light,0,Y_INJ-0.28,0); t2.rotation.x=Math.PI/2; g.add(t2);
+  for(let i=0;i<12;i++){
+    const a=i/12*Math.PI*2;
+    const n=cyl(0.055,0.055,0.2,M.brass,10); n.position.set(Math.cos(a)*r,Y_INJ-0.14,Math.sin(a)*r); g.add(n);
+  }
+  P('冷却剂进口集液环','加压后的冷燃料先在这里均分到几十条冷却通道，保证圆周上每条流道流量一致，不出现局部过热的「热点」。',
+    g,[0,2.7,1.6],{delay:0.28,labelOff:[0,0.8,0]});
+})();
+(function(){
+  const g=new THREE.Group();
+  const r=R_EX+0.10;
+  const t=torus(r,0.16,M.amber,0,Y_EXIT+0.22,0); t.rotation.x=Math.PI/2; g.add(t);
+  const t2=torus(r+0.1,0.05,M.light,0,Y_EXIT+0.22,0); t2.rotation.x=Math.PI/2; g.add(t2);
+  for(let i=0;i<16;i++){
+    const a=i/16*Math.PI*2;
+    const n=cyl(0.055,0.055,0.22,M.brass,10); n.position.set(Math.cos(a)*r,Y_EXIT+0.36,Math.sin(a)*r); g.add(n);
+  }
+  P('喷管出口回流集液环','所有冷却通道在喷管最大直径处汇合。此时燃料已吸饱热量，经回流立管上行送进喷注器——先当冷却剂，再当燃料。',
+    g,[0,-2.9,1.8],{delay:0.32,labelOff:[0,-0.9,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   七 · 喷注器：数百个同轴喷注孔 + 剖开的单个单元
+   ═══════════════════════════════════════════════════ */
+(function(){
+  const g=new THREE.Group();
+  /* 面板本体 + 正反两面的程序化孔阵贴图 */
+  const plate=cyl(R_CH,R_CH,0.14,M.plate,64); plate.position.y=Y_INJ+0.07; g.add(plate);
+  const top=new THREE.Mesh(new THREE.CircleGeometry(R_CH,64),M.face); top.rotation.x=-Math.PI/2; top.position.y=Y_INJ+0.142; g.add(top);
+  const bot=new THREE.Mesh(new THREE.CircleGeometry(R_CH,64),M.face); bot.rotation.x=Math.PI/2; bot.position.y=Y_INJ-0.002; g.add(bot);
+  const rim=torus(R_CH+0.02,0.055,M.brass,0,Y_INJ+0.07,0); rim.rotation.x=Math.PI/2; g.add(rim);
+
+  /* 三维同轴喷注单元：氧化剂环缝 + 燃料中心孔 */
+  const ringGeo=new THREE.TorusGeometry(0.041,0.011,6,12); ringGeo.rotateX(Math.PI/2);
+  const postGeo=new THREE.CylinderGeometry(0.016,0.016,0.055,8);
+  const holeGeo=new THREE.CircleGeometry(0.060,12); holeGeo.rotateX(Math.PI/2);
+  const rings=new THREE.InstancedMesh(ringGeo,M.teal,INJ_COUNT);
+  const posts=new THREE.InstancedMesh(postGeo,M.amber,INJ_COUNT);
+  const holes=new THREE.InstancedMesh(holeGeo,M.black,INJ_COUNT);
+  const d=new THREE.Object3D();
+  INJ_RINGS.forEach((o,i)=>{
+    const x=Math.cos(o.a)*o.r, z=Math.sin(o.a)*o.r;
+    d.position.set(x,Y_INJ-0.038,z); d.rotation.set(0,0,0); d.scale.setScalar(1); d.updateMatrix(); rings.setMatrixAt(i,d.matrix);
+    d.position.set(x,Y_INJ-0.045,z); d.updateMatrix(); posts.setMatrixAt(i,d.matrix);
+    d.position.set(x,Y_INJ-0.010,z); d.updateMatrix(); holes.setMatrixAt(i,d.matrix);
+  });
+  rings.instanceMatrix.needsUpdate=posts.instanceMatrix.needsUpdate=holes.instanceMatrix.needsUpdate=true;
+  nopick(rings); nopick(posts); nopick(holes); g.add(rings,posts,holes);
+  const pg=P('喷注器面板（'+INJ_COUNT+' 个同轴孔）','每个单元都是「外圈氧化剂环缝包着中心燃料孔」的同轴结构。两股液体高速相撞剪切成极细雾滴，混合比与雾化质量直接决定燃烧是否平稳。',
+    g,[0,2.0,0],{delay:0.05,labelOff:[0,1.0,0]});
+  grabRefs(pg);
+})();
+
+/* 中央剖开的单个同轴喷注单元（可一路放大钻进去） */
+(function(){
+  const g=new THREE.Group();
+  /* 半透外壁，能一眼看见环缝里那根燃料中心管 */
+  const heroGlass=new THREE.MeshStandardMaterial({color:0x66cfb8,metalness:0.55,roughness:0.22,
+    transparent:true,opacity:0.42,depthWrite:false,side:THREE.DoubleSide,envMapIntensity:1.7});
+  const outer=cyl(0.062,0.062,0.24,heroGlass,24,true); outer.position.y=Y_INJ-0.16; g.add(outer);
+  const inner=cyl(0.022,0.022,0.28,M.amber,18); inner.position.y=Y_INJ-0.17; g.add(inner);
+  const gap=torus(0.042,0.010,M.brass,0,Y_INJ-0.28,0); gap.rotation.x=Math.PI/2; g.add(gap);
+  const lip=torus(0.062,0.009,M.light,0,Y_INJ-0.28,0); lip.rotation.x=Math.PI/2; g.add(lip);
+  const cap=cyl(0.088,0.072,0.07,M.brass,24,true); cap.position.y=Y_INJ-0.005; g.add(cap);
+  const cone=new THREE.Mesh(new THREE.ConeGeometry(0.10,0.30,20,1,true),M.spray);
+  cone.position.y=Y_INJ-0.46; g.add(cone);
+  P('单个同轴喷注单元（剖开）','放大能看清两层同心通道：青色外环走氧化剂，琥珀色中心管走燃料，在出口处撞击形成空心锥形雾场；这一颗只是面板上数百颗里的一颗。',
+    g,[0,3.3,0],{delay:0.04,labelOff:[0.3,0.5,0]});
+})();
+
+/* 喷注器上盖 / 推进剂集气腔（前象限做成透视） */
+(function(){
+  const g=new THREE.Group();
+  const DOME=[];
+  const dp=[[R_CH,Y_INJ+0.14],[R_CH+0.02,Y_INJ+0.34],[1.16,Y_INJ+0.62],[0.92,Y_INJ+0.86],[0.58,Y_INJ+1.04],[0.24,Y_INJ+1.12],[0.06,Y_INJ+1.14]];
+  for(const q of dp) DOME.push(new THREE.Vector2(q[0],q[1]));
+  g.add(revolve(DOME,CUT_B,Math.PI*2-CUT_B,M.steel,72));
+  const ghost=tag(revolve(DOME,CUT_A,CUT_B,M.ghost,30),'domeGhost'); g.add(ghost);
+  const sep=new THREE.Mesh(new THREE.CircleGeometry(1.05,48),M.dark); sep.rotation.x=-Math.PI/2; sep.position.y=Y_INJ+0.62; g.add(sep);
+  const boss=cyl(0.26,0.26,0.32,M.brass,24); boss.position.y=Y_INJ+1.22; g.add(boss);
+  const pl=new THREE.Mesh(new THREE.PlaneGeometry(0.86,0.22),M.nameplate); pl.position.set(0,Y_INJ+0.75,R_CH+0.12); g.add(pl);
+  P('喷注器上盖与集液腔','穹形上盖内部分成互不相通的两腔：回流的热燃料一腔、氧化剂一腔，各自被均压后送进对应的喷注孔，避免整块面板上流量不均。',
+    g,[0,3.0,-1.4],{delay:0.08,labelOff:[0,1.3,0]});
+})();
+
+/* 点火器 */
+(function(){
+  const g=new THREE.Group();
+  const body=cyl(0.19,0.19,0.86,M.dark,20); body.rotation.z=Math.PI/2; body.position.set(-1.85,5.72,0.55); g.add(body);
+  const noz=cyl(0.075,0.115,0.42,M.igniter,16); noz.rotation.z=Math.PI/2; noz.position.set(-1.36,5.72,0.55); g.add(noz);
+  const flange=cyl(0.26,0.26,0.10,M.brass,6); flange.rotation.z=Math.PI/2; flange.position.set(-1.62,5.72,0.55); g.add(flange);
+  const wire=tube([[-2.3,5.72,0.55],[-2.7,6.2,0.9],[-2.9,7.0,1.1],[-2.4,7.7,1.0]],0.045,M.copper,40).mesh; g.add(wire);
+  const glow=ball(0.10,M.igniter,-1.19,5.72,0.55,14); g.add(glow);
+  P('点火器（火炬式）','在推进剂正式喷入前先点燃一小股混合气，喷出一道高温火炬；主燃烧室随后被它引燃，避免未燃推进剂在室内积聚后爆燃。',
+    g,[-3.0,1.2,2.4],{delay:0.34,labelOff:[-0.6,0.7,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   八 · 万向节轴承与承力框架
+   ═══════════════════════════════════════════════════ */
+(function(){
+  const g=new THREE.Group();
+  const Y=Y_INJ+2.05;
+  const ballB=ball(0.44,M.light,0,Y,0,28); g.add(ballB);
+  const outer=torus(0.86,0.115,M.steel,0,Y,0); outer.rotation.x=Math.PI/2; g.add(outer);
+  const inner=torus(0.62,0.085,M.brass,0,Y,0); inner.rotation.x=Math.PI/2; inner.rotation.y=Math.PI/2; g.add(inner);
+  const pinA=cyl(0.085,0.085,1.9,M.light,16); pinA.rotation.z=Math.PI/2; pinA.position.y=Y; g.add(pinA);
+  const pinB=cyl(0.075,0.075,1.5,M.light,16); pinB.rotation.x=Math.PI/2; pinB.position.y=Y; g.add(pinB);
+  for(const s of [-1,1]){
+    const ear=box(0.24,0.44,0.30,M.dark,s*0.94,Y,0); g.add(ear);
+    const bolt=cyl(0.10,0.10,0.34,M.brass,6); bolt.rotation.z=Math.PI/2; bolt.position.set(s*1.02,Y,0); g.add(bolt);
+  }
+  const mount=cyl(0.50,0.62,0.30,M.dark,24); mount.position.y=Y+0.68; g.add(mount);
+  const top=cyl(0.78,0.78,0.14,M.steel,32); top.position.y=Y+0.88; g.add(top);
+  for(let i=0;i<8;i++){
+    const a=i/8*Math.PI*2;
+    const b=cyl(0.06,0.06,0.10,M.brass,6); b.position.set(Math.cos(a)*0.66,Y+0.95,Math.sin(a)*0.66); g.add(b);
+  }
+  P('万向节轴承','两个正交轴套加球面轴承，让整台发动机能相对箭体摆动几度。推力矢量因此可以被偏转，火箭靠它俯仰、偏航与滚转。',
+    g,[0,4.6,0],{delay:0.02,labelOff:[0,0.9,0]});
+})();
+(function(){
+  const g=new THREE.Group();
+  const Y=Y_INJ+1.2;
+  for(const a of [Math.PI/4,Math.PI*3/4,Math.PI*5/4,Math.PI*7/4]){
+    const x=Math.cos(a)*0.98, z=Math.sin(a)*0.98;
+    const strut=tube([[0,Y_INJ+1.9,0],[x*0.55,Y_INJ+1.62,z*0.55],[x,Y,z],[x*1.12,Y_INJ+0.22,z*1.12]],0.075,M.steel,26).mesh;
+    g.add(strut);
+    g.add(ball(0.11,M.brass,x,Y,z,12));
+  }
+  const ring=torus(1.05,0.07,M.dark,0,Y_INJ+0.28,0); ring.rotation.x=Math.PI/2; g.add(ring);
+  P('推力承力框架','把燃烧室的全部推力，经四根斜撑集中传到万向节球头，再交给箭体；同时给侧挂的涡轮泵和密布管路提供挂载点。',
+    g,[0,3.6,-1.6],{delay:0.06,labelOff:[0,1.1,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   九 · 涡轮泵总成：涡轮 / 燃料泵 / 氧化剂泵共轴
+   ═══════════════════════════════════════════════════ */
+const TY=5.0, TZ=-0.35;
+function rotorBlades(x,r,count,len,mat,tilt){
+  const grp=new THREE.Group(); grp.position.set(x,TY,TZ);
+  for(let i=0;i<count;i++){
+    const a=i/count*Math.PI*2;
+    const bl=box(0.10,len,0.30,mat,0,0,0);
+    bl.position.set(0,Math.cos(a)*r*0.62,Math.sin(a)*r*0.62);
+    bl.rotation.x=a+(tilt||0);
+    bl.rotation.z=0.16;
+    grp.add(bl);
+  }
+  const hub=cyl(0.20,0.20,0.20,M.brass,20); hub.rotation.z=Math.PI/2; grp.add(hub);
+  return grp;
+}
+(function(){
+  const g=new THREE.Group();
+  const sh=cyl(0.105,0.105,3.55,M.light,18); sh.rotation.z=Math.PI/2; sh.position.set(4.35,TY,TZ); g.add(sh);
+  const keyway=tag(box(3.5,0.035,0.045,M.brass,4.35,TY+0.105,TZ),'shaftKey'); g.add(keyway);
+  for(const x of [2.75,3.6,4.75,5.85]){
+    const br=cyl(0.19,0.19,0.16,M.dark,16); br.rotation.z=Math.PI/2; br.position.set(x,TY,TZ); g.add(br);
+  }
+  P('共轴主轴','一根轴串起涡轮、燃料泵与氧化剂泵：燃气轮机输出的功率直接传给两只叶轮，靠同一转速保证两路流量按混合比同步增减。',
+    g,[6.0,1.6,0],{delay:0.22,labelOff:[0,0.7,0]});
+})();
+(function(){
+  const g=new THREE.Group();
+  const housing=cyl(0.82,0.82,0.52,M.dark,36,true); housing.rotation.z=Math.PI/2; housing.position.set(3.15,TY,TZ); g.add(housing);
+  for(const dx of [-0.27,0.27]){
+    const r=torus(0.83,0.055,M.brass,3.15+dx,TY,TZ); r.rotation.y=Math.PI/2; g.add(r);
+  }
+  const rotor=tag(rotorBlades(3.15,0.72,26,0.46,M.turbine,0.34),'turbineRotor'); g.add(rotor);
+  const disc=cyl(0.50,0.50,0.10,M.brass,28); disc.rotation.z=Math.PI/2; disc.position.set(3.15,TY,TZ); g.add(disc);
+  const inlet=cyl(0.20,0.26,0.34,M.pipeH,18); inlet.position.set(3.15,TY+0.78,TZ); g.add(inlet);
+  P('涡轮（燃气轮机）','燃气发生器送来的高温高压燃气冲过两级叶片，把热能变成轴功率；它只分走总流量的一小股，其余推进剂全部进主燃烧室。',
+    g,[5.0,0.9,0],{delay:0.24,labelOff:[0,1.0,0]});
+})();
+(function(){
+  const g=new THREE.Group();
+  const vol=cyl(0.66,0.66,0.56,M.steel,36,true); vol.rotation.z=Math.PI/2; vol.position.set(4.25,TY,TZ); g.add(vol);
+  for(const dx of [-0.29,0.29]){ const r=torus(0.67,0.05,M.light,4.25+dx,TY,TZ); r.rotation.y=Math.PI/2; g.add(r); }
+  const imp=tag(rotorBlades(4.25,0.56,10,0.60,M.amber,0.5),'fuelImpeller'); g.add(imp);
+  const eye=cyl(0.24,0.24,0.22,M.brass,20); eye.rotation.z=Math.PI/2; eye.position.set(4.52,TY,TZ); g.add(eye);
+  const out=cyl(0.16,0.16,0.30,M.pipeF,16); out.position.set(4.25,TY+0.62,TZ); g.add(out);
+  P('燃料泵（离心叶轮）','把贮箱送来的低压燃料增压到高于燃烧室压力，才推得进再生冷却通道；叶轮与涡轮、氧化剂泵共用一根轴，转速完全一致。',
+    g,[6.6,0,0],{delay:0.28,labelOff:[0,0.9,0]});
+})();
+(function(){
+  const g=new THREE.Group();
+  const vol=cyl(0.62,0.62,0.54,M.steel,36,true); vol.rotation.z=Math.PI/2; vol.position.set(5.42,TY,TZ); g.add(vol);
+  for(const dx of [-0.28,0.28]){ const r=torus(0.63,0.05,M.light,5.42+dx,TY,TZ); r.rotation.y=Math.PI/2; g.add(r); }
+  const imp=tag(rotorBlades(5.42,0.52,10,0.56,M.teal,0.5),'oxImpeller'); g.add(imp);
+  const eye=cyl(0.23,0.23,0.22,M.brass,20); eye.rotation.z=Math.PI/2; eye.position.set(5.70,TY,TZ); g.add(eye);
+  const out=cyl(0.16,0.16,0.30,M.pipeO,16); out.position.set(5.42,TY+0.60,TZ); g.add(out);
+  P('氧化剂泵（离心叶轮）','与燃料泵同轴但腔体完全隔离，按氧化剂密度另配叶轮直径，使两路压力同步上升而混合比保持恒定。',
+    g,[7.4,0,0],{delay:0.30,labelOff:[0,0.9,0]});
+})();
+(function(){
+  const g=new THREE.Group();
+  const GG=[3.0,7.25,-1.20];
+  const body=cyl(0.44,0.44,0.92,M.dark,28,true); body.position.set(...GG); g.add(body);
+  const top=cyl(0.46,0.46,0.12,M.brass,28); top.position.set(GG[0],GG[1]+0.50,GG[2]); g.add(top);
+  const bot=cyl(0.44,0.24,0.26,M.copper,28); bot.position.set(GG[0],GG[1]-0.58,GG[2]); g.add(bot);
+  const glow=ball(0.26,M.igniter,GG[0],GG[1]-0.08,GG[2],18); glow.material=M.igniter; g.add(glow);
+  for(const y of [GG[1]-0.3,GG[1]+0.3]){ const r=torus(0.45,0.04,M.brass,GG[0],y,GG[2]); r.rotation.x=Math.PI/2; g.add(r); }
+  const flange=torus(0.30,0.05,M.light,GG[0],GG[1]-0.74,GG[2]); flange.rotation.x=Math.PI/2; g.add(flange);
+  P('燃气发生器','分出一小股燃料与氧化剂，在这里富燃燃烧成温度较低但仍高压的燃气，专门用来吹动涡轮；它不产生主推力，只负责给泵供能。',
+    g,[4.2,2.8,-1.4],{delay:0.20,labelOff:[0,1.0,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   十 · 阀门
+   ═══════════════════════════════════════════════════ */
+function valveGroup(pos,mat,label){
+  const g=new THREE.Group();
+  const body=cyl(0.30,0.30,0.60,M.brass,6); body.position.set(...pos); g.add(body);
+  const act=box(0.44,0.30,0.44,M.dark,pos[0],pos[1]+0.42,pos[2]); g.add(act);
+  const stem=cyl(0.055,0.055,0.34,M.light,12); stem.position.set(pos[0],pos[1]+0.70,pos[2]); g.add(stem);
+  const wheel=torus(0.24,0.038,mat,pos[0],pos[1]+0.88,pos[2]); g.add(wheel);
+  for(let i=0;i<4;i++){ const s=box(0.46,0.032,0.032,M.light,pos[0],pos[1]+0.88,pos[2]); s.rotation.y=i/4*Math.PI; g.add(s); }
+  for(const s of [-1,1]){ const p=cyl(0.12,0.12,0.30,M.brass,14); p.rotation.z=Math.PI/2; p.position.set(pos[0]+s*0.40,pos[1],pos[2]); g.add(p); }
+  return g;
+}
+(function(){
+  P('燃料主阀','启动时序的第一道闸：先开它让燃料充满冷却通道与回流管，确认流量建立后才允许点火，防止干烧烧穿室壁。',
+    valveGroup([-2.05,6.05,1.72],M.amber),[-3.4,1.4,3.0],{delay:0.30,labelOff:[0,1.1,0]});
+})();
+(function(){
+  P('氧化剂主阀','与燃料主阀按毫秒级时序配合，稍晚开启，保证燃烧室里先有燃料雾场再进氧化剂，点火平稳不产生压力峰。',
+    valveGroup([2.05,7.20,-1.62],M.teal),[2.8,2.2,-2.4],{delay:0.32,labelOff:[0,1.1,0]});
+})();
+(function(){
+  P('燃气发生器分流阀','从两路主管各掐出一小股推进剂送进燃气发生器；它决定涡轮功率，也就决定泵转速、室压与最终推力。',
+    valveGroup([2.72,7.62,-1.72],M.brass),[3.8,3.4,-2.2],{delay:0.34,labelOff:[0,1.1,0]});
+})();
+
+/* ═══════════════════════════════════════════════════
+   十一 · 缠绕管路（曲线同时驱动流动动画）
+   ═══════════════════════════════════════════════════ */
+const PATH={};
+function pipePart(key,name,desc,pts,r,mat,ex,delay){
+  const g=new THREE.Group();
+  const t=tube(pts,r,mat,96); g.add(t.mesh);
+  for(const pt of [pts[0],pts[pts.length-1]]){
+    const j=cyl(r*1.75,r*1.75,0.14,M.brass,14); j.position.set(pt[0],pt[1],pt[2]); g.add(j);
+  }
+  /* 沿管身的卡箍 */
+  const cv=t.curve;
+  for(let i=1;i<=4;i++){
+    const p=cv.getPoint(i/5), q=cv.getPoint(Math.min(1,i/5+0.01));
+    const dir=q.clone().sub(p).normalize();
+    const band=new THREE.Mesh(new THREE.TorusGeometry(r*1.22,0.022,6,14),M.light);
+    band.position.copy(p); band.lookAt(p.clone().add(dir)); band.userData.nopick=true; g.add(band);
+  }
+  const part=P(name,desc,g,ex,{delay,labelOff:[0,0.55,0]}).userData.part;
+  PATH[key]={curve:cv,part,mesh:t.mesh};
+  return PATH[key];
+}
+pipePart('fuelIn','燃料进液管','从贮箱引出的低温燃料，绕到机身后侧再进入燃料泵入口；整条管路做绝热，避免泵前汽化产生气蚀。',
+  [[-5.0,9.0,-0.6],[-4.6,8.2,-1.6],[-3.8,6.9,-2.3],[-2.4,5.8,-2.7],[-0.4,5.2,-2.8],[1.8,5.05,-2.5],[3.2,5.0,-1.5],[4.05,5.0,TZ]],0.095,M.pipeF,[-4.6,1.4,-2.6],0.42);
+pipePart('oxIn','氧化剂进液管','氧化剂由另一路贮箱下来，不经过冷却通道，直接被氧化剂泵吸入加压，路径短、压损小。',
+  [[5.0,9.0,-0.6],[4.8,8.2,-1.0],[5.3,7.2,-1.4],[5.8,6.2,-1.1],[5.42,5.35,TZ]],0.09,M.pipeO,[4.8,2.2,-1.8],0.40);
+pipePart('fuelOut','燃料泵出口管','泵后的高压冷燃料被送到喷注器端的冷却剂进口集液环，从这里开始沿室壁下行吸热。',
+  [[4.25,5.55,TZ],[3.7,6.15,-1.25],[2.5,6.72,-1.55],[1.25,6.62,-1.35],[0,6.20,-1.44]],0.085,M.pipeF,[3.4,2.4,-1.4],0.36);
+pipePart('oxOut','氧化剂主管','加压后的氧化剂越过推力室顶部，直接进喷注器上盖的氧化剂集液腔，全程不与燃料管路相通。',
+  [[5.42,5.55,TZ],[5.2,6.6,-1.5],[3.8,7.4,-1.72],[2.05,7.20,-1.62],[1.05,7.15,-0.9],[0,6.95,-0.8]],0.088,M.pipeO,[3.6,2.6,-2.0],0.38);
+pipePart('return','燃料回流立管','跑完整条冷却通道、已吸热的燃料沿喷管外侧一根立管重新上行，回到喷注器完成「先冷却、后燃烧」的闭环。',
+  [[0,Y_EXIT+0.28,R_EX+0.12],[-1.5,-2.95,3.12],[-2.55,-1.5,2.95],[-2.35,1.0,2.45],[-1.85,3.8,1.95],[-1.30,5.8,1.35],[0,6.78,0.92]],0.105,M.pipeH,[-4.0,-0.4,3.4],0.34);
+pipePart('ggF','燃气发生器燃料支管','从燃料主管分出一小股送进燃气发生器，流量由分流阀限定，只够驱动涡轮而不影响主推力。',
+  [[2.5,6.72,-1.55],[2.72,7.05,-1.68],[3.0,7.42,-1.38]],0.052,M.pipeF,[2.2,3.0,-1.6],0.44);
+pipePart('ggO','燃气发生器氧化剂支管','与主路的同一步序分出氧化剂，与燃料支管在发生器里以富燃比例混合，控制燃气温度保护涡轮叶片。',
+  [[2.05,7.20,-1.62],[2.55,7.55,-1.5],[3.0,7.42,-1.38]],0.052,M.pipeO,[2.8,3.2,-1.8],0.44);
+pipePart('hotGas','涡轮热气管','燃气发生器底部喷出的高压燃气沿短管直冲涡轮进口；管越短，压力与温度损失越小。',
+  [[3.0,6.75,-1.20],[3.05,6.20,-0.92],[3.12,5.66,-0.58],[3.15,5.35,TZ]],0.115,M.pipeH,[3.0,1.6,-1.2],0.40);
+pipePart('turbEx','涡轮排气管','做完功的燃气仍有余压，被引到喷管下游低压段排入主流，回收一点点推力，同时避开主燃烧室的高温区。',
+  [[3.15,4.45,TZ],[3.05,3.55,0.45],[2.45,2.15,1.60],[1.70,0.55,2.00],[1.00,-1.0,1.78]],0.10,M.pipeE,[3.6,-1.6,1.8],0.46);
+
+/* ═══════════════════════════════════════════════════
+   十二 · 粒子系统（液流 / 燃气 / 羽流）
+   ═══════════════════════════════════════════════════ */
+const VSH=`
+  attribute float aSize; attribute float aAlpha; attribute vec3 aColor;
+  uniform float uScale;
+  varying float vA; varying vec3 vC;
+  void main(){
+    vA=aAlpha; vC=aColor;
+    vec4 mv=modelViewMatrix*vec4(position,1.0);
+    gl_PointSize=clamp(aSize*uScale/max(0.001,-mv.z),1.0,54.0);
+    gl_Position=projectionMatrix*mv;
+  }`;
+const FSH=`
+  uniform float uSoft;
+  varying float vA; varying vec3 vC;
+  void main(){
+    float r=length(gl_PointCoord-0.5)*2.0;
+    float a=uSoft>0.5?pow(max(0.0,1.0-r),2.1):smoothstep(1.0,0.62,r);
+    gl_FragColor=vec4(vC,a*vA);
+    if(gl_FragColor.a<0.008) discard;
+  }`;
+function makePoints(n,soft,blending){
+  const pos=new Float32Array(n*3), col=new Float32Array(n*3), siz=new Float32Array(n), alp=new Float32Array(n);
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('aColor',new THREE.BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.BufferAttribute(siz,1));
+  g.setAttribute('aAlpha',new THREE.BufferAttribute(alp,1));
+  const m=new THREE.ShaderMaterial({
+    uniforms:{uScale:{value:innerHeight/(2*Math.tan(FOV*Math.PI/360))},uSoft:{value:soft?1:0}},
+    vertexShader:VSH,fragmentShader:FSH,transparent:true,depthWrite:false,blending
+  });
+  const pts=new THREE.Points(g,m); pts.frustumCulled=false; pts.renderOrder=soft?7:6; scene.add(pts);
+  return {
+    n,pos,col,siz,alp,g,m,pts,wi:0,
+    put(x,y,z,c,s,a){
+      if(this.wi>=this.n) return;
+      const k=this.wi*3, i=this.wi;
+      this.pos[k]=x; this.pos[k+1]=y; this.pos[k+2]=z;
+      this.col[k]=c[0]; this.col[k+1]=c[1]; this.col[k+2]=c[2];
+      this.siz[i]=s; this.alp[i]=a; this.wi++;
+    },
+    flush(){
+      this.alp.fill(0,this.wi);
+      this.g.attributes.position.needsUpdate=true;
+      this.g.attributes.aColor.needsUpdate=true;
+      this.g.attributes.aSize.needsUpdate=true;
+      this.g.attributes.aAlpha.needsUpdate=true;
+      this.wi=0;
+    }
+  };
+}
+const LIQ=makePoints(2600,false,THREE.NormalBlending);
+const GAS=makePoints(2600,true,THREE.AdditiveBlending);
+
+const C_COLD=[0.28,0.68,1.0], C_WARM=[1.0,0.55,0.20], C_OX=[0.36,0.94,0.78],
+      C_FIRE=[1.0,0.93,0.68], C_HOT=[1.0,0.42,0.12], C_GG=[1.0,0.34,0.16],
+      C_PLUME=[0.62,0.60,1.0], C_EXH=[0.72,0.80,0.92];
+const mixC=(a,b,t,o)=>{o[0]=a[0]+(b[0]-a[0])*t;o[1]=a[1]+(b[1]-a[1])*t;o[2]=a[2]+(b[2]-a[2])*t;return o;};
+const tmpV=new THREE.Vector3(), tmpOff=new THREE.Vector3(), tmpC=[0,0,0];
+
+/* 一整圈 1 秒：每段按起止时间接力 */
+const FLOWS=[];
+function flow(o){ FLOWS.push(Object.assign({start:0,dur:0.1,count:16,spacing:0.05,size:0.075,sys:LIQ,c2:null,part:null,jit:0},o)); }
+flow({curve:PATH.fuelIn.curve,part:PATH.fuelIn.part,start:0.00,dur:0.16,count:38,spacing:0.024,c1:C_COLD,size:0.080,jit:0.03});
+flow({curve:PATH.oxIn.curve,part:PATH.oxIn.part,start:0.00,dur:0.16,count:24,spacing:0.038,c1:C_OX,size:0.076,jit:0.03});
+flow({curve:PATH.fuelOut.curve,part:PATH.fuelOut.part,start:0.16,dur:0.12,count:22,spacing:0.042,c1:C_COLD,size:0.078,jit:0.025});
+flow({curve:PATH.oxOut.curve,part:PATH.oxOut.part,start:0.16,dur:0.22,count:28,spacing:0.034,c1:C_OX,size:0.076,jit:0.025});
+for(let k=0;k<channelCurves.length;k++){
+  flow({curve:channelCurves[k],start:0.28,dur:0.26,count:20,spacing:0.042,c1:C_COLD,c2:C_WARM,size:0.055,jit:0.012});
+}
+flow({curve:PATH.return.curve,part:PATH.return.part,start:0.54,dur:0.14,count:34,spacing:0.026,c1:C_WARM,size:0.080,jit:0.025});
+flow({curve:PATH.ggF.curve,part:PATH.ggF.part,start:0.16,dur:0.09,count:8,spacing:0.10,c1:C_COLD,size:0.055});
+flow({curve:PATH.ggO.curve,part:PATH.ggO.part,start:0.16,dur:0.09,count:8,spacing:0.10,c1:C_OX,size:0.055});
+flow({curve:PATH.hotGas.curve,part:PATH.hotGas.part,start:0.26,dur:0.12,count:16,spacing:0.055,c1:C_GG,size:0.090,sys:GAS,jit:0.05});
+flow({curve:PATH.turbEx.curve,part:PATH.turbEx.part,start:0.38,dur:0.18,count:20,spacing:0.045,c1:C_EXH,size:0.085,sys:GAS,jit:0.06});
+/* 喷注雾化：从若干同轴孔向下甩出短雾锥 */
+const SPRAYS=[];
+for(let i=0;i<INJ_RINGS.length;i+=Math.max(1,Math.floor(INJ_RINGS.length/70))){
+  const o=INJ_RINGS[i]; SPRAYS.push([Math.cos(o.a)*o.r,Y_INJ-0.06,Math.sin(o.a)*o.r]);
+}
+flow({sprays:SPRAYS,start:0.66,dur:0.09,count:1,spacing:1,size:0.055,c1:C_FIRE,c2:C_HOT,sys:GAS});
+/* 燃烧室 → 喉部 → 喷管出口 → 羽流 */
+const CORE_PATH=new THREE.CatmullRomCurve3([
+  new THREE.Vector3(0,6.05,0),new THREE.Vector3(0,4.9,0),new THREE.Vector3(0,3.7,0),
+  new THREE.Vector3(0,2.15,0),new THREE.Vector3(0,0.2,0),new THREE.Vector3(0,-2.0,0),
+  new THREE.Vector3(0,-3.45,0),new THREE.Vector3(0,-5.2,0),new THREE.Vector3(0,-7.0,0)
+]);
+flow({curve:CORE_PATH,start:0.70,dur:0.30,count:82,spacing:0.011,c1:C_FIRE,c2:C_PLUME,size:0.24,sys:GAS,jit:0.20});
+
+function renderFlows(c){
+  for(const f of FLOWS){
+    const t0=(c-f.start)/f.dur;
+    if(t0<0 || t0>1+f.count*f.spacing) continue;
+    const off=f.part?(tmpOff.copy(f.part.obj.position).sub(f.part.base)):null;
+    if(f.sprays){
+      for(let j=0;j<f.sprays.length;j++){
+        const t=t0-j*0.0012;
+        if(t<0||t>1) continue;
+        const p=f.sprays[j];
+        const col=f.c2?mixC(f.c1,f.c2,t,tmpC):f.c1;
+        f.sys.put(p[0]+(Math.random()-0.5)*0.05,p[1]-t*0.62,p[2]+(Math.random()-0.5)*0.05,col,f.size*(1+t*1.5),0.75*(1-t));
+      }
+      continue;
+    }
+    for(let j=0;j<f.count;j++){
+      const t=t0-j*f.spacing;
+      if(t<0||t>1) continue;
+      f.curve.getPoint(t,tmpV);
+      if(off) tmpV.add(off);
+      const jx=f.jit?(Math.random()-0.5)*f.jit:0,
+            jy=f.jit?(Math.random()-0.5)*f.jit:0,
+            jz=f.jit?(Math.random()-0.5)*f.jit:0;
+      const col=f.c2?mixC(f.c1,f.c2,t,tmpC):f.c1;
+      f.sys.put(tmpV.x+jx,tmpV.y+jy,tmpV.z+jz,col,f.size,0.92);
+    }
+  }
+}
+/* 燃烧室内翻腾的燃气 + 超音速羽流 + 激波菱 */
+const NP=820;
+const seeds=[];
+for(let i=0;i<NP;i++) seeds.push([Math.random(),Math.random(),Math.random(),Math.random()]);
+function renderCombustion(){
+  for(let i=0;i<NP;i++){
+    const s=seeds[i];
+    const u=(state.time*1.45+s[0])%1;
+    const y=6.10-13.3*u;
+    let rr,a,col,alpha,size;
+    if(y>=Y_EXIT){
+      const base=radiusAt(y);
+      rr=base*(0.10+0.78*s[1]);
+      a=s[2]*Math.PI*2+state.time*0.7*(0.3+s[3]);
+      if(y>Y_THROAT) col=mixC(C_FIRE,C_HOT,clamp01((6.1-y)/4.2),tmpC);
+      else col=mixC(C_HOT,C_GG,clamp01((Y_THROAT-y)/(Y_THROAT-Y_EXIT)),tmpC);
+      alpha=0.62+0.34*s[3]; size=0.24+0.26*s[1];
+    }else{
+      const d=Y_EXIT-y;
+      rr=Math.max(0.25,1.85-d*0.28)*(0.12+0.9*s[1]);
+      a=s[2]*Math.PI*2+state.time*0.35;
+      col=mixC(C_GG,C_PLUME,clamp01(d/4.2),tmpC);
+      alpha=(0.18+0.14*s[3])*(1-clamp01((d-2.3)/1.6)); size=0.22+0.28*s[1];
+    }
+    GAS.put(Math.cos(a)*rr,y,Math.sin(a)*rr,col,size,Math.max(0,alpha));
+  }
+}
+
+/* 腔内辉光体 + 超音速羽流体 + 激波菱（装饰，不参与拾取） */
+(function(){
+  const vol=revolve(PROF.map(p=>new THREE.Vector2(Math.max(0.03,p.x-0.03),p.y)),0,Math.PI*2,M.gasVol,64);
+  vol.renderOrder=4; vol.userData.nopick=true; root.add(vol); refs.gasVol=vol;
+  const coreProf=[];
+  for(let i=0;i<=40;i++){ const y=Y_THROAT+(Y_INJ-0.2-Y_THROAT)*i/40; coreProf.push(new THREE.Vector2(0.62*radiusAt(y),y)); }
+  const core=revolve(coreProf,0,Math.PI*2,M.fireVol,48); core.renderOrder=5; root.add(core); refs.fireVol=core;
+
+  /* 羽流外廓：由亮橙渐冷到紫蓝的两层半透明壳体，超音速膨胀才有连续形体 */
+  function plumeShell(scale,opacity){
+    const prof=[[1.86,Y_EXIT+0.04],[2.02,Y_EXIT-0.55],[1.96,Y_EXIT-1.30],[1.72,Y_EXIT-2.10],
+                [1.34,Y_EXIT-2.90],[0.86,Y_EXIT-3.65],[0.34,Y_EXIT-4.15]]
+      .map(q=>new THREE.Vector2(q[0]*scale,q[1]));
+    const mesh=revolve(prof,0,Math.PI*2,M.gasVol,64);
+    const cnt=mesh.geometry.attributes.position.count, col=new Float32Array(cnt*3);
+    for(let i=0;i<cnt;i++){
+      const t=clamp01((Y_EXIT-mesh.geometry.attributes.position.getY(i))/4.15);
+      /* 喷口附近白热偏橙，向下膨胀降温转紫蓝；加色混合下保持低亮度才不堆成白雾 */
+      col[i*3]=0.95-0.62*t; col[i*3+1]=0.52-0.26*t; col[i*3+2]=0.10+0.58*t;
+    }
+    mesh.geometry.setAttribute('color',new THREE.BufferAttribute(col,3));
+    mesh.material=new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity,
+      blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.FrontSide});
+    mesh.renderOrder=6; root.add(mesh); return mesh;
+  }
+  refs.plumeA=plumeShell(1.0,0.26);
+  refs.plumeB=plumeShell(0.62,0.30);
+
+  const shockG=new THREE.Group(); root.add(shockG); refs.shockGroup=shockG;
+  for(let i=0;i<4;i++){
+    const r=torus(1.28-i*0.10,0.058,M.shock.clone(),0,Y_EXIT-0.62-i*0.86,0);
+    r.rotation.x=Math.PI/2; shockG.add(r);
+  }
+})();
+
+/* ═══════════════════════════════════════════════════
+   十三 · 声音（程序合成，无音频文件）
+   ═══════════════════════════════════════════════════ */
+let AC=null, rumbleGain=null, master=null;
+function initAudio(){
+  if(AC){ if(AC.state==='suspended') AC.resume(); return; }
+  try{
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain(); master.gain.value=0; master.connect(AC.destination);
+    const len=AC.sampleRate*2, buf=AC.createBuffer(1,len,AC.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=AC.createBufferSource(); src.buffer=buf; src.loop=true;
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=210; lp.Q.value=0.8;
+    const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=680; bp.Q.value=0.5;
+    const lfo=AC.createOscillator(); lfo.frequency.value=6.2;
+    const lfoG=AC.createGain(); lfoG.gain.value=120; lfo.connect(lfoG); lfoG.connect(lp.frequency); lfo.start();
+    rumbleGain=AC.createGain(); rumbleGain.gain.value=0.7;
+    src.connect(lp); lp.connect(bp); bp.connect(rumbleGain); rumbleGain.connect(master); src.start();
+    const whine=AC.createOscillator(); whine.type='sawtooth'; whine.frequency.value=1780;
+    const wg=AC.createGain(); wg.gain.value=0.012; whine.connect(wg); wg.connect(master); whine.start();
+  }catch(e){ AC=null; }
+}
+function audioTick(){
+  if(!AC) return;
+  master.gain.setTargetAtTime(state.muted?0:(state.playing?0.22:0.05),AC.currentTime,0.12);
+}
+
+/* ═══════════════════════════════════════════════════
+   十四 · 状态与交互
+   ═══════════════════════════════════════════════════ */
+const state={playing:true,slow:false,cut:true,muted:true,
+  explode:0,explodeTarget:0,time:0,tween:null,appliedDolly:1,focus:0};
+const damp=(cur,tgt,k,dt)=>cur+(tgt-cur)*Math.min(1,dt*k);
+const INJ_FOCUS=new THREE.Vector3(0,Y_INJ-0.1,0);
+const STAGES=['燃料泵与氧化剂泵建立压差','冷燃料沿再生冷却通道下行','吸热燃料回流至喷注器','同轴孔雾化混合并点火','燃气在喉部达到音速','钟形喷管内膨胀到超音速'];
+const stageAt=c=>c<0.16?0:c<0.30?1:c<0.55?2:c<0.70?3:c<0.80?4:5;
+
+const ray=new THREE.Raycaster(), pointer=new THREE.Vector2(-10,-10);
+let hovered=null, pickList=pickables.slice();
+const emiCache=new Map();
+function highlight(p,on){
+  p.obj.traverse(o=>{
+    if(!o.isMesh||!o.material||!o.material.emissive) return;
+    const m=o.material;
+    if(on){
+      if(!emiCache.has(m)) emiCache.set(m,{c:m.emissive.getHex(),i:m.emissiveIntensity});
+      m.emissive.setHex(0x7a3f12); m.emissiveIntensity=0.85;
+    }else{
+      const s=emiCache.get(m); if(s){ m.emissive.setHex(s.c); m.emissiveIntensity=s.i; }
+    }
+  });
+}
+const hName=document.getElementById('hName'), hDesc=document.getElementById('hDesc');
+const DEF_DESC='把指针移到任意部件上，它会高亮，并说明自己在推进剂循环与推力生成中的作用。';
+function applyHover(p){
+  if(hovered===p) return;
+  if(hovered){ highlight(hovered,false); hovered.el.classList.remove('hot'); }
+  hovered=p;
+  if(p){ highlight(p,true); p.el.classList.add('hot'); hName.textContent=p.name; hDesc.textContent=p.desc; }
+  else { hName.textContent='整台液体火箭发动机'; hDesc.textContent=DEF_DESC; }
+}
+function onPointer(e){
+  const r=canvas.getBoundingClientRect();
+  pointer.x=((e.clientX-r.left)/r.width)*2-1;
+  pointer.y=-((e.clientY-r.top)/r.height)*2+1;
+}
+canvas.addEventListener('pointermove',onPointer);
+canvas.addEventListener('pointerdown',e=>{canvas.style.cursor='grabbing';onPointer(e);});
+canvas.addEventListener('pointerup',()=>{canvas.style.cursor='grab';});
+canvas.addEventListener('pointerleave',()=>{pointer.set(-10,-10);applyHover(null);});
+
+const btnFlow=document.getElementById('btnFlow'), btnSlow=document.getElementById('btnSlow'),
+      btnEx=document.getElementById('btnEx'), btnCut=document.getElementById('btnCut'),
+      btnInj=document.getElementById('btnInj'), btnSound=document.getElementById('btnSound'),
+      btnReset=document.getElementById('btnReset');
+function syncButtons(){
+  btnFlow.textContent=state.playing?'暂停流动':'继续流动';
+  btnFlow.classList.toggle('on',!state.playing);
+  btnSlow.classList.toggle('on',state.slow);
+  btnEx.classList.toggle('on',state.explodeTarget>0.5);
+  btnCut.textContent=state.cut?'合拢壁面':'剖开壁面';
+  btnCut.classList.toggle('on',state.cut);
+  btnSound.textContent=state.muted?'开启声音':'关闭声音';
+  btnSound.classList.toggle('on',!state.muted);
+}
+function tweenTo(pos,tgt){ state.tween={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos.clone(),t1:tgt.clone(),k:0}; }
+btnFlow.onclick=()=>{state.playing=!state.playing;syncButtons();};
+btnSlow.onclick=()=>{state.slow=!state.slow;syncButtons();};
+btnEx.onclick=()=>{state.explodeTarget=state.explodeTarget>0.5?0:1;syncButtons();};
+btnCut.onclick=()=>{state.cut=!state.cut;applyCut();syncButtons();};
+btnInj.onclick=()=>{
+  if(state.explodeTarget>0.5){ state.explodeTarget=0; syncButtons(); }
+  tweenTo(new THREE.Vector3(0.42,5.55,0.72),new THREE.Vector3(0,Y_INJ-0.14,0));
+};
+btnSound.onclick=()=>{initAudio();state.muted=!state.muted;syncButtons();};
+btnReset.onclick=()=>{state.explodeTarget=0;state.cut=true;applyCut();syncButtons();tweenTo(HOME,TGT_HOME);};
+window.addEventListener('keydown',e=>{
+  if(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  if(e.code==='Space'){e.preventDefault();btnFlow.click();}
+});
+function applyCut(){
+  if(refs.jacketFront) refs.jacketFront.visible=!state.cut;
+  cutFaceMeshes.forEach(m=>{ m.visible=state.cut; });
+  const gm=refs.linerGhost?refs.linerGhost.material:null;
+  const dm=refs.domeGhost?refs.domeGhost.material:null;
+  for(const m of [gm,dm]){
+    if(!m) continue;
+    m.opacity=state.cut?0.10:0.97;
+    m.depthWrite=!state.cut;
+    m.color.setHex(state.cut?0x7fa6bd:0x8d5336);
+  }
+}
+applyCut();
+
+/* 特写时的微观中文标注 */
+const MICRO=[
+  {text:'氧化剂环缝',p:new THREE.Vector3(0.075,Y_INJ-0.17,0)},
+  {text:'燃料中心孔',p:new THREE.Vector3(0,Y_INJ-0.26,0.045)},
+  {text:'同轴喷注单元',p:new THREE.Vector3(0,Y_INJ+0.02,0)},
+  {text:'雾化锥',p:new THREE.Vector3(0,Y_INJ-0.50,0)}
+];
+const microEl=document.getElementById('micro');
+MICRO.forEach(o=>{ const d=document.createElement('div'); d.className='mlbl'; d.textContent=o.text; microEl.appendChild(d); o.el=d; });
+
+/* ═══════════════════════════════════════════════════
+   十五 · 读数
+   ═══════════════════════════════════════════════════ */
+const roF=document.getElementById('roF'), roP=document.getElementById('roP'), roT=document.getElementById('roT'),
+      roM1=document.getElementById('roM1'), roM2=document.getElementById('roM2'), roC=document.getElementById('roC'),
+      roBar=document.getElementById('roBar'), roPhase=document.getElementById('roPhase'),
+      stageEls=[...document.getElementById('stages').children];
+function readouts(c){
+  const wob=Math.sin(state.time*9)*0.9;
+  roF.textContent=(845+wob).toFixed(0);
+  roP.textContent=(10.2+Math.sin(state.time*6)*0.06).toFixed(2)+' 兆帕';
+  roT.textContent=(3300+Math.round(Math.sin(state.time*4)*18))+' 开尔文';
+  roM1.textContent='1.00';
+  roM2.textContent=(4.60+Math.sin(state.time*5)*0.03).toFixed(2);
+  roC.textContent=(state.slow?'4.00':'1.00')+' 秒 / 圈';
+  roBar.style.width=(c*100).toFixed(1)+'%';
+  const s=stageAt(c);
+  roPhase.textContent=STAGES[s];
+  stageEls.forEach((el,i)=>el.classList.toggle('on',i===s));
+}
+
+/* ═══════════════════════════════════════════════════
+   十六 · 主循环
+   ═══════════════════════════════════════════════════ */
+const clock=new THREE.Clock();
+function tick(){
+  const dt=Math.min(clock.getDelta(),0.05);
+  const adv=state.playing?(state.slow?0.25:1):0;
+  state.time+=dt*adv;
+  const c=state.time%1;
+  const dInj=camera.position.distanceTo(INJ_FOCUS);
+  state.focus=damp(state.focus,1-smooth(clamp01((dInj-1.3)/2.6)),5,dt);
+
+  /* 涡轮与叶轮同轴旋转 */
+  if(refs.turbineRotor) refs.turbineRotor.rotation.x+=dt*adv*13;
+  if(refs.fuelImpeller) refs.fuelImpeller.rotation.x+=dt*adv*10;
+  if(refs.oxImpeller)  refs.oxImpeller.rotation.x+=dt*adv*10;
+  if(refs.shaftKey)    refs.shaftKey.rotation.x+=dt*adv*11;
+  /* 燃气脉动 */
+  const pulse=0.82+0.18*Math.sin(state.time*12);
+  chamberLight.intensity=(2.6+0.7*pulse)*(state.playing?1:0.55);
+  throatLight.intensity=2.0+0.6*pulse;
+  plumeLight.intensity=(1.5+0.5*pulse)*(state.playing?1:0.6);
+  ggLight.intensity=1.4+0.5*pulse;
+  M.gasVol.opacity=0.09+0.03*pulse;
+  M.fireVol.opacity=0.14+0.04*pulse;
+  M.spray.opacity=0.13+0.06*pulse;
+  /* 钻进喷注孔时收起腔内辉光体，避免加色层糊住同轴孔细节 */
+  const microK=1-clamp01((state.focus-0.30)/0.35);
+  if(refs.gasVol) refs.gasVol.visible=microK>0.06;
+  if(refs.fireVol) refs.fireVol.visible=microK>0.06;
+  if(refs.plumeA) refs.plumeA.material.opacity=(0.26+0.07*pulse)*microK;
+  if(refs.plumeB) refs.plumeB.material.opacity=(0.30+0.08*pulse)*microK;
+  if(refs.shockGroup){
+    refs.shockGroup.children.forEach((r,i)=>{
+      r.material.opacity=(0.07+0.09*Math.abs(Math.sin(state.time*7-i*0.8)))*microK*(state.playing?1:0.4);
+      const s=1+0.06*Math.sin(state.time*9-i);
+      r.scale.set(s,s,1);
+    });
+  }
+
+  /* 爆炸位移（分层错峰） */
+  state.explode=damp(state.explode,state.explodeTarget,4.0,dt);
+  const eGlobal=smooth(clamp01(state.explode));
+  parts.forEach(p=>{
+    p._ei=smooth(clamp01((eGlobal-p.delay)/Math.max(0.001,1-p.delay)));
+    p.obj.position.copy(p.base).addScaledVector(p.ex,p._ei);
+  });
+
+  /* 相机补间与爆炸自动拉远 */
+  const dollyTarget=1+eGlobal*0.76;
+  if(!state.tween&&Math.abs(dollyTarget-state.appliedDolly)>1e-5){
+    const off=camera.position.clone().sub(controls.target);
+    off.setLength(THREE.MathUtils.clamp(off.length()*(dollyTarget/state.appliedDolly),controls.minDistance,controls.maxDistance));
+    camera.position.copy(controls.target).add(off);
+    state.appliedDolly=dollyTarget;
+  }
+  if(state.tween){
+    const w=state.tween; w.k=Math.min(1,w.k+dt*1.5);
+    const s=smooth(w.k);
+    camera.position.lerpVectors(w.p0,w.p1,s);
+    controls.target.lerpVectors(w.t0,w.t1,s);
+    if(w.k>=1){ state.tween=null; state.appliedDolly=dollyTarget; }
+  }
+  controls.update();
+  camera.updateMatrixWorld(true);
+
+  /* 粒子 */
+  renderFlows(c);
+  renderCombustion();
+  LIQ.flush(); GAS.flush();
+  audioTick();
+
+  /* 拾取 */
+  ray.setFromCamera(pointer,camera);
+  const hits=ray.intersectObjects(pickList,false);
+  applyHover(hits.length?hits[0].object.userData.part:null);
+
+  /* 爆炸标签：屏幕空间贪心避让 */
+  if(eGlobal>0.015){
+    const w=innerWidth,h=innerHeight,items=[],placed=[];
+    parts.forEach(p=>{
+      tmpV.copy(p.base).addScaledVector(p.ex,p._ei).add(p.labelOff).project(camera);
+      const x=(tmpV.x*0.5+0.5)*w, y=(-tmpV.y*0.5+0.5)*h;
+      const outside=tmpV.z>1||x<-90||x>w+90||y<-40||y>h+40;
+      items.push({el:p.el,x,y,outside});
+    });
+    items.sort((a,b)=>a.y-b.y);
+    items.forEach(it=>{
+      if(it.outside){ it.el.style.opacity='0'; return; }
+      let y=it.y;
+      for(let pass=0;pass<5;pass++){
+        for(const q of placed){ if(Math.abs(q.x-it.x)<164&&Math.abs(q.y-y)<25) y=q.y+25; }
+      }
+      placed.push({x:it.x,y});
+      it.el.style.opacity=String(Math.min(1,(eGlobal-0.015)*5));
+      it.el.style.transform='translate(-50%,-50%) translate('+it.x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+    });
+  }else{
+    for(const p of parts) if(p.el.style.opacity!=='0') p.el.style.opacity='0';
+  }
+
+  /* 钻进单个喷注孔时的微观标注 */
+  const mOn=state.focus>0.35&&eGlobal<0.08&&!state.tween;
+  MICRO.forEach(o=>{
+    if(!mOn){ if(o.el.style.opacity!=='0') o.el.style.opacity='0'; return; }
+    tmpV.copy(o.p).project(camera);
+    const x=(tmpV.x*0.5+0.5)*innerWidth, y=(-tmpV.y*0.5+0.5)*innerHeight;
+    const vis=tmpV.z<1&&x>0&&x<innerWidth&&y>0&&y<innerHeight;
+    o.el.style.opacity=vis?String(clamp01((state.focus-0.35)*3)):'0';
+    o.el.style.transform='translate(-50%,-50%) translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px)';
+  });
+
+  readouts(c);
+  renderer.render(scene,camera);
+}
+
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  const sc=innerHeight/(2*Math.tan(FOV*Math.PI/360));
+  LIQ.m.uniforms.uScale.value=sc; GAS.m.uniforms.uScale.value=sc;
+});
+
+syncButtons();
+document.getElementById('loading').classList.add('hide');
+window.__ready=true;
+renderer.setAnimationLoop(tick);
+}
+</script>
+</body>
+</html>
